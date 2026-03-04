@@ -7,6 +7,9 @@ on:
 
 jobs:
   deploy:
+    concurrency:
+      group: pages-prod-main
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read
