@@ -254,10 +254,25 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   z-index: 1000;
   direction: ltr;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 6px;
 }
 #timeline-bar.open { display: flex; }
+#timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  direction: rtl;
+  width: 100%;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #ddd;
+}
+#timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
 #timeline-play {
   background: none;
   border: none;
@@ -281,32 +296,23 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   text-align: center;
   flex-shrink: 0;
 }
-#timeline-label.live-label { color: #00cc00; }
+#timeline-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: #333;
+}
 #timeline-close {
   background: none;
   border: none;
-  font-size: 16px;
+  font-size: 12px;
   cursor: pointer;
-  padding: 0 2px;
+  padding: 2px 6px;
   line-height: 1;
   flex-shrink: 0;
   color: #888;
+  direction: rtl;
 }
 #timeline-close:hover { color: #333; }
-#timeline-live-btn {
-  background: #00cc00;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  padding: 3px 8px;
-  flex-shrink: 0;
-  line-height: 1;
-}
-#timeline-live-btn:hover { background: #00aa00; }
-#timeline-live-btn.hidden { display: none; }
 
 @media (max-width: 480px) {
   #legend {
@@ -416,11 +422,15 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 <button id="test-all-clear-btn" title="בדיקת צליל רגיעה">✅</button>
 
 <div id="timeline-bar">
-  <button id="timeline-close" title="סגור ציר זמן">&#10005;</button>
-  <button id="timeline-play" title="נגן ציר זמן">&#9654;</button>
-  <input type="range" id="timeline-slider" min="0" max="1000" value="1000" step="1">
-  <span id="timeline-label">LIVE</span>
-  <button id="timeline-live-btn" title="חזור לשידור חי">LIVE</button>
+  <div id="timeline-header">
+    <span id="timeline-title">צפיה בהתראות קודמות</span>
+    <button id="timeline-close" title="סגור וחזרה לשידור חי">&#10005; חזרה לעכשיו</button>
+  </div>
+  <div id="timeline-controls">
+    <button id="timeline-play" title="נגן ציר זמן">&#9654;</button>
+    <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+    <span id="timeline-label"></span>
+  </div>
 </div>
 
 <script>
@@ -961,7 +971,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       extendedRids.add(key);
       extendedHistory.push({ location: location, title: title, alertDate: since, state: state });
       if (!timelineMin || since < timelineMin) timelineMin = since;
-      if (since > timelineMax) timelineMax = since;
+      timelineMax = Math.max(timelineMax, since, Date.now());
     }
 
     if (isLiveMode) {
@@ -1151,7 +1161,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
         if (extendedHistory.length > 0) {
           timelineMin = extendedHistory[0].alertDate;
-          timelineMax = extendedHistory[extendedHistory.length - 1].alertDate;
+          timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
         }
         console.log('Extended history:', extendedHistory.length, 'entries');
         if (onDone) onDone();
@@ -1174,7 +1184,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     locationStates = {};
 
     // Replay history up to targetTime
-    var accumulated = {}; // {location: {state, title}}
+    var accumulated = {}; // {location: {state, since}}
     var PRIORITY = { red: 3, orange: 2, yellow: 1, green: 0 };
     for (var i = 0; i < extendedHistory.length; i++) {
       var e = extendedHistory[i];
@@ -1182,30 +1192,43 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       var existing = accumulated[e.location];
       if (existing) {
         if (e.state === 'green') {
-          accumulated[e.location] = { state: 'green' };
+          accumulated[e.location] = { state: 'green', since: e.alertDate };
         } else if ((PRIORITY[e.state] || 0) >= (PRIORITY[existing.state] || 0)) {
-          accumulated[e.location] = { state: e.state };
+          accumulated[e.location] = { state: e.state, since: e.alertDate };
         }
       } else {
-        accumulated[e.location] = { state: e.state };
+        accumulated[e.location] = { state: e.state, since: e.alertDate };
       }
     }
 
     // Apply accumulated state
     for (var loc in accumulated) {
       var s = accumulated[loc].state;
+      var sinceTime = accumulated[loc].since;
       var idx = cityIndex[loc];
       var polygon = idx != null ? cityPolygons[idx] : null;
       if (!polygon) continue;
-      var opacity = 0.5;
-      polygon.setStyle({
-        color: COLORS[s],
-        fillColor: COLORS[s],
-        fillOpacity: opacity,
-        opacity: opacity + 0.2,
-        weight: 1
-      });
-      locationStates[loc] = { state: s, since: Date.now(), marker: polygon };
+      if (s === 'green') {
+        var elapsed = targetTime - sinceTime;
+        if (elapsed >= GREEN_FADE_MS) continue; // already faded
+        var opacity = 0.6 * (1 - elapsed / GREEN_FADE_MS);
+        polygon.setStyle({
+          color: COLORS.green,
+          fillColor: COLORS.green,
+          fillOpacity: opacity,
+          opacity: opacity + 0.2,
+          weight: 1
+        });
+      } else {
+        polygon.setStyle({
+          color: COLORS[s],
+          fillColor: COLORS[s],
+          fillOpacity: 0.5,
+          opacity: 0.7,
+          weight: 1
+        });
+      }
+      locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
     }
   }
 
@@ -1260,39 +1283,41 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     var playBtn = document.getElementById('timeline-play');
     var toggleBtn = document.getElementById('timeline-btn');
     var closeBtn = document.getElementById('timeline-close');
-    var liveBtn = document.getElementById('timeline-live-btn');
 
     if (extendedHistory.length === 0) return; // keep hidden
 
     // Show the toggle button, bar stays hidden until user clicks
     toggleBtn.classList.add('has-data');
-    label.classList.add('live-label');
-    liveBtn.classList.add('hidden');
 
-    toggleBtn.addEventListener('click', function() {
-      var isOpen = bar.classList.toggle('open');
-      toggleBtn.classList.toggle('active', isOpen);
-      if (!isOpen) enterLiveMode();
-    });
+    function openTimeline() {
+      bar.classList.add('open');
+      toggleBtn.classList.add('active');
+      slider.value = 999;
+      enterHistoryMode(timelineMax);
+    }
 
     function closeTimeline() {
       bar.classList.remove('open');
       toggleBtn.classList.remove('active');
+      stopPlay();
       enterLiveMode();
     }
 
-    closeBtn.addEventListener('click', closeTimeline);
-
-    liveBtn.addEventListener('click', function() {
-      enterLiveMode();
+    toggleBtn.addEventListener('click', function() {
+      if (bar.classList.contains('open')) {
+        closeTimeline();
+      } else {
+        openTimeline();
+      }
     });
+
+    closeBtn.addEventListener('click', closeTimeline);
 
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && bar.classList.contains('open')) closeTimeline();
     });
 
     function timeFromSlider(val) {
-      if (val >= 1000) return null; // live
       return timelineMin + (val / 999) * (timelineMax - timelineMin);
     }
 
@@ -1307,11 +1332,6 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     function enterLiveMode() {
       isLiveMode = true;
       currentViewTime = 0;
-      slider.value = 1000;
-      label.textContent = 'LIVE';
-      label.classList.add('live-label');
-      liveBtn.classList.add('hidden');
-      stopPlay();
       restoreLiveState();
       updateLiveStatus();
     }
@@ -1323,19 +1343,13 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       }
       currentViewTime = time;
       label.textContent = 'בשעה: ' + formatTime(time);
-      label.classList.remove('live-label');
-      liveBtn.classList.remove('hidden');
       reconstructStateAt(time);
     }
 
     slider.addEventListener('input', function() {
       var val = parseInt(slider.value);
-      if (val >= 1000) {
-        enterLiveMode();
-      } else {
-        var time = timeFromSlider(val);
-        enterHistoryMode(time);
-      }
+      var time = timeFromSlider(val);
+      enterHistoryMode(time);
     });
 
     // Play/pause
@@ -1352,11 +1366,10 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       isPlaying = true;
       playBtn.innerHTML = '&#9646;&#9646;';
       var lastFrame = performance.now();
-      // If at live (rightmost), start from beginning
-      if (parseInt(slider.value) >= 1000) {
+      // If at the end, start from beginning
+      if (parseInt(slider.value) >= 999) {
         slider.value = 0;
-        var time = timeFromSlider(0);
-        enterHistoryMode(time);
+        enterHistoryMode(timelineMin);
       }
 
       function tick(now) {
@@ -1368,13 +1381,16 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         var currentTime = timeFromSlider(currentVal);
         var newTime = currentTime + dt * 600;
         if (newTime >= timelineMax) {
-          enterLiveMode();
+          // Loop back to beginning
+          slider.value = 0;
+          enterHistoryMode(timelineMin);
+          lastFrame = now;
+          playRAF = requestAnimationFrame(tick);
           return;
         }
         var newVal = Math.round(((newTime - timelineMin) / (timelineMax - timelineMin)) * 999);
         slider.value = Math.min(newVal, 999);
         label.textContent = 'בשעה: ' + formatTime(newTime);
-        label.classList.remove('live-label');
         currentViewTime = newTime;
         reconstructStateAt(newTime);
         playRAF = requestAnimationFrame(tick);
