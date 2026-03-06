@@ -387,6 +387,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 <div id="status">
   <span class="indicator indicator-ok" id="statusDot"></span>
   <span id="statusText">מתחבר...</span>
+  <div id="historyTimeLabel" style="display:none; font-size:11px; color:#555; margin-top:5px; padding-top:5px; border-top:1px solid #ddd;"></div>
 </div>
 <div id="errorDetail"></div>
 
@@ -1344,6 +1345,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     function enterLiveMode() {
       isLiveMode = true;
       currentViewTime = 0;
+      document.getElementById('historyTimeLabel').style.display = 'none';
       restoreLiveState();
       updateLiveStatus();
     }
@@ -1354,7 +1356,10 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         isLiveMode = false;
       }
       currentViewTime = time;
-      label.textContent = 'בשעה: ' + formatTime(time);
+      var timeStr = formatTime(time);
+      label.textContent = 'בשעה: ' + timeStr;
+      document.getElementById('historyTimeLabel').style.display = 'block';
+      document.getElementById('historyTimeLabel').textContent = 'מראה התראות משעה ' + timeStr;
       reconstructStateAt(time);
     }
 
@@ -1400,7 +1405,9 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         }
         var newVal = Math.round(((newTime - timelineMin) / (timelineMax - timelineMin)) * 999);
         slider.value = Math.min(newVal, 999);
-        label.textContent = 'בשעה: ' + formatTime(newTime);
+        var timeStr = formatTime(newTime);
+        label.textContent = 'בשעה: ' + timeStr;
+        document.getElementById('historyTimeLabel').textContent = 'מראה התראות משעה ' + timeStr;
         currentViewTime = newTime;
         reconstructStateAt(newTime);
         playRAF = requestAnimationFrame(tick);
