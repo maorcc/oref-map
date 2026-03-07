@@ -25,3 +25,4 @@ wheels/
 
 # Secrets
 .env
+/GEMINI.md
