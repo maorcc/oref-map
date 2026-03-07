@@ -478,6 +478,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   var liveErrors = 0;
   var historyErrors = 0;
   var lastErrorMsg = '';
+  var lastCfColo = '';
   var lastDangerTime = 0;
   var initialized = false;
   var soundMuted = true;
@@ -1156,6 +1157,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   function fetchLiveAlerts() {
     fetch(PROXY_BASE + '/api/alerts')
       .then(function(resp) {
+        lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.text();
       })
@@ -1181,6 +1183,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   function fetchHistory(onDone) {
     fetch(PROXY_BASE + '/api/history')
       .then(function(resp) {
+        lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.text();
       })
@@ -1569,7 +1572,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     if (detail.style.display === 'block') {
       detail.style.display = 'none';
     } else {
-      detail.textContent = lastErrorMsg || 'Unknown error';
+      detail.textContent = (lastErrorMsg || 'Unknown error') + (lastCfColo ? ' (CF edge: ' + lastCfColo + ')' : '');
       detail.style.display = 'block';
     }
   });
