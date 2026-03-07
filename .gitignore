@@ -7,10 +7,6 @@ node_modules/
 .wrangler/
 
 
-.DS_Store
-.claude/
-.jbeval/
-
 # Python-generated files
 __pycache__/
 *.py[oc]
@@ -25,4 +21,10 @@ wheels/
 
 # Secrets
 .env
+
+.DS_Store
+.claude/
+.jbeval/
 /GEMINI.md
+/screenshot.png
+/snapshot.txt
