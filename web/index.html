@@ -1842,7 +1842,10 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeAbout();
-      closeSoundPanel();
+      if (soundBtn.classList.contains('open')) {
+        closeSoundPanel();
+        popPanelHistory();
+      }
       map.closePopup();
       document.getElementById('errorDetail').style.display = 'none';
     }
