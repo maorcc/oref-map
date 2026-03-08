@@ -427,8 +427,8 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
 <div id="legend">
   <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
-  <div class="row"><div class="dot dot-purple"></div><span>חדירת כלי טיס עוין</span></div>
-  <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת על טילים</span></div>
+  <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
+  <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
   <div class="row"><div class="dot dot-green"></div><span>אירוע שהסתיים</span></div>
 </div>
 
@@ -545,6 +545,21 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
   var closeTimelinePanel = function() {}; // set by initTimeline
+
+  // --- Panel history (mobile back button closes panels) ---
+  var panelHistoryPushed = false;
+  function pushPanelHistory() {
+    if (!panelHistoryPushed) {
+      history.pushState({ panel: true }, '');
+      panelHistoryPushed = true;
+    }
+  }
+  function popPanelHistory() {
+    if (panelHistoryPushed) {
+      panelHistoryPushed = false;
+      history.back();
+    }
+  }
 
   // --- Voronoi state ---
   var cityNames = [];       // cityNames[i] = location name
@@ -1462,6 +1477,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     function openTimeline() {
       closeSoundPanel();
       container.classList.add('open');
+      pushPanelHistory();
       timelineMax = Math.max(timelineMax, Date.now());
       slider.value = 999;
       renderTicks();
@@ -1479,13 +1495,17 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     btnRow.addEventListener('click', function(e) {
       if (isOpen()) {
         closeTimeline();
+        popPanelHistory();
       } else {
         openTimeline();
       }
     });
 
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && isOpen()) closeTimeline();
+      if (e.key === 'Escape' && isOpen()) {
+        closeTimeline();
+        popPanelHistory();
+      }
     });
 
     // --- Helpers ---
@@ -1848,6 +1868,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   function openSoundPanel() {
     closeTimelinePanel();
     soundBtn.classList.add('open');
+    pushPanelHistory();
     soundSearch.value = '';
     soundResults.innerHTML = '';
     soundSearch.focus();
@@ -1867,11 +1888,13 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     } catch(e) {}
     getAudioContext();
     closeSoundPanel();
+    popPanelHistory();
   }
 
   soundBtnRow.addEventListener('click', function() {
     if (isSoundOpen()) {
       closeSoundPanel();
+      popPanelHistory();
     } else if (soundMuted) {
       openSoundPanel();
     } else {
@@ -1914,15 +1937,26 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     }
   });
 
+  // --- Mobile back button closes panels ---
+  window.addEventListener('popstate', function() {
+    panelHistoryPushed = false;
+    closeSoundPanel();
+    closeTimelinePanel();
+  });
+
   // --- Click outside to close panels ---
   document.addEventListener('click', function(e) {
+    var closed = false;
     if (soundBtn.classList.contains('open') && !soundBtn.contains(e.target)) {
       closeSoundPanel();
+      closed = true;
     }
     var tlBtn = document.getElementById('timeline-btn');
     if (tlBtn && tlBtn.classList.contains('open') && !tlBtn.contains(e.target)) {
       closeTimelinePanel();
+      closed = true;
     }
+    if (closed) popPanelHistory();
   });
 
   // --- Mobile resume: reload if data is stale ---

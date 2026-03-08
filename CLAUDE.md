@@ -4,24 +4,24 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project
 
-`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping, deployed on Cloudflare Pages.
+`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy is a Cloudflare Worker with placement pinned to Israel.
 
 **Public URL**: https://oref-map.org
 
 ## Commands
 
 ```bash
-./web-dev        # start dev server at http://localhost:8787 (wrangler pages dev)
-./deploy         # deploy to Cloudflare Pages
+./web-dev                          # start dev server at http://localhost:8787 (wrangler pages dev)
+./deploy                           # deploy static assets to Cloudflare Pages
+cd worker && npx wrangler deploy   # deploy API proxy Worker
 ```
 
 ## Structure
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
-- `functions/api/alerts.js` — Cloudflare Worker: proxies live alerts API
-- `functions/api/history.js` — Cloudflare Worker: proxies history API
-- `functions/api/alarms-history.js` — Cloudflare Worker: proxies extended history API
+- `worker/src/index.js` — Cloudflare Worker: proxies all Oref APIs (placement: `azure:israelcentral`)
+- `worker/wrangler.toml` — Worker configuration with placement and route
 - `docs/map-requirements.md` — Feature requirements doc
 
 ## Oref API details

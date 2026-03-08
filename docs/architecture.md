@@ -2,13 +2,13 @@
 
 ## Overview
 
-A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Deployed on Cloudflare Pages with Functions for API proxying.
+A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy runs as a separate Cloudflare Worker with placement pinned to Israel.
 
 ## Stack
 
 - **Map**: Leaflet.js (v1.9.4) + OpenStreetMap tiles
 - **Voronoi**: d3-delaunay (v6) for polygon computation, polygon-clipping (v0.15) for clipping to Israel border
-- **API proxy**: Cloudflare Pages Functions (`functions/api/`)
+- **API proxy**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"`
 - **No frameworks**: Vanilla JS, CSS
 
 ## Data Sources
@@ -41,16 +41,31 @@ The live API is a snapshot — all-clear alerts may only last a few seconds and 
 
 ### CORS
 
-The Oref APIs don't include `Access-Control-Allow-Origin`. Cloudflare Pages Functions add the required headers and forward requests server-side.
+The Oref APIs don't include `Access-Control-Allow-Origin`. The Worker proxy runs on the same domain (`oref-map.org/api/*` via Workers route), so no CORS headers are needed.
 
 ### Geo-blocking / Israeli IP requirement
 
-The Oref APIs (particularly `alerts-history.oref.org.il`) geo-block non-Israeli IPs. This was confirmed while building the `oref-logger` project: a Cloudflare Worker cron running from Zurich (`colo=ZRH`) got HTTP 403, while the same code triggered from Israel (`colo=TLV`) succeeded.
+The Oref APIs geo-block non-Israeli IPs. This was confirmed while building the `oref-logger` project: a Cloudflare Worker cron running from Zurich (`colo=ZRH`) got HTTP 403, while the same code triggered from Israel (`colo=TLV`) succeeded.
 
-This has implications for oref-map:
-- **Cloudflare Pages Functions work** because Israeli users' requests route to Cloudflare's TLV edge, and the proxy egresses from an Israeli IP.
-- **Users whose traffic routes through a non-Israeli Cloudflare edge** (e.g., certain ISPs, VPNs, or CDN misrouting) may get 403 errors from the Oref API through our proxy. At least one user on an Israeli ISP has reported access issues — this geo-routing may be the cause.
-- **The proxy does not control this** — Cloudflare decides which edge to use based on the user's network path.
+Previously, Pages Functions ran at the user's nearest Cloudflare edge. Users routed through non-Israeli edges (e.g., `FRA`, `ZRH`) got 403 errors because the proxy egressed from a non-Israeli IP.
+
+**Solution**: The API proxy now runs as a standalone Worker with explicit placement (`region = "azure:israelcentral"`). This forces the Worker to execute at Cloudflare's TLV data center regardless of where the user's request arrives. The `cf-placement` response header confirms the execution location (e.g., `remote-TLV`).
+
+#### Placement investigation notes
+
+Several placement strategies were tested before finding a working solution:
+
+| Strategy | Result |
+|----------|--------|
+| Smart Placement (Pages) | Unreliable — sometimes ran locally at non-Israeli colos |
+| `hostname = "www.oref.org.il"` | Placed Worker in Seattle (SEA) — Oref uses Akamai CDN with anycast IPs, so the probe found a non-Israeli edge |
+| `region = "aws:il-central-1"` | Placed Worker at ZDM, not TLV — still got 403 |
+| `host = "<Israeli IP>:443"` | Worked from Israel but not consistently from other locations |
+| `region = "azure:israelcentral"` | Reliably places Worker at TLV — confirmed working from FRA, TLV, and other colos |
+
+### Edge caching
+
+The Worker uses the Cloudflare Cache API (`caches.default`) with `s-maxage=1` to cache Oref responses at each edge for 1 second. This reduces redundant fetches when many clients poll simultaneously. The browser cache uses `max-age=2` (matching the previous behavior).
 
 ## Alert Classification
 
@@ -111,9 +126,12 @@ All overlays use `position: fixed`, `z-index: 1000`, semi-transparent white back
 
 Web Audio API oscillator-based sounds (no external files). Muted by default. Two distinct tones: one for danger alerts (red/purple), one for all-clears (green). Sounds only play after initialization (initial history reconstruction) is complete.
 
-## Development
+## Deployment
 
 ```sh
-./web-dev   # npx wrangler pages dev web/ — serves web/ + runs functions/ locally
-./deploy    # npx wrangler pages deploy web/ --project-name oref-map
+./web-dev                    # npx wrangler pages dev web/ — serves static files locally
+./deploy                     # npx wrangler pages deploy web/ — deploy static assets
+cd worker && npx wrangler deploy  # deploy API proxy Worker
 ```
+
+The Pages project serves static assets. The Worker handles `/api/*` via a Workers route on `oref-map.org`. The `oref-map.pages.dev` → `oref-map.org` redirect is configured as a Cloudflare Redirect Rule (dashboard).

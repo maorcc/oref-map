@@ -1,0 +1,11 @@
+name = "oref-proxy"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[[routes]]
+pattern = "oref-map.org/api/*"
+zone_name = "oref-map.org"
+
+[placement]
+region = "azure:israelcentral"
