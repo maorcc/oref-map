@@ -246,7 +246,13 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   cursor: pointer;
 }
 #timeline-btn.open #timeline-btn-row {
-  border-top: 1px solid #ddd;
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  height: auto;
+  padding: 4px 0;
+  border: none;
+  z-index: 1;
 }
 .btn-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
 .btn-text { font-size: 13px; font-weight: 500; white-space: nowrap; }
@@ -293,24 +299,26 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
 #timeline-controls {
   display: none;
-  padding: 8px 12px;
-  gap: 8px;
+  padding: 10px 12px;
+  gap: 4px;
   flex-direction: column;
 }
 #timeline-btn.open #timeline-controls { display: flex; }
 #timeline-transport {
   display: flex;
   justify-content: center;
-  gap: 2px;
-  order: 2;
+  align-items: center;
+  gap: 6px;
+  order: 1;
+  position: relative;
 }
 #timeline-transport button {
   background: none;
   border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 13px;
+  border-radius: 6px;
+  font-size: 18px;
   cursor: pointer;
-  padding: 3px 8px;
+  padding: 4px 12px;
   line-height: 1;
   color: #333;
   user-select: none;
@@ -343,12 +351,12 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   cursor: pointer;
 }
 #timeline-label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: bold;
   white-space: nowrap;
-  text-align: center;
-  flex-shrink: 0;
-  order: 1;
+  font-variant-numeric: tabular-nums;
+  position: absolute;
+  left: 0;
 }
 
 @media (max-width: 480px) {
@@ -398,7 +406,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     padding: 0 10px;
     gap: 5px;
   }
-  #timeline-transport button { font-size: 11px; padding: 3px 6px; }
+  #timeline-transport button { font-size: 16px; padding: 4px 10px; }
   .btn-icon { font-size: 16px; }
   .btn-text { font-size: 12px; }
   #test-danger-btn {
@@ -429,7 +437,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
   <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
   <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
-  <div class="row"><div class="dot dot-green"></div><span>אירוע שהסתיים</span></div>
+  <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
 </div>
 
 <div id="status">
@@ -453,7 +461,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
 
 <div id="tap-hint" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; z-index:1001; direction:rtl; text-align:center; animation:tapHintFade 5s forwards; pointer-events:none;">
-  לחצו על המפה לצפייה בהיסטוריית התראות
+  לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
 <div id="sound-btn" title="השמעת צלילים">
@@ -461,7 +469,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
   </div>
   <div id="sound-panel">
-    <p style="margin:0 0 8px; font-weight:bold; direction:rtl;">בחר מיקום לקבלת התרעות קוליות:</p>
+    <p style="margin:0 0 8px; font-weight:bold; direction:rtl;">בחר מיקום לקבלת התראות קוליות:</p>
     <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
            style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
     <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
@@ -472,21 +480,19 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 </div>
 <div id="timeline-btn" title="ציר זמן">
   <div id="timeline-btn-row">
-    <span class="btn-icon">🕓</span><span class="btn-text">התראות קודמות</span>
+    <span class="btn-icon">🕓</span><span class="btn-text">התרעות קודמות</span>
   </div>
   <div id="timeline-controls">
-    <div id="timeline-transport">
-      <button id="tl-prev" title="אירוע קודם">⏮</button>
-      <button id="tl-rw" title="5 דקות אחורה / החזק להרצה">⏪</button>
-      <button id="tl-play" title="נגן/עצור">▶</button>
-      <button id="tl-ff" title="5 דקות קדימה / החזק להרצה">⏩</button>
-      <button id="tl-next" title="אירוע הבא">⏭</button>
-    </div>
     <div id="timeline-slider-wrap">
       <div id="timeline-ticks"></div>
       <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
     </div>
-    <span id="timeline-label"></span>
+    <div id="timeline-transport">
+      <span id="timeline-label"></span>
+      <button id="tl-prev" title="אירוע קודם">⏮</button>
+      <button id="tl-play" title="נגן/עצור">▶</button>
+      <button id="tl-next" title="אירוע הבא">⏭</button>
+    </div>
   </div>
 </div>
 <button id="test-danger-btn" title="בדיקת צליל סכנה">🚨</button>
@@ -817,7 +823,11 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       }).addTo(map);
       polygon.bindTooltip(cityNames[i], { direction: 'top', offset: [0, -20] });
       (function(name, poly) {
-        poly.on('click', function() { showPopup(name, poly); });
+        poly.on('click', function() {
+          var tlBtn = document.getElementById('timeline-btn');
+          if (tlBtn && tlBtn.classList.contains('open')) return;
+          showPopup(name, poly);
+        });
       })(cityNames[i], polygon);
       cityPolygons.push(polygon);
     }
@@ -1290,7 +1300,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         historyErrors++;
         lastErrorMsg = 'Alert history: ' + err.message;
         if (historyErrors > 3) {
-          setStatus(false, 'תקלה בטעינת התראות קודמות. מנסה שוב...');
+          setStatus(false, 'תקלה בטעינת התרעות קודמות. מנסה שוב...');
         }
         console.error('History fetch error:', err);
         if (onDone) onDone();
@@ -1456,8 +1466,6 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
     var prevBtn = document.getElementById('tl-prev');
     var nextBtn = document.getElementById('tl-next');
-    var rwBtn = document.getElementById('tl-rw');
-    var ffBtn = document.getElementById('tl-ff');
     var ticksEl = document.getElementById('timeline-ticks');
 
     if (extendedHistory.length === 0) return;
@@ -1466,9 +1474,6 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
     var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
     var PLAY_SPEED = 600;
-    var SCRUB_SPEED = 2000;
-    var HOLD_THRESHOLD = 300;
-    var JUMP_MS = 5 * 60 * 1000; // 5 minutes
 
 
     // --- Open / Close ---
@@ -1487,7 +1492,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     function closeTimeline() {
       container.classList.remove('open');
       stopPlay();
-      stopScrub();
+
       enterLiveMode();
     }
     closeTimelinePanel = closeTimeline;
@@ -1546,7 +1551,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       var timeStr = formatTime(time);
       label.textContent = timeStr;
       document.getElementById('historyTimeLabel').style.display = 'block';
-      document.getElementById('historyTimeLabel').textContent = 'מראה התראות משעה ' + timeStr;
+      document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
       reconstructStateAt(time);
     }
 
@@ -1637,7 +1642,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     }
 
     function startPlay() {
-      stopScrub();
+
       isPlaying = true;
       playBtn.textContent = '⏸';
       var lastFrame = performance.now();
@@ -1661,7 +1666,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         currentViewTime = newTime;
         var timeStr = formatTime(newTime);
         label.textContent = timeStr;
-        document.getElementById('historyTimeLabel').textContent = 'מראה התראות משעה ' + timeStr;
+        document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
         reconstructStateAt(newTime);
         playRAF = requestAnimationFrame(tick);
       }
@@ -1674,7 +1679,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
     // --- Prev / Next band center ---
     prevBtn.addEventListener('click', function() {
-      stopPlay(); stopScrub();
+      stopPlay();
       for (var i = computedBands.length - 1; i >= 0; i--) {
         if (computedBands[i].center < currentViewTime - 500) {
           seekTo(computedBands[i].center);
@@ -1684,7 +1689,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     });
 
     nextBtn.addEventListener('click', function() {
-      stopPlay(); stopScrub();
+      stopPlay();
       for (var i = 0; i < computedBands.length; i++) {
         if (computedBands[i].center > currentViewTime + 500) {
           seekTo(computedBands[i].center);
@@ -1693,79 +1698,6 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       }
     });
 
-    // --- Rewind / Fast-forward (hold to scrub, click for 5-min jump) ---
-    var scrubRAF = null;
-    var scrubDir = 0;
-
-    function stopScrub() {
-      scrubDir = 0;
-      if (scrubRAF) { cancelAnimationFrame(scrubRAF); scrubRAF = null; }
-    }
-
-    function startScrub(dir) {
-      stopPlay();
-      scrubDir = dir;
-      var lastFrame = performance.now();
-      function tick(now) {
-        if (!scrubDir) return;
-        var dt = now - lastFrame;
-        lastFrame = now;
-        var newTime = clampTime(currentViewTime + dt * SCRUB_SPEED * scrubDir);
-        slider.value = Math.min(sliderFromTime(newTime), 999);
-        currentViewTime = newTime;
-        var timeStr = formatTime(newTime);
-        label.textContent = timeStr;
-        document.getElementById('historyTimeLabel').textContent = 'מראה התראות משעה ' + timeStr;
-        reconstructStateAt(newTime);
-        if (newTime <= timelineMin || newTime >= timelineMax) { stopScrub(); return; }
-        scrubRAF = requestAnimationFrame(tick);
-      }
-      scrubRAF = requestAnimationFrame(tick);
-    }
-
-    function setupHoldButton(btn, dir) {
-      var holdTimer = null;
-      var held = false;
-
-      function onDown(e) {
-        e.preventDefault();
-        held = false;
-        holdTimer = setTimeout(function() {
-          held = true;
-          startScrub(dir);
-        }, HOLD_THRESHOLD);
-      }
-
-      function onUp() {
-        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-        if (held) {
-          stopScrub();
-        } else {
-          // Short click: jump 5 minutes
-          stopPlay();
-          seekTo(currentViewTime + JUMP_MS * dir);
-        }
-        held = false;
-      }
-
-      btn.addEventListener('mousedown', onDown);
-      btn.addEventListener('touchstart', onDown, { passive: false });
-      btn.addEventListener('mouseup', onUp);
-      btn.addEventListener('mouseleave', function() {
-        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-        if (held) stopScrub();
-        held = false;
-      });
-      btn.addEventListener('touchend', onUp);
-      btn.addEventListener('touchcancel', function() {
-        if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
-        if (held) stopScrub();
-        held = false;
-      });
-    }
-
-    setupHoldButton(rwBtn, -1);
-    setupHoldButton(ffBtn, 1);
   }
 
   // --- Init ---
