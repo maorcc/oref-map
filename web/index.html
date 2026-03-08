@@ -508,6 +508,17 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   // Set PROXY_BASE to the Cloudflare Worker URL for production, e.g.:
   //   var PROXY_BASE = 'https://oref-proxy.YOUR_ACCOUNT.workers.dev';
   var PROXY_BASE = '';
+  var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
+
+  function apiFetch(endpoint) {
+    return fetch(PROXY_BASE + apiPrefix + '/' + endpoint).then(function(resp) {
+      if (apiPrefix === '/api' && resp.url && resp.url.indexOf('/api2/') !== -1) {
+        console.log('Non-TLV colo detected, switching to /api2');
+        apiPrefix = '/api2';
+      }
+      return resp;
+    });
+  }
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;
   var GREEN_FADE_MS = 120000; // 2 minutes
@@ -1225,7 +1236,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   }
 
   function fetchLiveAlerts() {
-    fetch(PROXY_BASE + '/api/alerts')
+    apiFetch('alerts')
       .then(function(resp) {
         lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1251,7 +1262,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   }
 
   function fetchHistory(onDone) {
-    fetch(PROXY_BASE + '/api/history')
+    apiFetch('history')
       .then(function(resp) {
         lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1318,7 +1329,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
   // --- Extended history (timeline) ---
   function fetchExtendedHistory(onDone) {
-    fetch(PROXY_BASE + '/api/alarms-history')
+    apiFetch('alarms-history')
       .then(function(resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
