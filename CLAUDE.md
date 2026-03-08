@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project
 
-`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy is a Cloudflare Worker with placement pinned to Israel.
+`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
 
 **Public URL**: https://oref-map.org
 
@@ -20,8 +20,9 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
-- `worker/src/index.js` — Cloudflare Worker: proxies all Oref APIs (placement: `azure:israelcentral`)
-- `worker/wrangler.toml` — Worker configuration with placement and route
+- `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
+- `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
+- `worker/wrangler.toml` — Worker configuration with placement and `/api2/*` route
 - `docs/map-requirements.md` — Feature requirements doc
 
 ## Oref API details
@@ -81,7 +82,7 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 The live API is polled every 1s for immediate danger display. The history API is polled every 10s because all-clear events are short-lived in the live API and would be missed — the history API is the reliable source for state transitions to green.
 
 ### Geo-blocking
-The Oref APIs geo-block non-Israeli IPs. Our proxy works because Israeli users route through Cloudflare's TLV edge. Users routed through non-Israeli edges will get 403 errors. See `docs/architecture.md` for details.
+The Oref APIs geo-block non-Israeli IPs. Pages Functions at `/api/*` check the colo — TLV users are proxied directly, non-TLV users get a 303 redirect to `/api2/*` which is handled by the placement-pinned Worker. See `docs/architecture.md` for details.
 
 # currentDate
 Today's date is 2026-03-04.

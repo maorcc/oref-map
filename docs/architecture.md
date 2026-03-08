@@ -2,13 +2,14 @@
 
 ## Overview
 
-A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy runs as a separate Cloudflare Worker with placement pinned to Israel.
+A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions handle TLV-routed users directly, non-TLV users are redirected to a placement-pinned Worker.
 
 ## Stack
 
 - **Map**: Leaflet.js (v1.9.4) + OpenStreetMap tiles
 - **Voronoi**: d3-delaunay (v6) for polygon computation, polygon-clipping (v0.15) for clipping to Israel border
-- **API proxy**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"`
+- **API proxy (tier 1)**: Cloudflare Pages Functions (`functions/api/`) — serves TLV users directly, redirects others
+- **API proxy (tier 2)**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"` — fallback for non-TLV users
 - **No frameworks**: Vanilla JS, CSS
 
 ## Data Sources
@@ -41,7 +42,7 @@ The live API is a snapshot — all-clear alerts may only last a few seconds and 
 
 ### CORS
 
-The Oref APIs don't include `Access-Control-Allow-Origin`. The Worker proxy runs on the same domain (`oref-map.org/api/*` via Workers route), so no CORS headers are needed.
+The Oref APIs don't include `Access-Control-Allow-Origin`. Both the Pages Functions (`/api/*`) and the Worker (`/api2/*`) run on the same domain (`oref-map.org`), so no CORS headers are needed.
 
 ### Geo-blocking / Israeli IP requirement
 
@@ -49,7 +50,12 @@ The Oref APIs geo-block non-Israeli IPs. This was confirmed while building the `
 
 Previously, Pages Functions ran at the user's nearest Cloudflare edge. Users routed through non-Israeli edges (e.g., `FRA`, `ZRH`) got 403 errors because the proxy egressed from a non-Israeli IP.
 
-**Solution**: The API proxy now runs as a standalone Worker with explicit placement (`region = "azure:israelcentral"`). This forces the Worker to execute at Cloudflare's TLV data center regardless of where the user's request arrives. The `cf-placement` response header confirms the execution location (e.g., `remote-TLV`).
+**Solution**: A two-tier proxy architecture:
+
+1. **Pages Functions (`/api/*`)**: Check `request.cf.colo`. If TLV, proxy directly to Oref (free, no Worker invocation). If not TLV, return 303 redirect to `/api2/*`.
+2. **Worker (`/api2/*`)**: Runs with placement `region = "azure:israelcentral"`, forcing execution at TLV regardless of the user's edge location.
+
+The client detects the redirect via `resp.url` and permanently switches to `/api2/` for the rest of the session. This way the Worker only serves the small minority of non-TLV users.
 
 #### Placement investigation notes
 
@@ -65,7 +71,7 @@ Several placement strategies were tested before finding a working solution:
 
 ### Edge caching
 
-The Worker uses the Cloudflare Cache API (`caches.default`) with `s-maxage=1` to cache Oref responses at each edge for 1 second. This reduces redundant fetches when many clients poll simultaneously. The browser cache uses `max-age=2` (matching the previous behavior).
+Both the Pages Functions and the Worker use the Cloudflare Cache API (`caches.default`) with `s-maxage=1` to cache Oref responses at each edge for 1 second. This reduces redundant fetches when many clients poll simultaneously. The browser cache uses `max-age=2` (matching the previous behavior).
 
 ## Alert Classification
 
@@ -134,4 +140,4 @@ Web Audio API oscillator-based sounds (no external files). Muted by default. Two
 cd worker && npx wrangler deploy  # deploy API proxy Worker
 ```
 
-The Pages project serves static assets. The Worker handles `/api/*` via a Workers route on `oref-map.org`. The `oref-map.pages.dev` → `oref-map.org` redirect is configured as a Cloudflare Redirect Rule (dashboard).
+The Pages project serves static assets and Pages Functions (`/api/*`). The Worker handles `/api2/*` via a Workers route on `oref-map.org`, serving as a fallback for non-TLV users.
