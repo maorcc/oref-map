@@ -34,7 +34,7 @@ export default {
     const response = new Response(body, {
       status: resp.status,
       headers: {
-        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
         'Cache-Control': 's-maxage=1, max-age=2',
         'X-CF-Colo': colo,
         'X-Served-By': 'worker',
