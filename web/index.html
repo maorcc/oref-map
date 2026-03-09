@@ -78,6 +78,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 .indicator-green  { background: #00cc00; }
 .indicator-err    { background: #999; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+#lastAlertLink { color: inherit; text-decoration: underline; cursor: pointer; }
 
 #errorDetail {
   display: none;
@@ -567,6 +568,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
   var closeTimelinePanel = function() {}; // set by initTimeline
+  var openTimelineToLastEvent = function() {}; // set by initTimeline
 
   // --- Panel history (mobile back button closes panels) ---
   var panelHistoryPushed = false;
@@ -1218,7 +1220,11 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       setStatus(dominant, 'התרעות פעילות');
     } else {
       var rel = formatRelativeTime(lastDangerTime);
-      setStatus('green', rel ? 'אין כרגע התרעות · התרעה אחרונה ' + rel : 'אין התרעות פעילות');
+      if (rel) {
+        setStatusHTML('green', 'אין כרגע התרעות · <a href="#" id="lastAlertLink">התרעה אחרונה ' + rel + '</a>');
+      } else {
+        setStatus('green', 'אין התרעות פעילות');
+      }
     }
   }
 
@@ -1236,6 +1242,25 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     } else {
       statusEl.style.cursor = 'pointer';
     }
+  }
+
+  function setStatusHTML(state, html) {
+    var dot = document.getElementById('statusDot');
+    var txt = document.getElementById('statusText');
+    var statusEl = document.getElementById('status');
+    dot.className = 'indicator indicator-' + state;
+    txt.innerHTML = html;
+    var link = document.getElementById('lastAlertLink');
+    if (link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openTimelineToLastEvent();
+      });
+    }
+    statusEl.style.cursor = '';
+    lastErrorMsg = '';
+    document.getElementById('errorDetail').style.display = 'none';
   }
 
   // --- Fetching ---
@@ -1517,6 +1542,18 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       enterLiveMode();
     }
     closeTimelinePanel = closeTimeline;
+
+    openTimelineToLastEvent = function() {
+      if (extendedHistory.length === 0) {
+        console.error('Cannot open timeline to last event: no history data');
+        return;
+      }
+      if (!isOpen()) openTimeline();
+      for (var i = computedBands.length - 1; i >= 0; i--) {
+        seekTo(computedBands[i].center);
+        return;
+      }
+    };
 
     btnRow.addEventListener('click', function(e) {
       if (isOpen()) {
