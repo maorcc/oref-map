@@ -72,8 +72,11 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   margin-left: 6px; vertical-align: middle;
 }
-.indicator-ok   { background: #00cc00; animation: pulse 3s ease-in-out infinite; }
-.indicator-err  { background: #ff0000; }
+.indicator-red    { background: #ff0000; animation: pulse 3s ease-in-out infinite; }
+.indicator-purple { background: #9922cc; animation: pulse 3s ease-in-out infinite; }
+.indicator-yellow { background: #ffcc00; animation: pulse 3s ease-in-out infinite; }
+.indicator-green  { background: #00cc00; }
+.indicator-err    { background: #999; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 #errorDetail {
@@ -443,7 +446,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 </div>
 
 <div id="status">
-  <span class="indicator indicator-ok" id="statusDot"></span>
+  <span class="indicator indicator-err" id="statusDot"></span>
   <span id="statusText">מתחבר...</span>
   <div id="historyTimeLabel" style="display:none; font-size:11px; color:#555; margin-top:5px; padding-top:5px; border-top:1px solid #ddd;"></div>
 </div>
@@ -1202,26 +1205,31 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
   function updateLiveStatus() {
     if (!isLiveMode) return;
-    var hasActive = false;
+    var dominant = null, bestP = -1;
+    var P = { red: 3, purple: 2, yellow: 1 };
     for (var name in locationStates) {
-      if (locationStates[name].state !== 'green') { hasActive = true; break; }
+      var s = locationStates[name].state;
+      if (s !== 'green' && (P[s] || 0) > bestP) {
+        bestP = P[s] || 0;
+        dominant = s;
+      }
     }
-    if (hasActive) {
-      setStatus(true, 'התרעות פעילות');
+    if (dominant) {
+      setStatus(dominant, 'התרעות פעילות');
     } else {
       var rel = formatRelativeTime(lastDangerTime);
-      setStatus(true, rel ? 'אין כרגע התרעות · התרעה אחרונה ' + rel : 'אין התרעות פעילות');
+      setStatus('green', rel ? 'אין כרגע התרעות · התרעה אחרונה ' + rel : 'אין התרעות פעילות');
     }
   }
 
   // --- Status indicator ---
-  function setStatus(ok, text) {
+  function setStatus(state, text) {
     var dot = document.getElementById('statusDot');
     var txt = document.getElementById('statusText');
     var statusEl = document.getElementById('status');
-    dot.className = 'indicator ' + (ok ? 'indicator-ok' : 'indicator-err');
+    dot.className = 'indicator indicator-' + state;
     txt.textContent = text;
-    if (ok) {
+    if (state !== 'err') {
       statusEl.style.cursor = '';
       lastErrorMsg = '';
       document.getElementById('errorDetail').style.display = 'none';
@@ -1246,7 +1254,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         text = stripBom(text).trim();
         liveErrors = 0;
         try { sessionStorage.setItem('oref-last-poll', String(Date.now())); } catch(e) {}
-        if (isLiveMode && historyErrors <= 3) updateLiveStatus();
+        if (initialized && isLiveMode && historyErrors <= 3) updateLiveStatus();
         if (!text) return; // no active alert
         var alert = JSON.parse(text);
         processLiveAlert(alert);
@@ -1255,7 +1263,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         liveErrors++;
         lastErrorMsg = 'Live alerts: ' + err.message;
         if (liveErrors > 3) {
-          setStatus(false, 'בעיית תקשורת לפיקוד העורף. מנסה שוב...');
+          setStatus('err', 'בעיית תקשורת לפיקוד העורף. מנסה שוב...');
         }
         console.error('Live poll error:', err);
       });
@@ -1271,7 +1279,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       .then(function(text) {
         text = stripBom(text).trim();
         historyErrors = 0;
-        if (isLiveMode && liveErrors <= 3) updateLiveStatus();
+        if (initialized && isLiveMode && liveErrors <= 3) updateLiveStatus();
         if (!text) { if (onDone) onDone(); return; }
         var entries;
         try {
@@ -1313,7 +1321,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         historyErrors++;
         lastErrorMsg = 'Alert history: ' + err.message;
         if (historyErrors > 3) {
-          setStatus(false, 'תקלה בטעינת התרעות קודמות. מנסה שוב...');
+          setStatus('err', 'תקלה בטעינת התרעות קודמות. מנסה שוב...');
         }
         console.error('History fetch error:', err);
         if (onDone) onDone();
@@ -1740,7 +1748,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       })
       .catch(function(err) {
         console.error('Failed to load cities_geo.json:', err);
-        setStatus(false, 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
+        setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
       });
   }
 
