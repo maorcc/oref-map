@@ -31,6 +31,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 #map { width: 100%; height: 100%; direction: ltr; }
 .leaflet-interactive:hover, .polygon-active { fill-opacity: 0.7 !important; stroke-opacity: 1 !important; stroke-linejoin: round !important; stroke-width: 4 !important; }
 .leaflet-interactive:focus { outline: none; }
+body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
 
 #legend {
@@ -842,8 +843,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       polygon.bindTooltip(cityNames[i], { direction: 'top', offset: [0, -20] });
       (function(name, poly) {
         poly.on('click', function() {
-          var tlBtn = document.getElementById('timeline-btn');
-          if (tlBtn && tlBtn.classList.contains('open')) return;
+          if (document.body.classList.contains('has-overlay')) return;
           showPopup(name, poly);
         });
       })(cityNames[i], polygon);
@@ -977,6 +977,14 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
   var openPopupName = null;
   var openPopupMarker = null;
 
+  function updateOverlay() {
+    var panelOpen = document.getElementById('sound-btn').classList.contains('open') ||
+      (document.getElementById('timeline-btn') &&
+       document.getElementById('timeline-btn').classList.contains('open'));
+    var popupOpen = openPopupName !== null;
+    document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
+  }
+
   function recordHistory(name, title, alertDate, state) {
     if (!locationHistory[name]) locationHistory[name] = [];
     var ts = parseAlertDate(alertDate);
@@ -1055,7 +1063,9 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       .on('popupclose', function() {
         openPopupName = null; openPopupMarker = null;
         if (el) el.classList.remove('polygon-active');
+        updateOverlay();
       });
+    updateOverlay();
   }
 
   // --- Polygon pulse hint (mobile) ---
@@ -1527,12 +1537,14 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
     function openTimeline() {
       closeSoundPanel();
+      map.closePopup();
       container.classList.add('open');
       pushPanelHistory();
       timelineMax = Math.max(timelineMax, Date.now());
       slider.value = 999;
       renderTicks();
       enterHistoryMode(timelineMax);
+      updateOverlay();
     }
 
     function closeTimeline() {
@@ -1540,6 +1552,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       stopPlay();
 
       enterLiveMode();
+      updateOverlay();
     }
     closeTimelinePanel = closeTimeline;
 
@@ -1859,15 +1872,18 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 
   function openSoundPanel() {
     closeTimelinePanel();
+    map.closePopup();
     soundBtn.classList.add('open');
     pushPanelHistory();
     soundSearch.value = '';
     soundResults.innerHTML = '';
     soundSearch.focus();
+    updateOverlay();
   }
 
   function closeSoundPanel() {
     soundBtn.classList.remove('open');
+    updateOverlay();
   }
 
   function selectSoundLocation(loc) {
@@ -1934,6 +1950,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
     panelHistoryPushed = false;
     closeSoundPanel();
     closeTimelinePanel();
+    map.closePopup();
   });
 
   // --- Click outside to close panels ---
@@ -1949,6 +1966,13 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
       closed = true;
     }
     if (closed) popPanelHistory();
+    if (openPopupName) {
+      var mapContainer = document.getElementById('map');
+      var popupEl = document.querySelector('.leaflet-popup');
+      if (!mapContainer.contains(e.target) && (!popupEl || !popupEl.contains(e.target))) {
+        map.closePopup();
+      }
+    }
   });
 
   // --- Mobile resume: reload if data is stale ---
