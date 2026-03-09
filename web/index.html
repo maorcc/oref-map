@@ -978,9 +978,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var openPopupMarker = null;
 
   function updateOverlay() {
+    var tlBtn = document.getElementById('timeline-btn');
     var panelOpen = document.getElementById('sound-btn').classList.contains('open') ||
-      (document.getElementById('timeline-btn') &&
-       document.getElementById('timeline-btn').classList.contains('open'));
+      (tlBtn && tlBtn.classList.contains('open'));
     var popupOpen = openPopupName !== null;
     document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
   }
