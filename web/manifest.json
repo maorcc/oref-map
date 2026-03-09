@@ -1,0 +1,32 @@
+{
+  "name": "מפת העורף - התרעות פיקוד העורף",
+  "short_name": "מפת העורף",
+  "description": "מפת התרעות פיקוד העורף בזמן אמת",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "dir": "rtl",
+  "lang": "he",
+  "theme_color": "#1a1a2e",
+  "background_color": "#ffffff",
+  "screenshots": [
+    {
+      "src": "/og-image.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "מפת התרעות פיקוד העורף"
+    },
+    {
+      "src": "/screenshot-mobile.jpg",
+      "sizes": "1005x1846",
+      "type": "image/jpeg",
+      "form_factor": "narrow",
+      "label": "מפת התרעות פיקוד העורף"
+    }
+  ],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

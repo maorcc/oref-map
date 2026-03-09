@@ -5,6 +5,11 @@
 <meta charset="utf-8">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="מפת העורף">
 <title>מפת העורף - מפת התרעות פיקוד העורף</title>
 <link rel="canonical" href="https://oref-map.org/">
 <meta name="description" content="מפת העורף - מפת התרעות פיקוד העורף בזמן אמת">
@@ -1990,6 +1995,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   init();
 })();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
 </script>
 </body>
 </html>
