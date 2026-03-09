@@ -1549,9 +1549,8 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
         return;
       }
       if (!isOpen()) openTimeline();
-      for (var i = computedBands.length - 1; i >= 0; i--) {
-        seekTo(computedBands[i].center);
-        return;
+      if (computedBands.length > 0) {
+        seekTo(computedBands[computedBands.length - 1].center);
       }
     };
 
