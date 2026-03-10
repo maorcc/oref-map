@@ -1313,6 +1313,31 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       });
   }
 
+  function processHistoryEntries(entries) {
+    if (!Array.isArray(entries)) return;
+
+    entries.sort(function(a, b) {
+      return (a.alertDate || '').localeCompare(b.alertDate || '');
+    });
+
+    var newEntries = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      var alertDate = entry.alertDate || '';
+      if (lastHistoryDate && alertDate <= lastHistoryDate) continue;
+      processHistoryEntry(entry);
+      newEntries++;
+    }
+
+    if (entries.length > 0) {
+      lastHistoryDate = entries[entries.length - 1].alertDate || lastHistoryDate;
+    }
+
+    if (newEntries > 0) {
+      console.log('History: processed', newEntries, 'new entries');
+    }
+  }
+
   function fetchHistory(onDone) {
     apiFetch('history')
       .then(function(resp) {
@@ -1334,37 +1359,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
             .then(function(r) { return r.text(); })
             .then(function(t) {
               t = stripBom(t).trim();
-              try { return JSON.parse(t); }
+              try { entries = JSON.parse(t); }
               catch (e) { console.error('History retry also failed (' + t.length + ' chars):', e); throw e; }
+              processHistoryEntries(entries);
+              if (onDone) onDone();
             });
         }
-        if (!Array.isArray(entries)) { if (onDone) onDone(); return; }
-
-        // Sort by alertDate ascending
-        entries.sort(function(a, b) {
-          return (a.alertDate || '').localeCompare(b.alertDate || '');
-        });
-
-        var newEntries = 0;
-        for (var i = 0; i < entries.length; i++) {
-          var entry = entries[i];
-          var alertDate = entry.alertDate || '';
-
-          // On subsequent polls, only process new entries
-          if (lastHistoryDate && alertDate <= lastHistoryDate) continue;
-
-          processHistoryEntry(entry);
-          newEntries++;
-        }
-
-        if (entries.length > 0) {
-          lastHistoryDate = entries[entries.length - 1].alertDate || lastHistoryDate;
-        }
-
-        if (newEntries > 0) {
-          console.log('History: processed', newEntries, 'new entries');
-        }
-
+        processHistoryEntries(entries);
         if (onDone) onDone();
       })
       .catch(function(err) {
@@ -1664,7 +1665,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (range <= 0) return;
 
       // Walk events, track per-location active state, emit bands
-      var locStates = {}; // location -> 'red'|'purple'|'yellow' or absent
+      var locStates = {}; // location -> {state, since}
       var bands = [];     // [{start, end, state}]
       var curState = null;
       var curStart = 0;
@@ -1672,19 +1673,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       function dominantState() {
         var best = null, bestP = -1;
         for (var loc in locStates) {
-          var p = STATE_PRIORITY[locStates[loc]] || 0;
-          if (p > bestP) { bestP = p; best = locStates[loc]; }
+          var p = STATE_PRIORITY[locStates[loc].state] || 0;
+          if (p > bestP) { bestP = p; best = locStates[loc].state; }
         }
         return best;
       }
 
+      function expireStale(atTime) {
+        for (var loc in locStates) {
+          if (atTime - locStates[loc].since >= ALERT_MAX_AGE_MS) delete locStates[loc];
+        }
+      }
+
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
-        // Update location state
+        expireStale(e.alertDate);
         if (e.state === 'green') {
           delete locStates[e.location];
         } else {
-          locStates[e.location] = e.state;
+          locStates[e.location] = { state: e.state, since: e.alertDate };
         }
         var newDom = dominantState();
         if (newDom !== curState) {
@@ -1695,9 +1702,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           curStart = e.alertDate;
         }
       }
-      // Close final band
+      // Close final band, capped at staleness limit
       if (curState) {
-        bands.push({ start: curStart, end: timelineMax, state: curState });
+        // Band ends at the latest location expiry, capped by timelineMax
+        var latestExpiry = 0;
+        for (var loc in locStates) {
+          var exp = locStates[loc].since + ALERT_MAX_AGE_MS;
+          if (exp > latestExpiry) latestExpiry = exp;
+        }
+        bands.push({ start: curStart, end: Math.min(latestExpiry, timelineMax), state: curState });
       }
 
       // Store bands with centers for prev/next navigation
