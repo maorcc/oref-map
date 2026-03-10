@@ -1082,7 +1082,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       var entry = locationStates[name];
       var idx = cityIndex[name];
       if (idx == null || !cityPolygons[idx]) continue;
-      var op = entry.state === 'green' ? 0.5 : 0.3;
+      var op = entry.state === 'green'
+        ? 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS))
+        : 0.3;
       targets.push({
         polygon: cityPolygons[idx],
         color: COLORS[entry.state],
