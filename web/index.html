@@ -952,7 +952,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var polygon = idx != null ? cityPolygons[idx] : null;
     if (!polygon) return;
 
-    var opacity = state === 'green' ? 0.5 : 0.3;
+    var now = Date.now();
+    var opacity = state === 'green'
+      ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
+      : 0.3;
     polygon.setStyle({
       color: COLORS[state],
       fillColor: COLORS[state],
