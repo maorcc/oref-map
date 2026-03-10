@@ -180,7 +180,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 .location-item:hover { background: #f5f5f5; }
 
-#sound-btn, #timeline-btn {
+#sound-btn, #timeline-btn, #location-btn {
   position: fixed;
   right: 24px;
   max-height: 40px;
@@ -195,10 +195,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out;
 }
 @media (hover: hover) {
-  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover {
+  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #location-btn:hover {
     background: rgba(219, 234, 254, 0.92);
     border-color: #93c5fd;
   }
+}
+#location-btn {
+  bottom: 256px;
+  direction: ltr;
+  display: flex;
+  align-items: center;
+}
+#location-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
 }
 #sound-btn {
   bottom: 208px;
@@ -390,9 +405,17 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     top: 74px;
     right: 8px;
   }
-  #sound-btn, #timeline-btn {
+  #sound-btn, #timeline-btn, #location-btn {
     right: 12px;
     max-height: 36px;
+  }
+  #location-btn {
+    bottom: 202px;
+  }
+  #location-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
   }
   #sound-btn {
     bottom: 158px;
@@ -476,6 +499,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
+<div id="location-btn" title="הצג מיקום שלי על המפה">
+  <div id="location-btn-row">
+    <span class="btn-icon" style="filter:hue-rotate(230deg);">📍</span><span class="btn-text">הראה אותי</span>
+  </div>
+</div>
+
 <div id="sound-btn" title="השמעת צלילים">
   <div id="sound-btn-row">
     <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
@@ -541,6 +570,56 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 18
   }).addTo(map);
+
+  // --- User location ---
+  var userLocationMarker = null;
+
+  function initUserLocation() {
+    var btn = document.getElementById('location-btn');
+    if (!navigator.geolocation) { btn.style.display = 'none'; return; }
+
+    var icon = L.divIcon({
+      html: '<span style="font-size:26px; line-height:1; display:block; filter:hue-rotate(230deg);">📍</span>',
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [6, 24]
+    });
+
+    var watching = false;
+
+    function startWatching() {
+      if (watching) return;
+      watching = true;
+      navigator.geolocation.watchPosition(function(pos) {
+        var latlng = [pos.coords.latitude, pos.coords.longitude];
+        if (!userLocationMarker) {
+          userLocationMarker = L.marker(latlng, {
+            icon: icon,
+            interactive: false,
+            zIndexOffset: 1000
+          }).addTo(map);
+          btn.style.display = 'none';
+        } else {
+          userLocationMarker.setLatLng(latlng);
+        }
+      }, function(err) {
+        console.warn('Geolocation error:', err.code, err.message);
+        btn.querySelector('.btn-text').textContent = 'מיקום לא זמין';
+      }, { enableHighAccuracy: false, maximumAge: 30000 });
+    }
+
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+        if (result.state === 'granted') startWatching();
+      });
+    }
+
+    document.getElementById('location-btn-row').addEventListener('click', function() {
+      startWatching();
+    });
+  }
+
+  initUserLocation();
 
   // --- State ---
   var citiesGeo = null;          // {name: [lat, lng]}
