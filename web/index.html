@@ -34,7 +34,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
 #map { width: 100%; height: 100%; direction: ltr; }
-.leaflet-interactive:hover, .polygon-active { fill-opacity: 0.7 !important; stroke-opacity: 1 !important; stroke-linejoin: round !important; stroke-width: 4 !important; }
+.leaflet-interactive:hover, .polygon-active { fill-opacity: 0.5 !important; stroke-opacity: 0.8 !important; stroke-linejoin: round !important; stroke-width: 3 !important; }
 .leaflet-interactive:focus { outline: none; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
@@ -952,13 +952,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var polygon = idx != null ? cityPolygons[idx] : null;
     if (!polygon) return;
 
-    var opacity = state === 'green' ? 0.6 : 0.5;
+    var opacity = state === 'green' ? 0.5 : 0.3;
     polygon.setStyle({
       color: COLORS[state],
       fillColor: COLORS[state],
       fillOpacity: opacity,
-      opacity: opacity + 0.2,
-      weight: 1
+      opacity: opacity + 0.15,
+      weight: state === 'red' ? 0.5 : 1
     });
     locationStates[name] = {
       state: state,
@@ -1082,11 +1082,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       var entry = locationStates[name];
       var idx = cityIndex[name];
       if (idx == null || !cityPolygons[idx]) continue;
-      var op = entry.state === 'green' ? 0.6 : 0.5;
+      var op = entry.state === 'green' ? 0.5 : 0.3;
       targets.push({
         polygon: cityPolygons[idx],
         color: COLORS[entry.state],
-        origStyle: { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: op, opacity: op + 0.2, weight: 1 }
+        origStyle: { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: op, opacity: op + 0.15, weight: entry.state === 'red' ? 0.5 : 1 }
       });
     }
 
@@ -1111,7 +1111,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       for (var i = 0; i < targets.length; i++) {
         targets[i].polygon.setStyle({
           fillColor: targets[i].color, fillOpacity: opacity,
-          color: targets[i].color, opacity: Math.min(opacity + 0.2, 1), weight: 2
+          color: targets[i].color, opacity: Math.min(opacity + 0.15, 0.8), weight: 2
         });
       }
       step++;
@@ -1198,8 +1198,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (elapsed >= GREEN_FADE_MS) {
         toRemove.push(name);
       } else {
-        var opacity = 0.6 * (1 - elapsed / GREEN_FADE_MS);
-        entry.marker.setStyle({ fillOpacity: opacity, opacity: opacity + 0.2 });
+        var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
+        entry.marker.setStyle({ fillOpacity: opacity, opacity: opacity + 0.15 });
       }
     }
     for (var i = 0; i < toRemove.length; i++) {
@@ -1452,21 +1452,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (s === 'green') {
         var elapsed = targetTime - sinceTime;
         if (elapsed >= GREEN_FADE_MS) continue; // already faded
-        var opacity = 0.6 * (1 - elapsed / GREEN_FADE_MS);
+        var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
         polygon.setStyle({
           color: COLORS.green,
           fillColor: COLORS.green,
           fillOpacity: opacity,
-          opacity: opacity + 0.2,
+          opacity: opacity + 0.15,
           weight: 1
         });
       } else {
         polygon.setStyle({
           color: COLORS[s],
           fillColor: COLORS[s],
-          fillOpacity: 0.5,
-          opacity: 0.7,
-          weight: 1
+          fillOpacity: 0.3,
+          opacity: 0.45,
+          weight: s === 'red' ? 0.5 : 1
         });
       }
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
