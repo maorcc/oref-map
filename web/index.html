@@ -536,7 +536,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var FADE_TICK_MS = 1000;
 
   // --- Map setup ---
-  var map = L.map('map').setView([31.6, 34.8], 8);
+  var map = L.map('map', { preferCanvas: true }).setView([31.6, 34.8], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 18
