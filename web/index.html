@@ -34,7 +34,6 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
 #map { width: 100%; height: 100%; direction: ltr; }
-.leaflet-interactive:hover { fill-opacity: 0.5 !important; stroke-opacity: 0.8 !important; stroke-linejoin: round !important; stroke-width: 3 !important; }
 .leaflet-interactive:focus { outline: none; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
@@ -852,6 +851,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           if (document.body.classList.contains('has-overlay')) return;
           showPopup(name, poly);
         });
+        poly.on('mouseover', function() {
+          if (document.body.classList.contains('has-overlay')) return;
+          poly.setStyle(ACTIVE_STYLE);
+        });
+        poly.on('mouseout', function() {
+          if (openPopupName === name) return;
+          poly.setStyle(currentLocationStyle(name));
+        });
       })(cityNames[i], polygon);
       cityPolygons.push(polygon);
     }
@@ -1064,16 +1071,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   var ACTIVE_STYLE = { fillOpacity: 0.5, opacity: 0.8, weight: 3 };
 
+  function currentLocationStyle(name) {
+    var entry = locationStates[name];
+    if (!entry) return BASE_STYLE;
+    if (entry.state === 'green') {
+      var opacity = 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS));
+      return { color: COLORS.green, fillColor: COLORS.green, fillOpacity: opacity, opacity: opacity + 0.15, weight: 1 };
+    }
+    return { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: 0.3, opacity: 0.45, weight: entry.state === 'red' ? 0.5 : 1 };
+  }
+
   function showPopup(name, marker) {
     openPopupName = name;
     openPopupMarker = marker;
-    var prevStyle = { fillOpacity: marker.options.fillOpacity, opacity: marker.options.opacity, weight: marker.options.weight };
     marker.setStyle(ACTIVE_STYLE);
     marker.bindPopup(buildPopupHtml(name), { maxWidth: 350 })
       .openPopup()
       .on('popupclose', function() {
         openPopupName = null; openPopupMarker = null;
-        marker.setStyle(prevStyle);
+        marker.setStyle(currentLocationStyle(name));
         updateOverlay();
       });
     updateOverlay();
