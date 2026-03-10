@@ -205,6 +205,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: ltr;
   display: flex;
   align-items: center;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
 }
 #location-btn-row {
   display: flex;
@@ -499,11 +502,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
-<div id="location-btn" title="הצג מיקום שלי על המפה">
+<button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
   <div id="location-btn-row">
     <span class="btn-icon" style="filter:hue-rotate(230deg);">📍</span><span class="btn-text">הראה אותי</span>
   </div>
-</div>
+</button>
 
 <div id="sound-btn" title="השמעת צלילים">
   <div id="sound-btn-row">
@@ -611,7 +614,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
         if (result.state === 'granted') startWatching();
-      });
+      }).catch(function() {});
     }
 
     document.getElementById('location-btn-row').addEventListener('click', function() {
