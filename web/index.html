@@ -532,6 +532,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;
   var GREEN_FADE_MS = 120000; // 2 minutes
+  var ALERT_MAX_AGE_MS = 3600000; // 1 hour — safety net for stuck alerts
   var FADE_TICK_MS = 1000;
 
   // --- Map setup ---
@@ -1193,7 +1194,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var toRemove = [];
     for (var name in locationStates) {
       var entry = locationStates[name];
-      if (entry.state !== 'green') continue;
+      if (entry.state !== 'green') {
+        if (now - entry.since >= ALERT_MAX_AGE_MS) toRemove.push(name);
+        continue;
+      }
       var elapsed = now - entry.since;
       if (elapsed >= GREEN_FADE_MS) {
         toRemove.push(name);
@@ -1325,8 +1329,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         try {
           entries = JSON.parse(text);
         } catch (parseErr) {
-          console.error('History JSON parse error:', parseErr, '\nRaw response:', text);
-          throw parseErr;
+          console.warn('History JSON truncated (' + text.length + ' chars), retrying...', parseErr);
+          return fetch(PROXY_BASE + apiPrefix + '/history', { cache: 'no-store' })
+            .then(function(r) { return r.text(); })
+            .then(function(t) {
+              t = stripBom(t).trim();
+              try { return JSON.parse(t); }
+              catch (e) { console.error('History retry also failed (' + t.length + ' chars):', e); throw e; }
+            });
         }
         if (!Array.isArray(entries)) { if (onDone) onDone(); return; }
 
@@ -1461,6 +1471,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           weight: 1
         });
       } else {
+        if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
         polygon.setStyle({
           color: COLORS[s],
           fillColor: COLORS[s],
