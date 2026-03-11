@@ -1,0 +1,11 @@
+name: "דיווח על באג"
+description: "משהו לא עובד כמו שצריך? ספרו בבקשה"
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: "מה קרה?"
+      placeholder: "תארו את הבעיה — מה ראיתם, האם בטלפון או במחשב, שתפו צילום מסך אם יש"
+    validations:
+      required: true

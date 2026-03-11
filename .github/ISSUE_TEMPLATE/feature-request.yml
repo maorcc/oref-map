@@ -1,0 +1,11 @@
+name: "בקשה לפיצ'ר"
+description: "יש לכם רעיון? נשמח לשמוע. בבקשה תשתפו"
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: "מה הייתם רוצים?"
+      placeholder: "תארו את הפיצ'ר שהייתם רוצים לראות"
+    validations:
+      required: true
