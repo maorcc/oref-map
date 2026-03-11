@@ -594,21 +594,26 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     });
 
     var watchId = null;
+    var transientTimeout = null;
 
     function setIdle() {
       btnText.textContent = 'הראה אותי';
       btnText.style.display = '';
+      btn.title = 'הצג מיקום שלי על המפה';
     }
 
     function setActive() {
+      if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
       btnText.textContent = '';
       btnText.style.display = 'none';
+      btn.title = 'הסר מיקום מהמפה';
     }
 
     function setTransient(msg) {
+      if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
       btnText.style.display = '';
       btnText.textContent = msg;
-      setTimeout(setIdle, 3000);
+      transientTimeout = setTimeout(function() { transientTimeout = null; setIdle(); }, 3000);
     }
 
     function showToast(msg) {
@@ -639,13 +644,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
             interactive: false,
             zIndexOffset: 1000
           }).addTo(map);
+          showToast('מראה מיקום על המפה');
         } else {
           userLocationMarker.setLatLng(latlng);
         }
         setActive();
       }, function(err) {
         console.warn('Geolocation error:', err.code, err.message);
-        watchId = null;
+        if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
         setTransient('מיקום לא זמין');
       }, { enableHighAccuracy: false, maximumAge: 30000 });
     }
@@ -661,7 +667,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     document.getElementById('location-btn-row').addEventListener('click', function() {
       if (watchId !== null || userLocationMarker) {
         stopWatching();
-        showToast('מיקום הוסר');
+        showToast('מיקום הוסר מהמפה');
         setIdle();
       } else {
         setTransient('מאתר...');
