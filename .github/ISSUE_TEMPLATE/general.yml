@@ -1,5 +1,6 @@
 name: "פנייה כללית"
 description: "שאלה, הצעה, או כל דבר אחר"
+labels: ["question"]
 body:
   - type: textarea
     id: details
