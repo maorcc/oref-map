@@ -2121,11 +2121,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       closeSoundPanel();
       closed = true;
     }
-    var tlBtn = document.getElementById('timeline-btn');
-    if (tlBtn && tlBtn.classList.contains('open') && !tlBtn.contains(e.target)) {
-      closeTimelinePanel();
-      closed = true;
-    }
     if (closed) popPanelHistory();
     if (openPopupName) {
       var mapContainer = document.getElementById('map');
