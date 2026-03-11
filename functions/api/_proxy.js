@@ -134,6 +134,8 @@ async function checkAndNotifyUnknownTitles(bodyText, kind, context) {
 export async function orefProxy(context, { target, redirectPath, kind }) {
   const colo = context.request.cf?.colo || '';
 
+  // Non-TLV requests redirect to the Worker; title detection only runs on the
+  // TLV path since all Israeli traffic goes through it — same titles are seen.
   if (colo !== 'TLV') {
     return new Response(null, {
       status: 303,
