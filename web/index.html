@@ -597,6 +597,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       watching = true;
       navigator.geolocation.watchPosition(function(pos) {
         var latlng = [pos.coords.latitude, pos.coords.longitude];
+        if (!pointInRing(latlng, ISRAEL_CLIP_RING)) {
+          if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+          return;
+        }
         if (!userLocationMarker) {
           userLocationMarker = L.marker(latlng, {
             icon: icon,
@@ -859,6 +863,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     [34.98, 29.55],   // Near Eilat
     [34.92, 29.49]    // Close polygon
   ];
+
+  // Ray-casting point-in-polygon test. ring is [lng, lat] pairs.
+  function pointInRing(latlng, ring) {
+    var lng = latlng[1], lat = latlng[0];
+    var inside = false;
+    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      var xi = ring[i][0], yi = ring[i][1];
+      var xj = ring[j][0], yj = ring[j][1];
+      if ((yi > lat) !== (yj > lat) &&
+          lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
 
   function clipToIsrael(latlngs) {
     // Convert [lat, lng] ring to [lng, lat] for polygon-clipping
