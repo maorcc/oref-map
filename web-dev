@@ -1,4 +1,9 @@
 #!/bin/sh
 # Start local dev server at http://localhost:8787.
-# Serves web/ as static files and runs functions/api/* as Cloudflare Workers.
+
+POLYGONS=web/locations_polygons.json
+if [ ! -f "$POLYGONS" ]; then
+  echo "WARNING: $POLYGONS not found. Run ./build in oref-polygons first, or production endpoint will be used."
+fi
+
 npx wrangler pages dev web/ "$@"

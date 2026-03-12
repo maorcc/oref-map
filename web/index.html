@@ -28,8 +28,6 @@
 <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/d3-delaunay@6/dist/d3-delaunay.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
@@ -637,7 +635,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (watchId !== null) return;
       watchId = navigator.geolocation.watchPosition(function(pos) {
         var latlng = [pos.coords.latitude, pos.coords.longitude];
-        if (!pointInRing(latlng, ISRAEL_CLIP_RING)) {
+        if (!isInIsrael(latlng)) {
           stopWatching();
           setTransient('בעיית GPS');
           return;
@@ -683,7 +681,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   initUserLocation();
 
   // --- State ---
-  var citiesGeo = null;          // {name: [lat, lng]}
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
   var lastHistoryDate = null;    // track newest history entry
@@ -732,10 +729,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
   }
 
-  // --- Voronoi state ---
-  var cityNames = [];       // cityNames[i] = location name
-  var cityIndex = {};       // cityIndex[name] = i
-  var cityPolygons = [];    // cityPolygons[i] = L.polygon
+  // --- Polygon state ---
+  var locationPolygons = {};  // name → L.polygon
 
   // --- Colors ---
   var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
@@ -861,137 +856,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
   }
 
-  // --- Polygon clipping (uses polygon-clipping library) ---
-  // polygon-clipping uses GeoJSON convention: [lng, lat] rings.
-  // Israel + territories outline — detailed concave border.
-  var ISRAEL_CLIP_RING = [
-    [34.92, 29.49],   // Eilat
-    [34.22, 31.21],   // Egypt-Gaza border
-    [34.33, 31.37],   // Gaza SW coast
-    [34.43, 31.53],   // Gaza coast
-    [34.54, 31.68],   // Ashkelon coast
-    [34.63, 31.82],   // Ashdod coast
-    [34.72, 31.96],   // Rishon coast
-    [34.76, 32.09],   // Tel Aviv coast
-    [34.79, 32.20],   // Herzliya coast
-    [34.84, 32.34],   // Netanya coast
-    [34.87, 32.50],   // Caesarea coast
-    [34.93, 32.70],   // Atlit coast
-    [34.96, 32.83],   // Haifa coast
-    [35.06, 32.95],   // Akko coast
-    [35.10, 33.10],   // Rosh HaNikra
-    [35.10523, 33.09433], [35.15548, 33.09163], [35.15564, 33.08610], [35.17770, 33.09392], [35.19268, 33.08515], [35.20686, 33.08826], [35.21120, 33.09945], [35.22650, 33.09797], [35.23746, 33.09203], [35.29350, 33.10822],
-    [35.30091, 33.10053], [35.30913, 33.10067], [35.31686, 33.10485], [35.32459, 33.09554], [35.32153, 33.08704], [35.35406, 33.05735], [35.37726, 33.05532], [35.38096, 33.06275], [35.39417, 33.06072], [35.43137, 33.06572],
-    [35.44603, 33.09163], [35.50320, 33.08974], [35.50240, 33.11551],
-    [35.51995, 33.11618], [35.53139, 33.13385], [35.52559, 33.13925],
-    [35.54186, 33.19911], [35.53654, 33.20867], [35.53686, 33.23225], [35.54637, 33.23724],
-    [35.54604, 33.25502], [35.55578, 33.25828], [35.55697, 33.26459], [35.56477, 33.27526], [35.56420, 33.28823], [35.56815, 33.29096], [35.58474, 33.28200],
-    [35.583, 33.266], // גבעת קורח
-    [35.750, 33.300], // Mt Dov
-    [35.820, 33.340], // Hermon / NE corner
-    [35.92, 33.34],   // Golan NE
-    [35.92, 33.15],   // Golan E
-    [35.88, 32.92],   // Golan SE
-    [35.82, 32.76],   // SE of Sea of Galilee
-    [35.72, 32.60],   // S of Sea of Galilee
-    [35.62, 32.48],   // Beit She'an area
-    [35.58, 32.35],   // N Jordan Valley
-    [35.57, 32.20],   // Jordan Valley
-    [35.56, 32.05],   // Jordan Valley mid
-    [35.55, 31.90],   // Jericho area
-    [35.54, 31.75],   // N Dead Sea
-    [35.50, 31.55],   // Dead Sea N
-    [35.48, 31.35],   // Dead Sea mid
-    [35.44, 31.15],   // Dead Sea S
-    [35.40, 31.00],   // S Dead Sea
-    [35.35, 30.80],   // N Arava
-    [35.30, 30.55],   // Arava mid
-    [35.22, 30.30],   // Arava
-    [35.14, 30.05],   // S Arava
-    [34.98, 29.55],   // Near Eilat
-    [34.92, 29.49]    // Close polygon
-  ];
-
-  // Ray-casting point-in-polygon test. ring is [lng, lat] pairs.
-  function pointInRing(latlng, ring) {
-    var lng = latlng[1], lat = latlng[0];
-    var inside = false;
-    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-      var xi = ring[i][0], yi = ring[i][1];
-      var xj = ring[j][0], yj = ring[j][1];
-      if ((yi > lat) !== (yj > lat) &&
-          lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) {
-        inside = !inside;
-      }
-    }
-    return inside;
+  // --- Israel bounding box (for GPS validation) ---
+  function isInIsrael(latlng) {
+    return latlng[0] >= 29.4 && latlng[0] <= 33.4 && latlng[1] >= 34.2 && latlng[1] <= 35.9;
   }
 
-  function clipToIsrael(latlngs) {
-    // Convert [lat, lng] ring to [lng, lat] for polygon-clipping
-    var subjectRing = [];
-    for (var i = 0; i < latlngs.length; i++) {
-      subjectRing.push([latlngs[i][1], latlngs[i][0]]);
-    }
-    var result = polygonClipping.intersection(
-      [subjectRing], [ISRAEL_CLIP_RING]
-    );
-    if (!result || result.length === 0) return [];
-    // Convert first result polygon back to [lat, lng]
-    var ring = result[0][0];
-    var out = [];
-    for (var i = 0; i < ring.length; i++) {
-      out.push([ring[i][1], ring[i][0]]);
-    }
-    return out;
-  }
-
-  // --- Voronoi polygon builder ---
-  function buildVoronoiPolygons() {
-    var COS_LAT = Math.cos(32.2 * Math.PI / 180); // ~0.846
-    var names = Object.keys(citiesGeo);
-    var points = [];
-    cityNames = [];
-    cityIndex = {};
-    cityPolygons = [];
-
-    for (var i = 0; i < names.length; i++) {
-      var name = names[i];
-      var geo = citiesGeo[name];
-      cityNames.push(name);
-      cityIndex[name] = i;
-      points.push([geo[1] * COS_LAT, geo[0]]); // [scaledLng, lat]
-    }
-
-    // Bounding box: generous west (clipping handles coast), tight elsewhere
-    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (var i = 0; i < points.length; i++) {
-      if (points[i][0] < minX) minX = points[i][0];
-      if (points[i][1] < minY) minY = points[i][1];
-      if (points[i][0] > maxX) maxX = points[i][0];
-      if (points[i][1] > maxY) maxY = points[i][1];
-    }
-    var bounds = [minX - 0.5, minY - 0.01, maxX + 0.01, maxY + 0.01];
-
-    var delaunay = d3.Delaunay.from(points);
-    var voronoi = delaunay.voronoi(bounds);
-
-    for (var i = 0; i < cityNames.length; i++) {
-      var cell = voronoi.cellPolygon(i);
-      if (!cell) {
-        cityPolygons.push(null);
-        continue;
-      }
-      // Convert from [scaledLng, lat] to [lat, lng]
-      var latlngs = [];
-      for (var j = 0; j < cell.length; j++) {
-        latlngs.push([cell[j][1], cell[j][0] / COS_LAT]);
-      }
-      // Clip to Israel outline
-      latlngs = clipToIsrael(latlngs);
-      if (latlngs.length < 3) {
-        cityPolygons.push(null);
-        continue;
+  // --- Build pre-computed polygons from locations_polygons.json ---
+  function buildPolygons(data) {
+    for (var name in data) {
+      var coords = data[name];
+      var isNested = Array.isArray(coords[0][0]);
+      var latlngs;
+      if (isNested) {
+        // Polygon with holes: [[[outer]], [[hole1]], ...]
+        latlngs = coords.map(function(ring) {
+          return ring.map(function(c) { return [c[1], c[0]]; });
+        });
+      } else {
+        // Simple polygon: [[lng,lat], ...]
+        latlngs = coords.map(function(c) { return [c[1], c[0]]; });
       }
       var polygon = L.polygon(latlngs, {
         fillColor: '#888',
@@ -1001,60 +884,37 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         weight: 1,
         interactive: true
       }).addTo(map);
-      polygon.bindTooltip(cityNames[i], { direction: 'top', offset: [0, -20] });
-      (function(name, poly) {
+      polygon.bindTooltip(name, { direction: 'top', offset: [0, -20] });
+      (function(n, poly) {
         poly.on('click', function() {
           if (document.body.classList.contains('has-overlay')) return;
-          showPopup(name, poly);
+          showPopup(n, poly);
         });
         poly.on('mouseover', function() {
           if (document.body.classList.contains('has-overlay')) return;
           poly.setStyle(ACTIVE_STYLE);
         });
         poly.on('mouseout', function() {
-          if (openPopupName === name) return;
-          poly.setStyle(currentLocationStyle(name));
+          if (openPopupName === n) return;
+          poly.setStyle(currentLocationStyle(n));
         });
-      })(cityNames[i], polygon);
-      cityPolygons.push(polygon);
+      })(name, polygon);
+      locationPolygons[name] = polygon;
     }
 
-    // ?debug: show clip polygon + all cell outlines
+    // ?debug: show all polygon outlines
     if (location.search.indexOf('debug') !== -1) {
       document.getElementById('test-danger-btn').style.display = 'block';
       document.getElementById('test-all-clear-btn').style.display = 'block';
-      var borderLatLngs = ISRAEL_CLIP_RING.map(function(p) { return [p[1], p[0]]; });
-      L.polygon(borderLatLngs, {
-        color: '#0000ff', fillOpacity: 0, weight: 2, dashArray: '6 4',
-        interactive: false
-      }).addTo(map);
-      var borderIcon = L.divIcon({
-        className: '',
-        html: '<div style="width:10px;height:10px;border-radius:50%;background:#fff;border:2px solid #00f;box-sizing:border-box;"></div>',
-        iconSize: [10, 10],
-        iconAnchor: [5, 5]
-      });
-      borderLatLngs.forEach(function(ll) {
-        var marker = L.marker(ll, { icon: borderIcon, draggable: true }).addTo(map);
-        marker.bindPopup(ll[0].toFixed(6) + ', ' + ll[1].toFixed(6));
-        marker.on('dragend', function() {
-          var pos = marker.getLatLng();
-          marker.setPopupContent(pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6));
-          marker.openPopup();
-        });
-      });
-      // Force all cell outlines visible via CSS (survives setStyle from alerts)
       var debugStyle = document.createElement('style');
       debugStyle.textContent = '.leaflet-overlay-pane path { stroke: #555 !important; stroke-opacity: 1 !important; stroke-width: 1 !important; }';
       document.head.appendChild(debugStyle);
-      for (var i = 0; i < cityPolygons.length; i++) {
-        if (cityPolygons[i]) {
-          cityPolygons[i].setStyle({ fillOpacity: 0.05 });
-        }
+      for (var n in locationPolygons) {
+        locationPolygons[n].setStyle({ fillOpacity: 0.05 });
       }
     }
 
-    console.log('Built Voronoi polygons for', cityNames.length, 'cities');
+    console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
   }
 
   // --- Title classification ---
@@ -1099,9 +959,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   // --- Marker management ---
   function setLocationState(name, state, since) {
-    var geo = citiesGeo[name];
-    if (!geo) return;
-
     var existing = locationStates[name];
 
     // Priority: red > purple > yellow. Green always overrides (all-clear).
@@ -1115,8 +972,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
     }
 
-    var idx = cityIndex[name];
-    var polygon = idx != null ? cityPolygons[idx] : null;
+    var polygon = locationPolygons[name] || null;
     if (!polygon) return;
 
     var now = Date.now();
@@ -1262,13 +1118,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     for (var name in locationStates) {
       var entry = locationStates[name];
-      var idx = cityIndex[name];
-      if (idx == null || !cityPolygons[idx]) continue;
+      var polygon = locationPolygons[name];
+      if (!polygon) continue;
       var op = entry.state === 'green'
         ? 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS))
         : 0.3;
       targets.push({
-        polygon: cityPolygons[idx],
+        polygon: polygon,
         color: COLORS[entry.state],
         origStyle: { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: op, opacity: op + 0.15, weight: entry.state === 'red' ? 0.5 : 1 }
       });
@@ -1278,9 +1134,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     if (targets.length === 0) {
       for (var hName in locationHistory) {
         if (locationHistory[hName].length > 0 && !locationStates[hName]) {
-          var hIdx = cityIndex[hName];
-          if (hIdx != null && cityPolygons[hIdx]) {
-            targets.push({ polygon: cityPolygons[hIdx], color: COLORS.green, origStyle: BASE_STYLE });
+          var hPoly = locationPolygons[hName];
+          if (hPoly) {
+            targets.push({ polygon: hPoly, color: COLORS.green, origStyle: BASE_STYLE });
           }
         }
       }
@@ -1410,8 +1266,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   function zoomToActiveAlerts() {
     var points = [];
     for (var name in locationStates) {
-      if (locationStates[name].state !== 'green' && citiesGeo[name]) {
-        points.push(citiesGeo[name]);
+      if (locationStates[name].state !== 'green' && locationPolygons[name]) {
+        points.push(locationPolygons[name].getBounds().getCenter());
       }
     }
     if (points.length === 0) return;
@@ -1662,8 +1518,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     for (var loc in accumulated) {
       var s = accumulated[loc].state;
       var sinceTime = accumulated[loc].since;
-      var idx = cityIndex[loc];
-      var polygon = idx != null ? cityPolygons[idx] : null;
+      var polygon = locationPolygons[loc] || null;
       if (!polygon) continue;
       if (s === 'green') {
         var elapsed = targetTime - sinceTime;
@@ -2007,33 +1862,28 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   // --- Init ---
   function init() {
-    fetch('cities_geo.json')
-      .then(function(resp) { return resp.json(); })
-      .then(function(data) {
-        citiesGeo = data;
-        console.log('Loaded', Object.keys(citiesGeo).length, 'city coordinates');
-        buildVoronoiPolygons();
+    fetch('locations_polygons.json').then(function(r) { return r.json(); })
+    .then(function(data) {
+      buildPolygons(data);
 
-        // Fetch both histories in parallel, then start polling
-        var historyDone = false, extendedDone = false;
-        function onBothDone() {
-          if (!historyDone || !extendedDone) return;
-          initialized = true;
-          initTimeline();
-          setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-          setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-          setInterval(fadeGreenMarkers, FADE_TICK_MS);
-          fetchLiveAlerts(); // first live poll immediately
-          updateLiveStatus();
-          if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
-        }
-        fetchHistory(function() { historyDone = true; onBothDone(); });
-        fetchExtendedHistory(function() { extendedDone = true; onBothDone(); });
-      })
-      .catch(function(err) {
-        console.error('Failed to load cities_geo.json:', err);
-        setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
-      });
+      var historyDone = false, extendedDone = false;
+      function onBothDone() {
+        if (!historyDone || !extendedDone) return;
+        initialized = true;
+        initTimeline();
+        setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+        setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+        setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        fetchLiveAlerts();
+        updateLiveStatus();
+        if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+      }
+      fetchHistory(function() { historyDone = true; onBothDone(); });
+      fetchExtendedHistory(function() { extendedDone = true; onBothDone(); });
+    }).catch(function(err) {
+      console.error('Failed to load geo data:', err);
+      setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
+    });
   }
 
   // --- About control ---
@@ -2164,7 +2014,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       soundResults.innerHTML = '';
       return;
     }
-    var matches = cityNames.filter(function(name) {
+    var matches = Object.keys(locationPolygons).filter(function(name) {
       return name.includes(q);
     }).slice(0, 20);
     

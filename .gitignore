@@ -28,3 +28,6 @@ wheels/
 /GEMINI.md
 /screenshot.png
 /snapshot.txt
+
+# Generated locally from oref-polygons; served via Pages Function in production
+/web/locations_polygons.json
