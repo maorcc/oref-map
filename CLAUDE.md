@@ -11,7 +11,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 ## Commands
 
 ```bash
-./web-dev                          # start dev server at http://localhost:8787 (wrangler pages dev)
+./web-dev                          # start dev server at http://localhost:8788 (wrangler pages dev)
 ./deploy                           # deploy static assets to Cloudflare Pages
 cd worker && npx wrangler deploy   # deploy API proxy Worker
 ```

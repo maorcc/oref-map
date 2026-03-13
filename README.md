@@ -29,7 +29,7 @@ Live map of Israel showing [Pikud HaOref](https://www.oref.org.il) (Home Front C
 ## Development
 
 ```sh
-./web-dev        # start dev server at http://localhost:8787
+./web-dev        # start dev server at http://localhost:8788
 ```
 
 Requires [Node.js](https://nodejs.org) and `npx` (comes with npm). Uses [Wrangler](https://developers.cloudflare.com/workers/wrangler/) to serve `web/` and run the API proxy functions locally.

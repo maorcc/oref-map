@@ -542,6 +542,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       <button id="tl-prev" title="אירוע קודם">⏮</button>
       <button id="tl-play" title="נגן/עצור">▶</button>
       <button id="tl-next" title="אירוע הבא">⏭</button>
+      <button id="tl-locate" title="הצג אירוע במפה"><svg width="16" height="19" viewBox="0 0 24 28" fill="currentColor"><path d="M12 0C6.5 0 2 4.5 2 10c0 7 10 18 10 18s10-11 10-18C22 4.5 17.5 0 12 0zm0 15c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z"/><circle cx="10.5" cy="9" r="2.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="12.3" y1="11" x2="15" y2="13.7" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     </div>
   </div>
 </div>
@@ -574,7 +575,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var FADE_TICK_MS = 1000;
 
   // --- Map setup ---
-  var map = L.map('map', { preferCanvas: true }).setView([31.6, 34.8], 8);
+  var DEFAULT_CENTER = [31.6, 34.8], DEFAULT_ZOOM = 8;
+  var map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 18
@@ -1276,7 +1278,31 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
     if (points.length === 0) return;
     var bounds = L.latLngBounds(points);
-    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
+    map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 12, duration: 0.7 });
+  }
+
+  function getActiveEventBounds() {
+    var allBounds = null;
+    for (var name in locationStates) {
+      if (locationStates[name].state === 'green') continue;
+      var polygon = locationPolygons[name];
+      if (!polygon) continue;
+      if (!allBounds) {
+        allBounds = L.latLngBounds(polygon.getBounds());
+      } else {
+        allBounds.extend(polygon.getBounds());
+      }
+    }
+    return allBounds;
+  }
+
+  function maybeZoomToEvent() {
+    var bounds = getActiveEventBounds();
+    if (bounds) {
+      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 12, duration: 0.7 });
+    } else {
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+    }
   }
 
   function updateLiveStatus() {
@@ -1603,6 +1629,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     var prevBtn = document.getElementById('tl-prev');
     var nextBtn = document.getElementById('tl-next');
+    var locateBtn = document.getElementById('tl-locate');
     var ticksEl = document.getElementById('timeline-ticks');
 
     if (extendedHistory.length === 0) return;
@@ -1711,6 +1738,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       time = clampTime(time);
       slider.value = Math.min(sliderFromTime(time), 999);
       enterHistoryMode(time);
+      maybeZoomToEvent();
     }
 
     // --- Slider input ---
@@ -1860,6 +1888,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           return;
         }
       }
+    });
+
+    locateBtn.addEventListener('click', function() {
+      maybeZoomToEvent();
     });
 
   }
