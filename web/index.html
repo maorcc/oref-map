@@ -1653,8 +1653,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       pushPanelHistory();
       timelineMax = Math.max(timelineMax, Date.now());
       renderTicks();
-      if (computedBands.length > 0) {
-        seekTo(computedBands[computedBands.length - 1].center);
+      if (eventPeaks.length > 0) {
+        seekTo(eventPeaks[eventPeaks.length - 1]);
       } else {
         slider.value = 999;
         enterHistoryMode(timelineMax);
@@ -1750,10 +1750,35 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     // --- Timeline bands (show duration of active alerts) ---
     var STATE_PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
-    var computedBands = []; // [{start, end, state, center}] - shared with prev/next
+    var computedBands = []; // [{start, end, state}] - visual tick bands
+    var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
+
+    function computeEventPeaks() {
+      eventPeaks = [];
+      var lastNonGreenTime = null;
+      var prevWasGreen = false;
+      for (var i = 0; i < extendedHistory.length; i++) {
+        var e = extendedHistory[i];
+        if (e.state !== 'green') {
+          prevWasGreen = false;
+          lastNonGreenTime = e.alertDate;
+        } else {
+          if (!prevWasGreen && lastNonGreenTime !== null) {
+            eventPeaks.push(lastNonGreenTime);
+          }
+          prevWasGreen = true;
+        }
+      }
+      // Ongoing event: last entry was non-green
+      if (!prevWasGreen && lastNonGreenTime !== null) {
+        eventPeaks.push(lastNonGreenTime);
+      }
+    }
+
     function renderTicks() {
       ticksEl.innerHTML = '';
       computedBands = [];
+      computeEventPeaks();
       if (extendedHistory.length === 0) return;
       var range = timelineMax - timelineMin;
       if (range <= 0) return;
@@ -1807,11 +1832,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         bands.push({ start: curStart, end: Math.min(latestExpiry, timelineMax), state: curState });
       }
 
-      // Store bands with centers for prev/next navigation
       computedBands = bands;
-      for (var k = 0; k < computedBands.length; k++) {
-        computedBands[k].center = (computedBands[k].start + computedBands[k].end) / 2;
-      }
 
       // Render bands as spans
       for (var j = 0; j < bands.length; j++) {
@@ -1870,12 +1891,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (isPlaying) stopPlay(); else startPlay();
     });
 
-    // --- Prev / Next band center ---
+    // --- Prev / Next event peak ---
     prevBtn.addEventListener('click', function() {
       stopPlay();
-      for (var i = computedBands.length - 1; i >= 0; i--) {
-        if (computedBands[i].center < currentViewTime - 500) {
-          seekTo(computedBands[i].center);
+      for (var i = eventPeaks.length - 1; i >= 0; i--) {
+        if (eventPeaks[i] < currentViewTime - 500) {
+          seekTo(eventPeaks[i]);
           return;
         }
       }
@@ -1883,9 +1904,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     nextBtn.addEventListener('click', function() {
       stopPlay();
-      for (var i = 0; i < computedBands.length; i++) {
-        if (computedBands[i].center > currentViewTime + 500) {
-          seekTo(computedBands[i].center);
+      for (var i = 0; i < eventPeaks.length; i++) {
+        if (eventPeaks[i] > currentViewTime + 500) {
+          seekTo(eventPeaks[i]);
           return;
         }
       }
