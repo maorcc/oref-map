@@ -660,7 +660,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     if (navigator.permissions) {
       navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
-        if (result.state === 'granted') {
+        if (result.state === 'granted' && localStorage.getItem('oref-location-hidden') !== 'true') {
           startWatching();
         }
       }).catch(function() {});
@@ -671,9 +671,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         stopWatching();
         showToast('מיקום הוסר מהמפה');
         setIdle();
+        localStorage.setItem('oref-location-hidden', 'true');
       } else {
         setTransient('מאתר...');
         startWatching();
+        localStorage.removeItem('oref-location-hidden');
       }
     });
   }
