@@ -342,11 +342,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #timeline-btn.open #timeline-controls { display: flex; }
 #timeline-transport {
   display: flex;
-  justify-content: center;
   align-items: center;
   gap: 6px;
-  order: 1;
-  position: relative;
+  order: 2;
 }
 #timeline-transport button {
   background: none;
@@ -391,8 +389,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   font-weight: bold;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  position: absolute;
-  left: 0;
+  order: 1;
 }
 
 @media (max-width: 480px) {
@@ -537,8 +534,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       <div id="timeline-ticks"></div>
       <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
     </div>
+    <span id="timeline-label"></span>
     <div id="timeline-transport">
-      <span id="timeline-label"></span>
       <button id="tl-prev" title="אירוע קודם">⏮</button>
       <button id="tl-play" title="נגן/עצור">▶</button>
       <button id="tl-next" title="אירוע הבא">⏭</button>
