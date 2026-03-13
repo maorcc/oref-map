@@ -865,6 +865,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   function buildPolygons(data) {
     for (var name in data) {
       var coords = data[name];
+      if (!Array.isArray(coords)) continue;
       var isNested = Array.isArray(coords[0][0]);
       var latlngs;
       if (isNested) {
@@ -912,6 +913,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       for (var n in locationPolygons) {
         locationPolygons[n].setStyle({ fillOpacity: 0.05 });
       }
+      L.rectangle([[29.4, 34.2], [33.4, 35.9]], { color: '#0000ff', weight: 2, fill: false }).addTo(map);
     }
 
     console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
