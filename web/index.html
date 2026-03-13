@@ -183,7 +183,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 .location-item:hover { background: #f5f5f5; }
 
-#sound-btn, #timeline-btn, #location-btn {
+#sound-btn, #timeline-btn, #location-btn, #locate-btn {
   position: fixed;
   right: 24px;
   max-height: 40px;
@@ -198,10 +198,23 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out;
 }
 @media (hover: hover) {
-  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #location-btn:hover {
+  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #location-btn:hover, #locate-btn:hover {
     background: rgba(219, 234, 254, 0.92);
     border-color: #93c5fd;
   }
+}
+#locate-btn {
+  bottom: 304px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  max-width: 40px;
+  height: 40px;
+  padding: 0;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
 }
 #location-btn {
   bottom: 256px;
@@ -411,9 +424,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     top: 110px;
     left: 8px;
   }
-  #sound-btn, #timeline-btn, #location-btn {
+  #sound-btn, #timeline-btn, #location-btn, #locate-btn {
     right: 12px;
     max-height: 36px;
+  }
+  #locate-btn {
+    bottom: 244px;
+    width: 36px;
+    max-width: 36px;
+    height: 36px;
   }
   #location-btn {
     bottom: 202px;
@@ -505,6 +524,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
+<button id="locate-btn" type="button" title="הצג התרעות במפה">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
+</button>
 <button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
   <div id="location-btn-row">
     <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
@@ -527,7 +549,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 </div>
 <div id="timeline-btn" title="ציר זמן">
   <div id="timeline-btn-row">
-    <span class="btn-icon">🕓</span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
+    <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
   </div>
   <div id="timeline-controls">
     <div id="timeline-slider-wrap">
@@ -539,7 +561,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       <button id="tl-prev" title="אירוע קודם">⏮</button>
       <button id="tl-play" title="נגן/עצור">▶</button>
       <button id="tl-next" title="אירוע הבא">⏭</button>
-      <button id="tl-locate" title="הצג אירוע במפה"><svg width="16" height="19" viewBox="0 0 24 28" fill="currentColor"><path d="M12 0C6.5 0 2 4.5 2 10c0 7 10 18 10 18s10-11 10-18C22 4.5 17.5 0 12 0zm0 15c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z"/><circle cx="10.5" cy="9" r="2.5" fill="none" stroke="white" stroke-width="1.8"/><line x1="12.3" y1="11" x2="15" y2="13.7" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     </div>
   </div>
 </div>
@@ -680,6 +701,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   initUserLocation();
+
+  document.getElementById('locate-btn').addEventListener('click', function() {
+    maybeZoomToEvent();
+  });
 
   // --- State ---
   var locationStates = {};       // {name: {state, since, marker}}
@@ -1266,18 +1291,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     return '';
   }
 
-  function zoomToActiveAlerts() {
-    var points = [];
-    for (var name in locationStates) {
-      if (locationStates[name].state !== 'green' && locationPolygons[name]) {
-        points.push(locationPolygons[name].getBounds().getCenter());
-      }
-    }
-    if (points.length === 0) return;
-    var bounds = L.latLngBounds(points);
-    map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 12, duration: 0.7 });
-  }
-
   function getActiveEventBounds() {
     var allBounds = null;
     for (var name in locationStates) {
@@ -1296,11 +1309,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   function maybeZoomToEvent() {
     var bounds = getActiveEventBounds();
     if (bounds) {
-      map.flyToBounds(bounds, { padding: [50, 50], maxZoom: 12, duration: 0.7 });
+      map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
     } else {
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
     }
   }
+
 
   function updateLiveStatus() {
     if (!isLiveMode) return;
@@ -1314,15 +1328,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
     }
     if (dominant) {
-      setStatusHTML(dominant, '<a href="#" id="zoomAlertsLink">התרעות פעילות</a>');
-      var zoomLink = document.getElementById('zoomAlertsLink');
-      if (zoomLink) {
-        zoomLink.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          zoomToActiveAlerts();
-        });
-      }
+      setStatus(dominant, 'התרעות פעילות');
     } else {
       var rel = formatRelativeTime(lastDangerTime);
       if (rel) {
@@ -1626,7 +1632,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     var prevBtn = document.getElementById('tl-prev');
     var nextBtn = document.getElementById('tl-next');
-    var locateBtn = document.getElementById('tl-locate');
     var ticksEl = document.getElementById('timeline-ticks');
 
     if (extendedHistory.length === 0) return;
@@ -1646,9 +1651,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       container.classList.add('open');
       pushPanelHistory();
       timelineMax = Math.max(timelineMax, Date.now());
-      slider.value = 999;
       renderTicks();
-      enterHistoryMode(timelineMax);
+      if (computedBands.length > 0) {
+        seekTo(computedBands[computedBands.length - 1].center);
+      } else {
+        slider.value = 999;
+        enterHistoryMode(timelineMax);
+      }
       updateOverlay();
     }
 
@@ -1662,14 +1671,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     closeTimelinePanel = closeTimeline;
 
     openTimelineToLastEvent = function() {
-      if (extendedHistory.length === 0) {
-        console.error('Cannot open timeline to last event: no history data');
-        return;
-      }
+      if (extendedHistory.length === 0) return;
       if (!isOpen()) openTimeline();
-      if (computedBands.length > 0) {
-        seekTo(computedBands[computedBands.length - 1].center);
-      }
     };
 
     btnRow.addEventListener('click', function(e) {
@@ -1729,7 +1732,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       document.getElementById('historyTimeLabel').style.display = 'block';
       document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
       reconstructStateAt(time);
-    }
+      }
 
     function seekTo(time) {
       time = clampTime(time);
@@ -1885,10 +1888,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           return;
         }
       }
-    });
-
-    locateBtn.addEventListener('click', function() {
-      maybeZoomToEvent();
     });
 
   }
