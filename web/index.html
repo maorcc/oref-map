@@ -208,7 +208,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   gap: 8px;
 }
 @media (hover: hover) {
-  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #location-btn:hover, #locate-btn:hover {
+  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #stats-btn:not(.open):hover, #location-btn:hover, #locate-btn:hover {
     background: rgba(219, 234, 254, 0.92);
     border-color: #93c5fd;
   }
@@ -278,6 +278,43 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #sound-btn.open #sound-panel { display: block; }
 
+#stats-btn {
+  bottom: 208px;
+  direction: ltr;
+  display: flex;
+  flex-direction: column-reverse;
+}
+#stats-btn.open {
+  width: 340px;
+  max-width: min(calc(100vw - 48px), 340px);
+  max-height: 250px;
+  cursor: default;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.97);
+}
+#stats-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
+#stats-btn.open #stats-panel {
+  border-bottom: 1px solid #ddd;
+}
+#stats-panel {
+  display: none;
+  padding: 12px;
+  direction: rtl;
+}
+#stats-btn.open #stats-panel { display: block; }
+#stats-panel label { display: block; margin-bottom: 5px; font-size: 13px; }
+#stats-panel input, #stats-panel select { width: 100%; padding: 6px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+#stats-panel button { width: 100%; padding: 8px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+#stats-panel button:hover { background: #3367D6; }
+
 #timeline-btn {
   display: none;
   direction: ltr;
@@ -317,6 +354,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 .tl-close { display: none; font-size: 16px; cursor: pointer; color: #888; margin-right: auto; }
 .tl-close:hover { color: #333; }
 #timeline-btn.open .tl-close { display: inline; }
+#stats-btn.open .tl-close { display: inline; }
 
 #test-danger-btn {
   display: none;
@@ -361,7 +399,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #timeline-controls {
   display: none;
   padding: 10px 12px;
-  gap: 4px;
+  gap: 10px;
   flex-direction: column;
 }
 #timeline-btn.open #timeline-controls { display: flex; }
@@ -370,6 +408,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   align-items: center;
   gap: 6px;
   order: 2;
+  flex-wrap: wrap;
+  justify-content: flex-start; /* Ensure left alignment */
 }
 #timeline-transport button {
   background: none;
@@ -443,6 +483,17 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   order: 1;
+  margin-right: 12px; /* Push away from the buttons slightly */
+}
+
+#timeline-date-picker {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  direction: ltr; /* Force LTR for calendar widget */
+  font-family: inherit;
 }
 
 @media (max-width: 480px) {
@@ -491,6 +542,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     padding: 0 10px;
     gap: 5px;
   }
+  #stats-btn {
+    bottom: 160px;
+  }
+  #stats-btn.open {
+    max-width: calc(100vw - 24px);
+    right: 12px;
+  }
+  #stats-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
+  }
+  #timeline-btn {
+    bottom: 116px;
+  }
   #timeline-btn.open {
     max-width: calc(100vw - 24px);
   }
@@ -502,6 +568,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   #timeline-transport button { font-size: 16px; padding: 4px 10px; }
   .btn-icon { font-size: 16px; }
   .btn-text { font-size: 12px; }
+  #timeline-date-picker { font-size: 12px; padding: 2px 4px; }
   #test-danger-btn {
     bottom: 12px;
     left: 100px;
@@ -584,21 +651,45 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     </div>
   </div>
 </div>
-  <div id="timeline-btn" title="ציר זמן">
-    <div id="timeline-btn-row">
-      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
+
+<div id="stats-btn" title="סטטיסטיקות">
+  <div id="stats-btn-row">
+    <span class="btn-icon">📊</span><span class="btn-text">סטטיסטיקות</span><span class="tl-close">✕</span>
+  </div>
+  <div id="stats-panel">
+    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+      <div style="flex:1;">
+        <label>מתאריך</label>
+        <input type="date" id="stats-from-date" max="">
+      </div>
+      <div style="flex:1;">
+        <label>עד תאריך</label>
+        <input type="date" id="stats-to-date" max="">
+      </div>
     </div>
-    <div id="timeline-controls">
-      <div id="timeline-slider-wrap">
-        <div id="timeline-ticks"></div>
-        <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
-      </div>
+    <label>סוג התרעה</label>
+    <select id="stats-category">
+      <option value="all">טוען...</option>
+    </select>
+    <button id="stats-apply-btn">הצג נתונים</button>
+  </div>
+</div>
+
+<div id="timeline-btn" title="ציר זמן">
+  <div id="timeline-btn-row">
+    <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
+  </div>
+  <div id="timeline-controls">
+    <div id="timeline-slider-wrap">
+      <div id="timeline-ticks"></div>
+      <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+    </div>
+    <div id="timeline-transport">
+      <input type="date" id="timeline-date-picker" title="בחר תאריך">
       <span id="timeline-label"></span>
-      <div id="timeline-transport">
-        <button id="tl-prev" title="אירוע קודם">⏮</button>
-        <button id="tl-play" title="נגן/עצור">▶</button>
-        <button id="tl-next" title="אירוע הבא">⏭</button>
-      </div>
+      <button id="tl-prev" title="אירוע קודם">⏮</button>
+      <button id="tl-play" title="נגן/עצור">▶</button>
+      <button id="tl-next" title="אירוע הבא">⏭</button>
     </div>
   </div>
 </div>
@@ -813,6 +904,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var polygonHintTargets = null;  // targets being pulsed by showPolygonHint
   var closeTimelinePanel = function() {}; // set by initTimeline
   var openTimelineToLastEvent = function() {}; // set by initTimeline
+  var currentTimelineDay = null; // track currently selected day in timeline
+
+  // --- Stats mode state ---
+  var isStatsMode = false;
+  var statsCounts = {}; // name -> count
+  var maxStatsCount = 0;
 
   // --- Panel history (mobile back button closes panels) ---
   var panelHistoryPushed = false;
@@ -989,15 +1086,24 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       (function(n, poly) {
         poly.on('click', function() {
           if (document.body.classList.contains('has-overlay')) return;
+          if (isStatsMode) return; // Disable standard popup in stats mode
           showPopup(n, poly);
         });
         poly.on('mouseover', function() {
           if (document.body.classList.contains('has-overlay')) return;
-          poly.setStyle(ACTIVE_STYLE);
+          if (isStatsMode) {
+            poly.setStyle({ fillOpacity: 0.9, weight: 3 });
+          } else {
+            poly.setStyle(ACTIVE_STYLE);
+          }
         });
         poly.on('mouseout', function() {
-          if (openPopupName === n) return;
-          poly.setStyle(currentLocationStyle(n));
+          if (isStatsMode) {
+             poly.setStyle(getStatsStyle(n));
+          } else {
+             if (openPopupName === n) return;
+             poly.setStyle(currentLocationStyle(n));
+          }
         });
       })(name, polygon);
       locationPolygons[name] = polygon;
@@ -1020,6 +1126,19 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   // --- Title classification ---
+  var OFFICIAL_CATEGORY_MAP = {
+      1: "ירי רקטות וטילים",           // Rocket and Missile Fire
+      2: "חדירת כלי טיס עוין",         // Hostile Aircraft Intrusion
+      3: "חדירת מחבלים",               // Terrorist Infiltration
+      4: "רעידת אדמה",                 // Earthquake
+      5: "חשש לצונאמי",                // Tsunami Warning
+      6: "אירוע חומרים מסוכנים",       // Hazardous Materials Event
+      7: "אירוע רדיולוגי",             // Radiological Event
+      10: "חשש לאירוע ביולוגי",        // Biological Event
+      13: "יציאה ממרחב מוגן",          // "All Clear" / Event Ended (Special Update)
+      14: "התרעה מוקדמת"               // Pre-Alert (usually for aircraft tracking)
+  };
+
   function classifyTitle(title) {
     title = title.replace(/\s+/g, ' ').trim();
 
@@ -1243,8 +1362,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   function updateOverlay() {
     var tlBtn = document.getElementById('timeline-btn');
+    var statsBtn = document.getElementById('stats-btn');
     var panelOpen = document.getElementById('sound-btn').classList.contains('open') ||
-      (tlBtn && tlBtn.classList.contains('open'));
+      (tlBtn && tlBtn.classList.contains('open')) ||
+      (statsBtn && statsBtn.classList.contains('open'));
     var popupOpen = openPopupName !== null;
     document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
   }
@@ -1320,7 +1441,29 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   var ACTIVE_STYLE = { fillOpacity: 0.5, opacity: 0.8, weight: 3 };
 
+  function getStatsStyle(name) {
+      var count = statsCounts[name] || 0;
+      if (count === 0) return BASE_STYLE;
+
+      // heatmap from yellow to red depending on intensity
+      var intensity = maxStatsCount > 0 ? (count / maxStatsCount) : 0;
+      var r = 255;
+      var g = Math.round(255 * (1 - intensity));
+      var b = 0;
+      var color = 'rgb(' + r + ',' + g + ',' + b + ')';
+
+      return {
+          fillColor: color,
+          color: color,
+          fillOpacity: 0.4 + (intensity * 0.4),
+          opacity: 0.6 + (intensity * 0.4),
+          weight: 1.5
+      };
+  }
+
   function currentLocationStyle(name) {
+    if (isStatsMode) return getStatsStyle(name);
+
     var entry = locationStates[name];
     if (!entry) return BASE_STYLE;
     if (entry.state === 'green') {
@@ -1425,7 +1568,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     for (var i = 0; i < locations.length; i++) {
       var loc = locations[i];
       recordHistory(loc, title, now, state);
-      if (isLiveMode) {
+      if (isLiveMode && !isStatsMode) {
         setLocationState(loc, state);
       } else if (liveLocationStates) {
         updateShadowState(loc, state);
@@ -1453,14 +1596,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var key = location + '|' + (entry.alertDate || '');
     if (!extendedRids.has(key) && since) {
       extendedRids.add(key);
-      extendedHistory.push({ location: location, title: title, alertDate: since, state: state });
-      if (!timelineMin || since < timelineMin) timelineMin = since;
+      extendedHistory.push({ location: location, title: title, alertDate: since, state: state, category_desc: title });
+      // Update global bounds but wait for panel open to re-render timeline day
+      timelineMin = timelineMin ? Math.min(timelineMin, since) : since;
       timelineMax = Math.max(timelineMax, since, Date.now());
     }
 
-    // Skip expired green markers — don't briefly flash old all-clears on page load
+    // Skip expired green markers — dont briefly flash old all-clears on page load
     var expired = state === 'green' && (Date.now() - since) >= GREEN_FADE_MS;
-    if (isLiveMode) {
+    if (isLiveMode && !isStatsMode) {
       if (expired) {
         if (locationStates[location]) removeLocation(location);
       } else {
@@ -1477,7 +1621,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   // --- Green fade-out ---
   function fadeGreenMarkers() {
-    if (!isLiveMode) return;
+    if (!isLiveMode || isStatsMode) return;
     var now = Date.now();
     var toRemove = [];
     for (var name in locationStates) {
@@ -1541,7 +1685,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 
   function updateLiveStatus() {
-    if (!isLiveMode) return;
+    if (!isLiveMode || isStatsMode) return;
     var dominant = null, bestP = -1;
     var P = { red: 3, purple: 2, yellow: 1 };
     for (var name in locationStates) {
@@ -1623,7 +1767,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         text = stripBom(text).trim();
         liveErrors = 0;
         try { sessionStorage.setItem('oref-last-poll', String(Date.now())); } catch(e) {}
-        if (initialized && isLiveMode && historyErrors <= 3) updateLiveStatus();
+        if (initialized && isLiveMode && !isStatsMode && historyErrors <= 3) updateLiveStatus();
         if (!text) return; // no active alert
         var alert;
         try { alert = JSON.parse(text); }
@@ -1633,7 +1777,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       .catch(function(err) {
         liveErrors++;
         lastErrorMsg = 'Live alerts: ' + err.message;
-        if (liveErrors > 3) {
+        if (liveErrors > 3 && !isStatsMode) {
           setStatus('err', 'בעיית תקשורת לפיקוד העורף. מנסה שוב...');
         }
         console.error('Live poll error:', err);
@@ -1675,7 +1819,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       .then(function(text) {
         text = stripBom(text).trim();
         historyErrors = 0;
-        if (initialized && isLiveMode && liveErrors <= 3) updateLiveStatus();
+        if (initialized && isLiveMode && !isStatsMode && liveErrors <= 3) updateLiveStatus();
         if (!text) { if (onDone) onDone(); return; }
         var entries;
         try {
@@ -1698,7 +1842,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       .catch(function(err) {
         historyErrors++;
         lastErrorMsg = 'Alert history: ' + err.message;
-        if (historyErrors > 3) {
+        if (historyErrors > 3 && !isStatsMode) {
           setStatus('err', 'תקלה בטעינת התרעות קודמות. מנסה שוב...');
         }
         console.error('History fetch error:', err);
@@ -1713,41 +1857,61 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     return isNaN(d.getTime()) ? null : d.getTime();
   }
 
-  // --- Extended history (timeline) ---
-  function fetchExtendedHistory(onDone) {
-    apiFetch('alarms-history')
+  function formatDateForApi(dateObj) {
+    var dd = String(dateObj.getDate()).padStart(2, '0');
+    var mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    var yyyy = dateObj.getFullYear();
+    return dd + '.' + mm + '.' + yyyy;
+  }
+
+  // --- Extended history (timeline & stats) ---
+  function fetchExtendedHistory(fromDateObj, toDateObj, onDone) {
+    var apiPath = 'alarms-history';
+    if (fromDateObj && toDateObj) {
+      var dStrFrom = formatDateForApi(fromDateObj);
+      var dStrTo = formatDateForApi(toDateObj);
+      apiPath += '?fromDate=' + dStrFrom + '&toDate=' + dStrTo;
+    } else if (fromDateObj) {
+      var dStr = formatDateForApi(fromDateObj);
+      apiPath += '?fromDate=' + dStr + '&toDate=' + dStr;
+    }
+
+    apiFetch(apiPath)
       .then(function(resp) {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         return resp.json();
       })
       .then(function(entries) {
-        if (!Array.isArray(entries)) { if (onDone) onDone(); return; }
-        for (var i = 0; i < entries.length; i++) {
-          var e = entries[i];
-          if (!e.data || !e.category_desc) continue;
-          var rid = String(e.rid || '');
-          if (rid && extendedRids.has(rid)) continue;
-          var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
-          var state = classifyTitle(title);
-          var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
-          var ts = parseAlertDate(e.alertDate);
-          if (!ts) continue;
-          if (rid) extendedRids.add(rid);
-          extendedHistory.push({ location: location, title: title, alertDate: ts, state: state });
-          recordHistory(location, title, e.alertDate || '', state);
+        var parsedEntries = [];
+        if (Array.isArray(entries)) {
+            for (var i = 0; i < entries.length; i++) {
+              var e = entries[i];
+              if (!e.data || !e.category_desc) continue;
+              var rid = String(e.rid || '');
+              if (rid && extendedRids.has(rid)) continue;
+              var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
+              var state = classifyTitle(title);
+              var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
+              var ts = parseAlertDate(e.alertDate);
+              if (!ts) continue;
+              if (rid) extendedRids.add(rid);
+              var entryObj = { location: location, title: title, alertDate: ts, state: state, category_desc: title };
+              extendedHistory.push(entryObj);
+              parsedEntries.push(entryObj);
+              recordHistory(location, title, e.alertDate || '', state);
+            }
+            // Sort ascending by time
+            extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
+            if (extendedHistory.length > 0) {
+              timelineMin = extendedHistory[0].alertDate;
+              timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
+            }
         }
-        // Sort ascending by time
-        extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-        if (extendedHistory.length > 0) {
-          timelineMin = extendedHistory[0].alertDate;
-          timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
-        }
-        console.log('Extended history:', extendedHistory.length, 'entries');
-        if (onDone) onDone();
+        if (onDone) onDone(parsedEntries);
       })
       .catch(function(err) {
         console.error('Extended history fetch error:', err);
-        if (onDone) onDone();
+        if (onDone) onDone([]);
       });
   }
 
@@ -1764,11 +1928,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     locationStates = {};
     if (isHullMode) clearHullPolygons();
 
-    // Replay history up to targetTime
+    // Replay history up to targetTime (limit replay to current selected day if possible)
+    var dayStart = currentTimelineDay ? new Date(currentTimelineDay).setHours(0,0,0,0) : 0;
+
     var accumulated = {}; // {location: {state, since}}
     var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
     for (var i = 0; i < extendedHistory.length; i++) {
       var e = extendedHistory[i];
+      if (currentTimelineDay && e.alertDate < dayStart) continue; // skip older days to start clean
       if (e.alertDate > targetTime) break;
       var existing = accumulated[e.location];
       if (existing) {
@@ -1863,41 +2030,311 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
   }
 
+  // --- Stats Feature ---
+  function initStats() {
+    var statsBtn = document.getElementById('stats-btn');
+    var btnRow = document.getElementById('stats-btn-row');
+    var fromDateInput = document.getElementById('stats-from-date');
+    var toDateInput = document.getElementById('stats-to-date');
+    var applyBtn = document.getElementById('stats-apply-btn');
+    var categorySelect = document.getElementById('stats-category');
+
+    // Set max dates to today
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    var maxDateStr = yyyy + '-' + mm + '-' + dd;
+    fromDateInput.max = maxDateStr;
+    toDateInput.max = maxDateStr;
+
+    // Default to last 7 days
+    var lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    fromDateInput.value = lastWeek.getFullYear() + '-' + String(lastWeek.getMonth()+1).padStart(2,'0') + '-' + String(lastWeek.getDate()).padStart(2,'0');
+    toDateInput.value = maxDateStr;
+
+    function populateCategories(entries) {
+        var uniqueCategories = new Set();
+        for (var i = 0; i < entries.length; i++) {
+            // ignore green/all-clear events from stats
+            if (entries[i].state !== 'green') {
+                uniqueCategories.add(entries[i].category_desc);
+            }
+        }
+
+        categorySelect.innerHTML = '<option value="all">הכל</option>';
+        var sorted = Array.from(uniqueCategories).sort();
+        for (var j = 0; j < sorted.length; j++) {
+            var opt = document.createElement('option');
+            opt.value = sorted[j];
+            opt.textContent = sorted[j];
+            categorySelect.appendChild(opt);
+        }
+    }
+
+    function closeStats() {
+      statsBtn.classList.remove('open');
+      isStatsMode = false;
+      statsCounts = {};
+      maxStatsCount = 0;
+      document.getElementById('historyTimeLabel').style.display = 'none';
+
+      // Remove tooltips and reset styles
+      for (var name in locationPolygons) {
+        var p = locationPolygons[name];
+        p.setStyle(BASE_STYLE);
+        p.unbindTooltip();
+        p.bindTooltip(name, { direction: 'top', offset: [0, -20] }); // Restore default tooltip
+      }
+
+      enterLiveMode();
+      updateOverlay();
+    }
+
+    btnRow.addEventListener('click', function(e) {
+        if (e.target.classList.contains('tl-close')) {
+            closeStats();
+            popPanelHistory();
+            return;
+        }
+        if (statsBtn.classList.contains('open')) {
+            statsBtn.classList.remove('open');
+            popPanelHistory();
+            updateOverlay();
+        } else {
+            closeTimelinePanel();
+            closeSoundPanel();
+            map.closePopup();
+
+            statsBtn.classList.add('open');
+            pushPanelHistory();
+            updateOverlay();
+
+            // Initial fetch to populate categories if needed
+            if (extendedHistory.length === 0) {
+               fetchExtendedHistory(new Date(fromDateInput.value), new Date(toDateInput.value), function(entries) {
+                   populateCategories(entries);
+               });
+            } else {
+               populateCategories(extendedHistory);
+            }
+        }
+    });
+
+    // When date changes, we might want to refresh the available categories, but that requires a fetch
+    // To prevent spamming, we only do it when they actually click apply, or they can just leave it as 'all'
+    var dateChangeHandler = function() {
+        var fromStr = fromDateInput.value;
+        var toStr = toDateInput.value;
+        if (!fromStr || !toStr) return;
+
+        var fromDate = new Date(fromStr);
+        var toDate = new Date(toStr);
+        if (fromDate > toDate) return;
+
+        categorySelect.innerHTML = '<option value="all">טוען קטגוריות...</option>';
+        fetchExtendedHistory(fromDate, toDate, function(entries) {
+            populateCategories(entries);
+        });
+    };
+    fromDateInput.addEventListener('change', dateChangeHandler);
+    toDateInput.addEventListener('change', dateChangeHandler);
+
+    applyBtn.addEventListener('click', function() {
+        var fromStr = fromDateInput.value;
+        var toStr = toDateInput.value;
+        if (!fromStr || !toStr) return;
+
+        var fromDate = new Date(fromStr);
+        var toDate = new Date(toStr);
+
+        if (fromDate > toDate) {
+           alert("תאריך התחלה לא יכול להיות אחרי תאריך סיום");
+           return;
+        }
+
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'טוען נתונים...';
+
+        if (isLiveMode) {
+          saveLiveState();
+          isLiveMode = false;
+        }
+        isStatsMode = true;
+
+        // clear map
+        for (var name in locationStates) {
+            removeLocation(name);
+        }
+        locationStates = {};
+
+        fetchExtendedHistory(fromDate, toDate, function(fetchedEntries) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'הצג נתונים';
+
+            var selectedCategory = categorySelect.value;
+
+            // if we needed to refresh categories, do it and retain selection if possible
+            if (categorySelect.options.length <= 1) {
+                populateCategories(fetchedEntries);
+                if (Array.from(categorySelect.options).some(function(o) { return o.value === selectedCategory; })) {
+                    categorySelect.value = selectedCategory;
+                } else {
+                    selectedCategory = 'all';
+                }
+            }
+
+            statsCounts = {};
+            maxStatsCount = 0;
+
+            var startTs = fromDate.getTime();
+            var endTs = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999).getTime();
+
+            for (var i = 0; i < extendedHistory.length; i++) {
+                var e = extendedHistory[i];
+                if (e.alertDate >= startTs && e.alertDate <= endTs && e.state !== 'green') {
+                    if (selectedCategory === 'all' || e.category_desc === selectedCategory) {
+                        statsCounts[e.location] = (statsCounts[e.location] || 0) + 1;
+                        if (statsCounts[e.location] > maxStatsCount) {
+                            maxStatsCount = statsCounts[e.location];
+                        }
+                    }
+                }
+            }
+
+            // Apply heat map colors and tooltips
+            for (var locName in locationPolygons) {
+                 var p = locationPolygons[locName];
+                 var count = statsCounts[locName] || 0;
+                 p.setStyle(getStatsStyle(locName));
+
+                 p.unbindTooltip();
+                 if (count > 0) {
+                     p.bindTooltip('<b>' + locName + '</b><br>התרעות: ' + count, { direction: 'top', offset: [0, -20] });
+                 } else {
+                     p.bindTooltip(locName, { direction: 'top', offset: [0, -20] });
+                 }
+            }
+
+            document.getElementById('historyTimeLabel').style.display = 'block';
+            document.getElementById('historyTimeLabel').textContent = 'מציג מפת חום לפי מספר התרעות';
+            setStatus('err', 'מצב סטטיסטיקה'); // Use grey dot for stats mode
+        });
+    });
+  }
+
   function initTimeline() {
     var container = document.getElementById('timeline-btn');
     var btnRow = document.getElementById('timeline-btn-row');
     var slider = document.getElementById('timeline-slider');
     var label = document.getElementById('timeline-label');
     var playBtn = document.getElementById('tl-play');
+    var datePicker = document.getElementById('timeline-date-picker');
 
     var prevBtn = document.getElementById('tl-prev');
     var nextBtn = document.getElementById('tl-next');
     var ticksEl = document.getElementById('timeline-ticks');
 
-    if (extendedHistory.length === 0) return;
-
-    container.classList.add('has-data');
 
     var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
     var PLAY_SPEED = 600;
 
+    var viewTimelineMin = 0;
+    var viewTimelineMax = 0;
+
+    // init the input date to today
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    datePicker.max = yyyy + '-' + mm + '-' + dd;
+    datePicker.value = yyyy + '-' + mm + '-' + dd;
+
+    function setTimelineDayBounds(dayStr, isFromUser) {
+      if (!dayStr) return;
+      currentTimelineDay = dayStr;
+
+      var parts = dayStr.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+
+      var startOfDay = new Date(y, m, d, 0, 0, 0, 0).getTime();
+      var endOfDay = new Date(y, m, d, 23, 59, 59, 999).getTime();
+
+      // If it's today, cap at current time
+      var now = Date.now();
+      if (endOfDay > now) endOfDay = now;
+
+      // Find actual event bounds within this day to narrow the slider
+      var firstEvent = null;
+      var lastEvent = null;
+      for (var i = 0; i < extendedHistory.length; i++) {
+        var t = extendedHistory[i].alertDate;
+        if (t >= startOfDay && t <= endOfDay) {
+          if (!firstEvent || t < firstEvent) firstEvent = t;
+          if (!lastEvent || t > lastEvent) lastEvent = t;
+        }
+      }
+
+      // If we don't have events for this day yet and user selected it, fetch it
+      if (!firstEvent && isFromUser) {
+          fetchExtendedHistory(new Date(y, m, d), null, function() {
+            setTimelineDayBounds(dayStr, false); // call again without user flag
+          });
+          return;
+      }
+
+      if (firstEvent && lastEvent) {
+         // add a little buffer
+         viewTimelineMin = Math.max(startOfDay, firstEvent - 5 * 60000);
+         viewTimelineMax = Math.min(endOfDay, lastEvent + 15 * 60000);
+      } else {
+         // default whole day if no events
+         viewTimelineMin = startOfDay;
+         viewTimelineMax = endOfDay;
+      }
+
+      renderTicks();
+
+      // Seek to the end of the newly selected day
+      if (eventPeaks.length > 0) {
+        seekTo(eventPeaks[eventPeaks.length - 1]);
+      } else {
+        slider.value = 999;
+        enterHistoryMode(viewTimelineMax);
+      }
+    }
+
+    datePicker.addEventListener('change', function() {
+      stopPlay();
+      setTimelineDayBounds(datePicker.value, true);
+    });
 
     // --- Open / Close ---
     function isOpen() { return container.classList.contains('open'); }
 
     function openTimeline() {
+      if (extendedHistory.length === 0 && !currentTimelineDay) {
+          fetchExtendedHistory(new Date(), null, function() {
+              openTimeline();
+          });
+          return;
+      }
+
+      container.classList.add('has-data');
       closeSoundPanel();
+      var statsBtn = document.getElementById('stats-btn');
+      if (statsBtn && statsBtn.classList.contains('open')) {
+          statsBtn.classList.remove('open');
+          isStatsMode = false;
+      }
       map.closePopup();
       container.classList.add('open');
       pushPanelHistory();
-      timelineMax = Math.max(timelineMax, Date.now());
-      renderTicks();
-      if (eventPeaks.length > 0) {
-        seekTo(biggestEventPeak());
-      } else {
-        slider.value = 999;
-        enterHistoryMode(timelineMax);
-      }
+
+      setTimelineDayBounds(datePicker.value, false);
+
       updateOverlay();
     }
 
@@ -1915,7 +2352,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     closeTimelinePanel = closeTimeline;
 
     openTimelineToLastEvent = function() {
-      if (extendedHistory.length === 0) return;
       if (!isOpen()) openTimeline();
       else computeEventPeaks();
       stopPlay();
@@ -1933,19 +2369,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     });
 
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && isOpen()) {
-        closeTimeline();
+      if (e.key === 'Escape') {
+        var statsBtn = document.getElementById('stats-btn');
+        if (statsBtn && statsBtn.classList.contains('open')) {
+             statsBtn.classList.remove('open');
+             isStatsMode = false;
+             enterLiveMode();
+        }
+        if (isOpen()) closeTimeline();
         popPanelHistory();
       }
     });
 
     // --- Helpers ---
     function timeFromSlider(val) {
-      return timelineMin + (val / 999) * (timelineMax - timelineMin);
+      return viewTimelineMin + (val / 999) * (viewTimelineMax - viewTimelineMin);
     }
 
     function sliderFromTime(time) {
-      return Math.round(((time - timelineMin) / (timelineMax - timelineMin)) * 999);
+      return Math.round(((time - viewTimelineMin) / (viewTimelineMax - viewTimelineMin)) * 999);
     }
 
     function formatTime(ms) {
@@ -1956,13 +2398,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
 
     function clampTime(t) {
-      return Math.max(timelineMin, Math.min(timelineMax, t));
+      return Math.max(viewTimelineMin, Math.min(viewTimelineMax, t));
     }
 
     // --- Mode switching ---
-    function enterLiveMode() {
-      if (isLiveMode) return;
+    window.enterLiveMode = function() {
+      if (isLiveMode && !isStatsMode) return;
       isLiveMode = true;
+      isStatsMode = false;
       currentViewTime = 0;
       document.getElementById('historyTimeLabel').style.display = 'none';
       restoreLiveState();
@@ -1974,6 +2417,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         saveLiveState();
         isLiveMode = false;
       }
+      isStatsMode = false;
       currentViewTime = time;
       var timeStr = formatTime(time);
       label.textContent = timeStr;
@@ -2014,6 +2458,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       var groupLocs = new Set();
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
+        if (e.alertDate < viewTimelineMin || e.alertDate > viewTimelineMax) continue;
+
         if (e.state !== 'green') {
           if (prevWasGreen || firstNonGreenTime === null) firstNonGreenTime = e.alertDate;
           prevWasGreen = false;
@@ -2066,7 +2512,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       computedBands = [];
       computeEventPeaks();
       if (extendedHistory.length === 0) return;
-      var range = timelineMax - timelineMin;
+      var range = viewTimelineMax - viewTimelineMin;
       if (range <= 0) return;
 
       // Walk events, track per-location active state, emit bands
@@ -2092,16 +2538,26 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
+
+        // Skip events completely outside the day, but we still need to process them to know ongoing state at day start
+        if (e.alertDate > viewTimelineMax) break;
+
         expireStale(e.alertDate);
         if (e.state === 'green') {
           delete locStates[e.location];
         } else {
           locStates[e.location] = { state: e.state, since: e.alertDate };
         }
+
         var newDom = dominantState();
         if (newDom !== curState) {
           if (curState) {
-            bands.push({ start: curStart, end: e.alertDate, state: curState });
+            // clip band to view
+            var bandStart = Math.max(curStart, viewTimelineMin);
+            var bandEnd = Math.min(e.alertDate, viewTimelineMax);
+            if (bandEnd > bandStart) {
+                bands.push({ start: bandStart, end: bandEnd, state: curState });
+            }
           }
           curState = newDom;
           curStart = e.alertDate;
@@ -2109,13 +2565,17 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
       // Close final band, capped at staleness limit
       if (curState) {
-        // Band ends at the latest location expiry, capped by timelineMax
+        // Band ends at the latest location expiry, capped by viewTimelineMax
         var latestExpiry = 0;
         for (var loc in locStates) {
           var exp = locStates[loc].since + ALERT_MAX_AGE_MS;
           if (exp > latestExpiry) latestExpiry = exp;
         }
-        bands.push({ start: curStart, end: Math.min(latestExpiry, timelineMax), state: curState });
+        var bandStart = Math.max(curStart, viewTimelineMin);
+        var bandEnd = Math.min(latestExpiry, viewTimelineMax);
+        if (bandEnd > bandStart) {
+            bands.push({ start: bandStart, end: bandEnd, state: curState });
+        }
       }
 
       computedBands = bands;
@@ -2123,7 +2583,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       // Render bands as spans
       for (var j = 0; j < bands.length; j++) {
         var b = bands[j];
-        var leftPct = ((b.start - timelineMin) / range) * 100;
+        var leftPct = ((b.start - viewTimelineMin) / range) * 100;
         var widthPct = ((b.end - b.start) / range) * 100;
         if (widthPct < 0.1) widthPct = 0.1; // min visible width
         var span = document.createElement('span');
@@ -2167,7 +2627,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       var playEventIdx = -1;
       if (parseInt(slider.value) >= 999) {
         slider.value = 0;
-        enterHistoryMode(timelineMin);
+        enterHistoryMode(viewTimelineMin);
       }
 
       function findEventIdx(time) {
@@ -2183,9 +2643,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         var dt = now - lastFrame;
         lastFrame = now;
         var newTime = currentViewTime + dt * PLAY_SPEED;
-        if (newTime >= timelineMax) {
+        if (newTime >= viewTimelineMax) {
           slider.value = 0;
-          enterHistoryMode(timelineMin);
+          enterHistoryMode(viewTimelineMin);
           lastFrame = now;
           gapEnterFrame = null;
           playEventIdx = -1;
@@ -2265,6 +2725,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
     });
 
+    // initial fetch of extended history, no longer in main init
+    fetchExtendedHistory(new Date(), null, function() {
+       if (extendedHistory.length > 0) {
+           container.classList.add('has-data');
+       }
+    });
+
   }
 
   // --- Init ---
@@ -2282,11 +2749,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       buildPolygons(data);
 
       var isDebug2 = location.search.indexOf('debug2') !== -1;
-      var historyDone = false, extendedDone = false;
-      function onBothDone() {
-        if (!historyDone || !extendedDone) return;
+      var historyDone = false;
+      function onHistoryDone() {
         initialized = true;
         initTimeline();
+        initStats();
         if (!isDebug2) {
           setInterval(fetchLiveAlerts, LIVE_POLL_MS);
           setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
@@ -2331,8 +2798,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
             historyDone = true; extendedDone = true; onBothDone();
           });
       } else {
-        fetchHistory(function() { historyDone = true; onBothDone(); });
-        fetchExtendedHistory(function() { extendedDone = true; onBothDone(); });
+        fetchHistory(function() { historyDone = true; onHistoryDone(); });
       }
     }).catch(function(err) {
       console.error('Failed to load geo data:', err);
@@ -2489,6 +2955,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     panelHistoryPushed = false;
     closeSoundPanel();
     closeTimelinePanel();
+
+    var statsBtn = document.getElementById('stats-btn');
+    if (statsBtn && statsBtn.classList.contains('open')) {
+        statsBtn.classList.remove('open');
+        isStatsMode = false;
+        enterLiveMode();
+    }
+
     map.closePopup();
   });
 
@@ -2500,7 +2974,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       closed = true;
     }
     if (closed) popPanelHistory();
-    if (openPopupName) {
+    if (openPopupName && !isStatsMode) {
       var mapContainer = document.getElementById('map');
       var popupEl = document.querySelector('.leaflet-popup');
       if (!mapContainer.contains(e.target) && (!popupEl || !popupEl.contains(e.target))) {
