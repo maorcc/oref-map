@@ -6,13 +6,25 @@ const OREF_HEADERS = {
 const ROUTES = {
   '/api2/alerts': 'https://www.oref.org.il/warningMessages/alert/Alerts.json',
   '/api2/history': 'https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json',
-  '/api2/alarms-history': 'https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1',
 };
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const target = ROUTES[url.pathname];
+    
+    let target;
+    if (url.pathname === '/api2/alarms-history') {
+      const fromDate = url.searchParams.get('fromDate');
+      const toDate = url.searchParams.get('toDate');
+      // target = 'http://127.0.0.1:5000/Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=0';
+      target = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=0';
+      if (fromDate && toDate) {
+         target += `&fromDate=${fromDate}&toDate=${toDate}`;
+      }
+    } else {
+      target = ROUTES[url.pathname];
+    }
+
     if (!target) return new Response('Not found', { status: 404 });
 
     const colo = request.cf?.colo || '';
