@@ -1050,20 +1050,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
   }
 
-  // --- Title classification ---
-  var OFFICIAL_CATEGORY_MAP = {
-      1: "ירי רקטות וטילים",           // Rocket and Missile Fire
-      2: "חדירת כלי טיס עוין",         // Hostile Aircraft Intrusion
-      3: "חדירת מחבלים",               // Terrorist Infiltration
-      4: "רעידת אדמה",                 // Earthquake
-      5: "חשש לצונאמי",                // Tsunami Warning
-      6: "אירוע חומרים מסוכנים",       // Hazardous Materials Event
-      7: "אירוע רדיולוגי",             // Radiological Event
-      10: "חשש לאירוע ביולוגי",        // Biological Event
-      13: "יציאה ממרחב מוגן",          // "All Clear" / Event Ended (Special Update)
-      14: "התרעה מוקדמת"               // Pre-Alert (usually for aircraft tracking)
-  };
-
   function classifyTitle(title) {
     title = title.replace(/\s+/g, ' ').trim();
 
@@ -1655,13 +1641,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
               var e = entries[i];
               if (!e.data || !e.category_desc) continue;
               var rid = String(e.rid || '');
-              if (rid && extendedRids.has(rid)) continue;
               var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
               var state = classifyTitle(title);
               var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
+              var canonicalKey = location + '|' + (e.alertDate || '') + '|' + title;
+              if ((rid && extendedRids.has('rid:' + rid)) || extendedRids.has(canonicalKey)) continue;
               var ts = parseAlertDate(e.alertDate);
               if (!ts) continue;
-              if (rid) extendedRids.add(rid);
+              if (rid) extendedRids.add('rid:' + rid);
+              extendedRids.add(canonicalKey);
               var entryObj = { location: location, title: title, alertDate: ts, state: state, category_desc: title };
               extendedHistory.push(entryObj);
               parsedEntries.push(entryObj);
@@ -1674,6 +1662,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
               timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
             }
         }
+        console.log('Extended history:', extendedHistory.length, 'entries');
         if (onDone) onDone(parsedEntries);
       })
       .catch(function(err) {
