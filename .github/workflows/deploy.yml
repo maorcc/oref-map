@@ -39,8 +39,8 @@ jobs:
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN_PROXY }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID_PROXY }}
           wranglerVersion: "4"
           command: deploy
           workingDirectory: worker
