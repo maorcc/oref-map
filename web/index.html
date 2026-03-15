@@ -3,11 +3,12 @@
 <head>
 <script src="https://t.contentsquare.net/uxa/1d8a4cde7672c.js"></script>
 <meta charset="utf-8">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
+<link rel="icon" href="/icon-32.png" sizes="32x32">
+<link rel="icon" href="/icon-192.png" sizes="192x192">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#1a1a2e">
 <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/icon-180.png">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="מפת העורף">
 <title>מפת העורף - מפת התרעות פיקוד העורף</title>
@@ -42,17 +43,23 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 @keyframes toastFade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
 
-#legend {
+#right-panel {
   position: fixed;
-  bottom: 24px;
   right: 24px;
+  bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  z-index: 1000;
+}
+#legend {
   background: rgba(255,255,255,0.92);
   border-radius: 8px;
   padding: 12px 16px;
   font-size: 14px;
   line-height: 1.8;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 1000;
   direction: rtl;
   max-width: calc(100vw - 32px);
 }
@@ -184,8 +191,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 .location-item:hover { background: #f5f5f5; }
 
 #sound-btn, #timeline-btn, #location-btn, #locate-btn {
-  position: fixed;
-  right: 24px;
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -193,9 +198,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   border-radius: 20px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 1000;
   overflow: hidden;
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out;
+}
+#gps-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
 }
 @media (hover: hover) {
   #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #location-btn:hover, #locate-btn:hover {
@@ -204,20 +214,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 }
 #locate-btn {
-  bottom: 304px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  max-width: 40px;
-  height: 40px;
-  padding: 0;
   font: inherit;
   -webkit-appearance: none;
   appearance: none;
 }
+#locate-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
 #location-btn {
-  bottom: 256px;
   direction: ltr;
   display: flex;
   align-items: center;
@@ -235,7 +247,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: pointer;
 }
 #sound-btn {
-  bottom: 208px;
   direction: ltr;
   display: flex;
   flex-direction: column-reverse;
@@ -269,11 +280,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #timeline-btn {
   display: none;
-  bottom: 160px;
   direction: ltr;
   flex-direction: column-reverse;
 }
-#timeline-btn.has-data { display: flex; }
+#timeline-btn.has-data { display: flex; background: rgba(219, 234, 254, 0.92); border-color: #93c5fd; }
+#right-panel:has(#timeline-btn.open) #gps-row,
+#right-panel:has(#timeline-btn.open) #sound-btn { display: none; }
 #timeline-btn.open {
   width: 620px;
   max-width: min(calc(100vw - 48px), 620px);
@@ -373,6 +385,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #timeline-transport button:hover { background: #eee; }
 #timeline-transport button:active { background: #ddd; }
+#timeline-transport #tl-prev, #timeline-transport #tl-next { font-size: 19px; background: rgba(219, 234, 254, 0.92); border-color: #93c5fd; }
 #timeline-slider-wrap {
   position: relative;
   width: 100%;
@@ -406,9 +419,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 
 @media (max-width: 480px) {
-  #legend {
-    bottom: 12px;
+  #right-panel {
     right: 12px;
+    bottom: 28px;
+    gap: 6px;
+  }
+  #legend {
     padding: 8px 12px;
     font-size: 13px;
     line-height: 1.6;
@@ -425,41 +441,31 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     left: 8px;
   }
   #sound-btn, #timeline-btn, #location-btn, #locate-btn {
-    right: 12px;
     max-height: 36px;
   }
-  #locate-btn {
-    bottom: 244px;
-    width: 36px;
-    max-width: 36px;
-    height: 36px;
+  #gps-row {
+    gap: 6px;
   }
-  #location-btn {
-    bottom: 202px;
+  #locate-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
   }
   #location-btn-row {
     height: 36px;
     padding: 0 10px;
     gap: 5px;
   }
-  #sound-btn {
-    bottom: 158px;
-  }
   #sound-btn.open {
     max-width: calc(100vw - 24px);
-    right: 12px;
   }
   #sound-btn-row {
     height: 36px;
     padding: 0 10px;
     gap: 5px;
   }
-  #timeline-btn {
-    bottom: 116px;
-  }
   #timeline-btn.open {
     max-width: calc(100vw - 24px);
-    right: 12px;
   }
   #timeline-btn-row {
     height: 36px;
@@ -493,12 +499,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 <h1 id="page-title">מפת העורף</h1>
 
-<div id="legend">
-  <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
-  <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
-  <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
-  <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
-</div>
 
 <div id="status">
   <span class="indicator indicator-err" id="statusDot"></span>
@@ -524,16 +524,26 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
-<button id="locate-btn" type="button" title="הצג התרעות במפה">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
-</button>
-<button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
-  <div id="location-btn-row">
-    <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
+<div id="right-panel">
+  <div id="legend">
+    <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
+    <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
+    <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
+    <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
   </div>
-</button>
-
-<div id="sound-btn" title="השמעת צלילים">
+  <div id="gps-row">
+    <button id="locate-btn" type="button" title="הצג התרעות במפה">
+      <div id="locate-btn-row">
+        <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg></span><span class="btn-text">זום</span>
+      </div>
+    </button>
+    <button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
+      <div id="location-btn-row">
+        <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
+      </div>
+    </button>
+  </div>
+  <div id="sound-btn" title="השמעת צלילים">
   <div id="sound-btn-row">
     <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
   </div>
@@ -547,20 +557,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     </div>
   </div>
 </div>
-<div id="timeline-btn" title="ציר זמן">
-  <div id="timeline-btn-row">
-    <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
-  </div>
-  <div id="timeline-controls">
-    <div id="timeline-slider-wrap">
-      <div id="timeline-ticks"></div>
-      <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+  <div id="timeline-btn" title="ציר זמן">
+    <div id="timeline-btn-row">
+      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
     </div>
-    <span id="timeline-label"></span>
-    <div id="timeline-transport">
-      <button id="tl-prev" title="אירוע קודם">⏮</button>
-      <button id="tl-play" title="נגן/עצור">▶</button>
-      <button id="tl-next" title="אירוע הבא">⏭</button>
+    <div id="timeline-controls">
+      <div id="timeline-slider-wrap">
+        <div id="timeline-ticks"></div>
+        <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+      </div>
+      <span id="timeline-label"></span>
+      <div id="timeline-transport">
+        <button id="tl-prev" title="אירוע קודם">⏮</button>
+        <button id="tl-play" title="נגן/עצור">▶</button>
+        <button id="tl-next" title="אירוע הבא">⏭</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1805,6 +1816,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       container.classList.remove('open');
       stopPlay();
 
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
       enterLiveMode();
       updateOverlay();
     }

@@ -6,4 +6,4 @@ if [ ! -f "$POLYGONS" ]; then
   echo "WARNING: $POLYGONS not found. Run ./build in oref-polygons first, or production endpoint will be used."
 fi
 
-npx wrangler pages dev web/ "$@"
+npx wrangler pages dev web/ --ip 0.0.0.0 "$@"

@@ -52,7 +52,7 @@ export default {
       status: resp.status,
       headers: {
         'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
-        'Cache-Control': 's-maxage=4, max-age=2',
+        'Cache-Control': 's-maxage=4, max-age=3',
         'Access-Control-Allow-Origin': 'https://oref-map.org',
         'Access-Control-Expose-Headers': 'X-CF-Colo, X-Served-By',
         'X-CF-Colo': colo,
