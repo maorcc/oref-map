@@ -1,0 +1,7 @@
+name = "proxy1"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[placement]
+region = "azure:israelcentral"

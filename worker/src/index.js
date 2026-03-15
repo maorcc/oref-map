@@ -15,6 +15,17 @@ export default {
     const target = ROUTES[url.pathname];
     if (!target) return new Response('Not found', { status: 404 });
 
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': 'https://oref-map.org',
+          'Access-Control-Allow-Methods': 'GET',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+
     const colo = request.cf?.colo || '';
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), { method: 'GET' });
@@ -24,6 +35,7 @@ export default {
     if (cached) {
       const resp = new Response(cached.body, cached);
       resp.headers.set('X-CF-Colo', colo);
+      resp.headers.set('Access-Control-Allow-Origin', 'https://oref-map.org');
       return resp;
     }
 
@@ -36,6 +48,7 @@ export default {
       headers: {
         'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
         'Cache-Control': 's-maxage=4, max-age=2',
+        'Access-Control-Allow-Origin': 'https://oref-map.org',
         'X-CF-Colo': colo,
         'X-Served-By': 'worker',
       },
