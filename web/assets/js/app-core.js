@@ -30,7 +30,9 @@ var FADE_TICK_MS = 1000;
 
 // --- Map setup ---
 var DEFAULT_CENTER = [31.6, 34.8], DEFAULT_ZOOM = 8;
-var map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+var map = L.map('map', { preferCanvas: true, zoomControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 18
@@ -301,16 +303,16 @@ function playDangerSound() {
     playSequence(dangerBuffer);
   } else {
     fetch('mixkit-clear-announce-tones-2861.wav')
-      .then(function(r) { 
+      .then(function(r) {
         if (!r.ok) throw new Error('Fetch failed');
-        return r.arrayBuffer(); 
+        return r.arrayBuffer();
       })
       .then(function(b) { return ctx.decodeAudioData(b); })
       .then(function(buffer) {
         dangerBuffer = buffer;
         playSequence(dangerBuffer);
       })
-      .catch(function(err) { 
+      .catch(function(err) {
         console.error('Failed to play danger WAV, falling back to sine:', err);
         playFallback();
       });
@@ -1196,4 +1198,3 @@ function updateShadowState(name, state, since) {
     liveLocationStates[name] = { state: state, since: since || Date.now() };
   }
 }
-

@@ -55,7 +55,19 @@ function formatYmd(dateObj) {
 }
 
 function formatIsoSeconds(dateObj) {
-  return dateObj.toISOString().slice(0, 19);
+  const options = {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  };
+  // The 'sv' locale (Swedish) is commonly used to get an ISO-like format.
+  // It produces 'YYYY-MM-DD HH:mm:ss'. We just need to replace the space with a 'T'.
+  return new Intl.DateTimeFormat('sv', options).format(dateObj).replace(' ', 'T');
 }
 
 function parseDdMmYyyy(dateStr, endOfDay) {

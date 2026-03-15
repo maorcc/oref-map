@@ -13,21 +13,20 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #legend {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  top: 12px;
+  right: 12px;
   background: rgba(255,255,255,0.92);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 14px;
-  line-height: 1.8;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   z-index: 1000;
   direction: rtl;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 24px);
 }
 #legend .row { display: flex; align-items: center; gap: 8px; }
 #legend .dot {
-  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
 }
 .dot-red    { background: #ff0000; }
 .dot-purple { background: #9922cc; }
@@ -36,8 +35,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #status {
   position: fixed;
-  top: 80px;
-  left: 10px;
+  top: 50px;
+  left: 12px;
   background: rgba(255,255,255,0.92);
   border-radius: 6px;
   padding: 6px 12px;
@@ -91,8 +90,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #errorDetail {
   display: none;
   position: fixed;
-  top: 126px;
-  left: 10px;
+  top: 48px;
+  left: 12px;
   background: #fff;
   border: 1px solid #e00;
   border-radius: 6px;
@@ -202,7 +201,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #sound-btn, #timeline-btn, #stats-btn, #location-btn, #locate-btn {
   position: fixed;
-  right: 24px;
+  right: 12px;
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -221,7 +220,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 }
 #locate-btn {
-  bottom: 352px;
+  bottom: 204px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,7 +233,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   appearance: none;
 }
 #location-btn {
-  bottom: 304px;
+  bottom: 156px;
   direction: ltr;
   display: flex;
   align-items: center;
@@ -252,10 +251,17 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: pointer;
 }
 #sound-btn {
-  bottom: 256px;
-  direction: ltr;
+  top: 10px;
+  left: 12px;
+  right: auto;
+  direction: rtl;
   display: flex;
   flex-direction: column-reverse;
+  border-radius: 6px;
+  padding: 0;
+  font-size: 13px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 #sound-btn.open {
   width: 380px;
@@ -264,13 +270,16 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1001;
 }
 #sound-btn-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
+  gap: 0;
+  padding: 6px 12px;
+  height: auto;
+  min-height: 31px;
   direction: rtl;
   cursor: pointer;
 }
@@ -318,7 +327,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 
 #stats-btn {
-  bottom: 208px;
+  bottom: 108px;
   direction: ltr;
   display: flex;
   flex-direction: column-reverse;
@@ -330,6 +339,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
+  z-index: 1001;
 }
 #stats-btn-row {
   display: flex;
@@ -418,7 +428,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #timeline-btn {
   display: flex; /* THIS MUST BE FLEX TO BE VISIBLE */
-  bottom: 160px;
+  bottom: 60px;
   direction: ltr; /* This sets content to flow LTR by default inside the button */
   flex-direction: column-reverse;
 }
@@ -429,6 +439,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
+  z-index: 1001;
 }
 #timeline-btn-row {
   display: flex;
@@ -512,12 +523,16 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #timeline-mode-buttons button {
   flex: 1;
-  min-width: 100px;
+  min-width: 80px;
   padding: 6px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
   font-size: 12px;
+}
+#tl-mode-3h {
+  background: #93c5fd;
+  border: 1px solid #3b82f6;
 }
 #tl-mode-24h {
   background: #93c5fd;
@@ -595,17 +610,17 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 @media (max-width: 480px) {
   #legend {
-    bottom: 12px;
+    top: 12px;
     right: 12px;
-    padding: 8px 12px;
-    font-size: 13px;
-    line-height: 1.6;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.5;
   }
-  #legend .dot { width: 12px; height: 12px; }
+  #legend .dot { width: 8px; height: 8px; }
   #status {
-    top: 80px;
-    left: 10px;
-    padding: 5px 10px;
+    top: 60px;
+    left: 12px;
+    padding: 6px 10px;
     font-size: 13px;
   }
   .history-provider-control {
@@ -620,41 +635,42 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     padding: 2px 6px;
   }
   #errorDetail {
-    top: 118px; /* Adjusted since #history-provider-control is no longer fixed below #status */
-    left: 8px;
+    top: 48px;
+    left: 12px;
   }
   #sound-btn, #timeline-btn, #stats-btn, #location-btn, #locate-btn {
     right: 12px;
     max-height: 36px;
   }
+  #sound-btn {
+    top: 52px;
+    left: 12px;
+    right: auto;
+  }
+  #sound-btn-row {
+      min-height: 29px;
+  }
   #locate-btn {
-    bottom: 292px;
+    bottom: 200px;
     width: 36px;
     max-width: 36px;
     height: 36px;
   }
   #location-btn {
-    bottom: 248px;
+    bottom: 156px;
   }
   #location-btn-row {
     height: 36px;
     padding: 0 10px;
     gap: 5px;
   }
-  #sound-btn {
-    bottom: 204px;
-  }
   #sound-btn.open {
     max-width: calc(100vw - 24px);
-    right: 12px;
-  }
-  #sound-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
+    right: auto;
+    left: 12px;
   }
   #stats-btn {
-    bottom: 160px;
+    bottom: 112px;
   }
   #stats-btn.open {
     max-width: calc(100vw - 24px);
@@ -666,7 +682,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     gap: 5px;
   }
   #timeline-btn {
-    bottom: 116px;
+    bottom: 68px;
   }
   #timeline-btn.open {
     max-width: calc(100vw - 24px);

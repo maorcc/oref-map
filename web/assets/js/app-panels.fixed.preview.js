@@ -347,6 +347,7 @@ function initTimeline() {
   var label = document.getElementById('timeline-label');
   var playBtn = document.getElementById('tl-play');
   var datePicker = document.getElementById('timeline-date-picker');
+  var mode3hBtn = document.getElementById('tl-mode-3h');
   var mode24hBtn = document.getElementById('tl-mode-24h');
   var modeDateBtn = document.getElementById('tl-mode-date');
 
@@ -359,7 +360,7 @@ function initTimeline() {
 
   var viewTimelineMin = 0;
   var viewTimelineMax = 0;
-  var timelineMode = '24h'; // '24h' or 'date'
+  var timelineMode = '3h'; // '24h', '3h' or 'date'
 
   // init the input date to today by default
   var today = new Date();
@@ -376,12 +377,24 @@ function initTimeline() {
     if (mode === '24h') {
       mode24hBtn.style.background = '#93c5fd';
       mode24hBtn.style.borderColor = '#3b82f6';
+      mode3hBtn.style.background = '#f0f0f0';
+      mode3hBtn.style.borderColor = '#ccc';
+      modeDateBtn.style.background = '#f0f0f0';
+      modeDateBtn.style.borderColor = '#ccc';
+      datePicker.style.display = 'none';
+    } else if (mode === '3h') {
+      mode3hBtn.style.background = '#93c5fd';
+      mode3hBtn.style.borderColor = '#3b82f6';
+      mode24hBtn.style.background = '#f0f0f0';
+      mode24hBtn.style.borderColor = '#ccc';
       modeDateBtn.style.background = '#f0f0f0';
       modeDateBtn.style.borderColor = '#ccc';
       datePicker.style.display = 'none';
     } else {
       mode24hBtn.style.background = '#f0f0f0';
       mode24hBtn.style.borderColor = '#ccc';
+      mode3hBtn.style.background = '#f0f0f0';
+      mode3hBtn.style.borderColor = '#ccc';
       modeDateBtn.style.background = '#93c5fd';
       modeDateBtn.style.borderColor = '#3b82f6';
       datePicker.style.display = 'inline-block';
@@ -414,6 +427,15 @@ function initTimeline() {
         fromDate: null,
         toDate: null,
         startMs: now - (24 * 60 * 60 * 1000),
+        endMs: now
+      };
+    } else if (timelineMode === '3h') {
+      currentTimelineDay = null;
+      return {
+        mode: '1',
+        fromDate: null,
+        toDate: null,
+        startMs: now - (3 * 60 * 60 * 1000),
         endMs: now
       };
     }
@@ -468,6 +490,12 @@ function initTimeline() {
   }
 
   // Mode button handlers
+  mode3hBtn.addEventListener('click', function() {
+    stopPlay();
+    datePicker.value = getTodayIsoDate();
+    setTimelineMode('3h');
+    reloadTimelineData();
+  });
   mode24hBtn.addEventListener('click', function() {
     stopPlay();
     datePicker.value = getTodayIsoDate();
@@ -502,7 +530,7 @@ function initTimeline() {
 
     // Make sure mode is styled correctly on open
     datePicker.value = getTodayIsoDate();
-    setTimelineMode('24h');
+    setTimelineMode('3h');
     reloadTimelineData();
     updateOverlay();
   }

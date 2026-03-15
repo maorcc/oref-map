@@ -1,29 +1,29 @@
 // --- Init ---
 function init() {
   fetch('locations_polygons.json').then(function(r) { return r.json(); })
-  .then(function(data) {
-    buildPolygons(data);
+      .then(function(data) {
+        buildPolygons(data);
 
-    var historyDone = false;
-    function onHistoryDone() {
-      initialized = true;
-      initTimeline();
-      initStats();
-      setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-      setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-      setInterval(fadeGreenMarkers, FADE_TICK_MS);
-      fetchLiveAlerts();
-      updateLiveStatus();
-      if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+        var historyDone = false;
+        function onHistoryDone() {
+          initialized = true;
+          initTimeline();
+          initStats();
+          setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+          setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+          setInterval(fadeGreenMarkers, FADE_TICK_MS);
+          fetchLiveAlerts();
+          updateLiveStatus();
+          if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
 
-      // Ensure timeline button starts visible if history data exists from initial live poll
-      var container = document.getElementById('timeline-btn');
-      if (extendedHistory.length > 0 && container) {
-         container.classList.add('has-data');
-      }
-    }
-    fetchHistory(function() { historyDone = true; onHistoryDone(); });
-  }).catch(function(err) {
+          // Ensure timeline button starts visible if history data exists from initial live poll
+          var container = document.getElementById('timeline-btn');
+          if (extendedHistory.length > 0 && container) {
+            container.classList.add('has-data');
+          }
+        }
+        fetchHistory(function() { historyDone = true; onHistoryDone(); });
+      }).catch(function(err) {
     console.error('Failed to load geo data:', err);
     setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
   });
@@ -137,7 +137,7 @@ function openSoundPanel() {
   closeTimelinePanel();
   var statsBtn = document.getElementById('stats-btn');
   if (statsBtn && statsBtn.classList.contains('open')) {
-       statsBtn.querySelector('.tl-close').click();
+    statsBtn.querySelector('.tl-close').click();
   }
 
   map.closePopup();
@@ -200,7 +200,7 @@ soundSearch.addEventListener('input', function() {
   var matches = Object.keys(locationPolygons).filter(function(name) {
     return name.includes(q);
   }).slice(0, 20);
-  
+
   soundResults.innerHTML = matches.map(function(m) {
     return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
   }).join('');
@@ -221,7 +221,7 @@ window.addEventListener('popstate', function() {
 
   var statsBtn = document.getElementById('stats-btn');
   if (statsBtn && statsBtn.classList.contains('open')) {
-      statsBtn.querySelector('.tl-close').click();
+    statsBtn.querySelector('.tl-close').click();
   }
 
   map.closePopup();
