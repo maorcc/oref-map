@@ -19,12 +19,16 @@ const TZEVA_ADOM_TO_OFFICIAL_API = {
 };
 
 const OFFICIAL_CATEGORY_MAP = {
-  1: '\u05d9\u05e8\u05d9 \u05e8\u05e7\u05d8\u05d5\u05ea \u05d5\u05d8\u05d9\u05dc\u05d9\u05dd',
-  2: '\u05d7\u05d3\u05d9\u05e8\u05ea \u05db\u05dc\u05d9 \u05d8\u05d9\u05e1 \u05e2\u05d5\u05d9\u05df',
-  4: '\u05d7\u05d3\u05d9\u05e8\u05ea \u05de\u05d7\u05d1\u05dc\u05d9\u05dd',
-  13: '\u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd',
-  14: '\u05d1\u05d3\u05e7\u05d5\u05ea \u05d4\u05e7\u05e8\u05d5\u05d1\u05d5\u05ea \u05e6\u05e4\u05d5\u05d9\u05d5\u05ea \u05dc\u05d4\u05ea\u05e7\u05d1\u05dc \u05d4\u05ea\u05e8\u05e2\u05d5\u05ea \u05d1\u05d0\u05d6\u05d5\u05e8\u05da',
-  8: '\u05d4\u05ea\u05e8\u05e2\u05d4',
+  1: "ירי רקטות וטילים",
+  2: "חדירת כלי טיס עוין",
+  3: "חדירת מחבלים",
+  4: "רעידת אדמה",
+  5: "חשש לצונאמי",
+  6: "אירוע חומרים מסוכנים",
+  7: "אירוע רדיולוגי",
+  10: "חשש לאירוע ביולוגי",
+  13: "האירוע הסתיים",
+  14: "התרעה מוקדמת"
 };
 
 function jsonResponse(body, status, extraHeaders) {
@@ -163,36 +167,60 @@ function transformTzevaPayload(payload, startTs, endTs) {
 
   for (let i = 0; i < alerts.length; i++) {
     const alert = alerts[i] || {};
-    const startTime = Number(alert.startTime);
-    if (!Number.isFinite(startTime)) continue;
-    if (startTime < startTs || startTime > endTs) continue;
-
     const cities = Array.isArray(alert.cities) ? alert.cities : [];
     if (cities.length === 0) continue;
 
-    const category = mapTzevaTypeToOfficialCategory(alert.type);
-    const categoryDesc = OFFICIAL_CATEGORY_MAP[category] || OFFICIAL_CATEGORY_MAP[8];
-    const alertDate = formatIsoSeconds(new Date(startTime * 1000));
+    // Create "start" event
+    const startTime = Number(alert.startTime);
+    if (Number.isFinite(startTime) && startTime >= startTs && startTime <= endTs) {
+      const startCategory = mapTzevaTypeToOfficialCategory(alert.type);
+      const startCategoryDesc = OFFICIAL_CATEGORY_MAP[startCategory] || OFFICIAL_CATEGORY_MAP[8];
+      const startAlertDate = formatIsoSeconds(new Date(startTime * 1000));
 
-    for (let c = 0; c < cities.length; c++) {
-      const city = cities[c];
-      if (city === null || city === undefined) continue;
-      const cityName = String(city).trim();
-      if (!cityName) continue;
+      for (let c = 0; c < cities.length; c++) {
+        const city = cities[c];
+        if (city === null || city === undefined) continue;
+        const cityName = String(city).trim();
+        if (!cityName) continue;
 
-      transformed.push({
-        data: cityName,
-        alertDate: alertDate,
-        category_desc: categoryDesc,
-        category: category,
-        rid: 0,
-        __startTime: startTime,
-      });
+        transformed.push({
+          data: cityName,
+          alertDate: startAlertDate,
+          category_desc: startCategoryDesc,
+          category: startCategory,
+          rid: 0,
+          __timestamp: startTime,
+        });
+      }
+    }
+
+    // Create "end" event
+    const endTime = Number(alert.endTime);
+    if (Number.isFinite(endTime) && endTime > 0 && endTime >= startTs && endTime <= endTs) {
+      const endCategory = 13;
+      const endCategoryDesc = OFFICIAL_CATEGORY_MAP[endCategory];
+      const endAlertDate = formatIsoSeconds(new Date(endTime * 1000));
+
+      for (let c = 0; c < cities.length; c++) {
+        const city = cities[c];
+        if (city === null || city === undefined) continue;
+        const cityName = String(city).trim();
+        if (!cityName) continue;
+
+        transformed.push({
+          data: cityName,
+          alertDate: endAlertDate,
+          category_desc: endCategoryDesc,
+          category: endCategory,
+          rid: 0,
+          __timestamp: endTime,
+        });
+      }
     }
   }
 
   transformed.sort(function(a, b) {
-    return b.__startTime - a.__startTime;
+    return b.__timestamp - a.__timestamp;
   });
 
   return transformed.map(function(entry) {
