@@ -393,7 +393,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #timeline-ticks {
   position: relative;
-  width: 100%;
+  width: calc(100% - 16px);
+  margin: 0 8px;
   height: 8px;
   pointer-events: none;
   border-radius: 4px;
@@ -409,6 +410,29 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #timeline-slider {
   width: 100%;
   cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: #93c5fd;
+  outline: none;
+}
+#timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 20px;
+  background: #3b82f6;
+  clip-path: polygon(50% 0%, 100% 45%, 100% 100%, 0% 100%, 0% 45%);
+  cursor: pointer;
+}
+#timeline-slider::-moz-range-thumb {
+  width: 13px;
+  height: 20px;
+  background: #3b82f6;
+  clip-path: polygon(50% 0%, 100% 45%, 100% 100%, 0% 100%, 0% 45%);
+  cursor: pointer;
+  border: none;
 }
 #timeline-label {
   font-size: 15px;
@@ -1804,7 +1828,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       timelineMax = Math.max(timelineMax, Date.now());
       renderTicks();
       if (eventPeaks.length > 0) {
-        seekTo(eventPeaks[eventPeaks.length - 1]);
+        seekTo(biggestEventPeak());
       } else {
         slider.value = 999;
         enterHistoryMode(timelineMax);
@@ -1825,6 +1849,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     openTimelineToLastEvent = function() {
       if (extendedHistory.length === 0) return;
       if (!isOpen()) openTimeline();
+      if (eventPeaks.length > 0) seekTo(eventPeaks[eventPeaks.length - 1]);
     };
 
     btnRow.addEventListener('click', function(e) {
@@ -1903,27 +1928,42 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var STATE_PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
     var computedBands = []; // [{start, end, state}] - visual tick bands
     var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
+    var eventPeakSizes = []; // [number] — unique location count for each peak
 
     function computeEventPeaks() {
       eventPeaks = [];
+      eventPeakSizes = [];
       var lastNonGreenTime = null;
       var prevWasGreen = false;
+      var groupLocs = new Set();
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
         if (e.state !== 'green') {
           prevWasGreen = false;
           lastNonGreenTime = e.alertDate;
+          groupLocs.add(e.location);
         } else {
           if (!prevWasGreen && lastNonGreenTime !== null) {
             eventPeaks.push(lastNonGreenTime);
+            eventPeakSizes.push(groupLocs.size);
           }
           prevWasGreen = true;
+          groupLocs = new Set();
         }
       }
       // Ongoing event: last entry was non-green
       if (!prevWasGreen && lastNonGreenTime !== null) {
         eventPeaks.push(lastNonGreenTime);
+        eventPeakSizes.push(groupLocs.size);
       }
+    }
+
+    function biggestEventPeak() {
+      var bestIdx = 0;
+      for (var i = 1; i < eventPeakSizes.length; i++) {
+        if (eventPeakSizes[i] >= eventPeakSizes[bestIdx]) bestIdx = i;
+      }
+      return eventPeaks[bestIdx];
     }
 
     function renderTicks() {
