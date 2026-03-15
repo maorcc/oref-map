@@ -276,7 +276,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #stats-btn.open {
   width: 340px;
   max-width: min(calc(100vw - 48px), 340px);
-  max-height: 250px;
+  max-height: calc(100vh - 90px);
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
@@ -290,13 +290,26 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: rtl;
   cursor: pointer;
 }
+#stats-btn.open #stats-btn-row {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  height: auto;
+  padding: 4px 0;
+  border: none;
+  z-index: 1;
+}
 #stats-btn.open #stats-panel {
   border-bottom: 1px solid #ddd;
+  max-height: calc(100vh - 170px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 #stats-panel {
   display: none;
   padding: 12px;
   direction: rtl;
+  margin-bottom: 40px; /* Space for the bottom row */
 }
 #stats-btn.open #stats-panel { display: block; }
 #stats-panel label { display: block; margin-bottom: 5px; font-size: 13px; }
@@ -305,12 +318,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #stats-panel button:hover { background: #3367D6; }
 
 #timeline-btn {
-  display: none;
+  display: flex; /* THIS MUST BE FLEX TO BE VISIBLE */
   bottom: 160px;
   direction: ltr; /* This sets content to flow LTR by default inside the button */
   flex-direction: column-reverse;
 }
-#timeline-btn.has-data { display: flex; }
 #timeline-btn.open {
   width: 620px;
   max-width: min(calc(100vw - 48px), 620px);
@@ -618,21 +630,32 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     <span class="btn-icon">📊</span><span class="btn-text">סטטיסטיקות</span><span class="tl-close">✕</span>
   </div>
   <div id="stats-panel">
-    <div style="display:flex; gap:10px; margin-bottom: 10px;">
-      <div style="flex:1;">
-        <label>מתאריך</label>
-        <input type="date" id="stats-from-date" max="">
+    <div style="margin-bottom: 10px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: bold;">טווח זמן</label>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;">
+        <button id="stats-mode-1-btn" class="stats-mode-btn" data-mode="1" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; background: #f0f0f0; cursor: pointer; font-size: 13px; font-weight: bold;">24 שעות אחרונות</button>
+        <button id="stats-mode-2-btn" class="stats-mode-btn" data-mode="2" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; background: #f0f0f0; cursor: pointer; font-size: 13px; font-weight: bold;">שבוע אחרון</button>
+        <button id="stats-mode-3-btn" class="stats-mode-btn" data-mode="3" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; background: #f0f0f0; cursor: pointer; font-size: 13px; font-weight: bold;">חודש אחרון</button>
+        <button id="stats-mode-0-btn" class="stats-mode-btn" data-mode="0" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; background: #f0f0f0; cursor: pointer; font-size: 13px; font-weight: bold;">מותאם אישית</button>
       </div>
-      <div style="flex:1;">
-        <label>עד תאריך</label>
-        <input type="date" id="stats-to-date" max="">
+      <div id="stats-custom-dates" style="display: none; margin-bottom: 10px;">
+        <div style="display:flex; gap:10px; margin-bottom: 10px;">
+          <div style="flex:1;">
+            <label style="display: block; font-size: 12px;">מתאריך</label>
+            <input type="date" id="stats-from-date" max="">
+          </div>
+          <div style="flex:1;">
+            <label style="display: block; font-size: 12px;">עד תאריך</label>
+            <input type="date" id="stats-to-date" max="">
+          </div>
+        </div>
       </div>
+      <div id="stats-range-label" style="font-size: 12px; color: #666; margin-bottom: 10px; text-align: center;"></div>
     </div>
     <label>סוג התרעה</label>
     <select id="stats-category">
       <option value="all">טוען...</option>
     </select>
-    <button id="stats-apply-btn">הצג נתונים</button>
   </div>
 </div>
 
@@ -641,6 +664,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
   </div>
   <div id="timeline-controls">
+    <div id="timeline-mode-buttons" style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+      <button id="tl-mode-24h" style="flex: 1; min-width: 100px; padding: 6px; background: #93c5fd; border: 1px solid #3b82f6; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">24 שעות אחרונות</button>
+      <button id="tl-mode-date" style="flex: 1; min-width: 100px; padding: 6px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">בחר תאריך</button>
+    </div>
     <div id="timeline-slider-wrap">
       <div id="timeline-ticks"></div>
       <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
@@ -820,6 +847,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   // --- Timeline state ---
   var extendedHistory = [];     // sorted ascending by alertDate ms
   var extendedRids = new Set(); // dedup by rid
+
   var timelineMin = 0;
   var timelineMax = 0;
   var isLiveMode = true;
@@ -1618,15 +1646,28 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   // --- Extended history (timeline & stats) ---
-  function fetchExtendedHistory(fromDateObj, toDateObj, onDone) {
+  function fetchExtendedHistory(fromDateObj, toDateObj, onDone, mode, options) {
+    options = options || {};
     var apiPath = 'alarms-history';
-    if (fromDateObj && toDateObj) {
+
+    // If mode is specified (1, 2, 3), use it
+    if (mode && mode !== '0') {
+      apiPath += '?mode=' + mode;
+    } else if (fromDateObj && toDateObj) {
+      // Custom date range (mode 0)
       var dStrFrom = formatDateForApi(fromDateObj);
       var dStrTo = formatDateForApi(toDateObj);
-      apiPath += '?fromDate=' + dStrFrom + '&toDate=' + dStrTo;
+      apiPath += '?fromDate=' + dStrFrom + '&toDate=' + dStrTo + '&mode=0';
     } else if (fromDateObj) {
       var dStr = formatDateForApi(fromDateObj);
-      apiPath += '?fromDate=' + dStr + '&toDate=' + dStr;
+      apiPath += '?fromDate=' + dStr + '&toDate=' + dStr + '&mode=0';
+    }
+
+    if (options.replaceHistory) {
+      extendedHistory = [];
+      extendedRids = new Set();
+      timelineMin = 0;
+      timelineMax = 0;
     }
 
     apiFetch(apiPath)
@@ -1663,7 +1704,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
             }
         }
         console.log('Extended history:', extendedHistory.length, 'entries');
-        if (onDone) onDone(parsedEntries);
+        if (onDone) {
+            onDone(parsedEntries);
+        }
       })
       .catch(function(err) {
         console.error('Extended history fetch error:', err);
@@ -1672,25 +1715,26 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   function reconstructStateAt(targetTime) {
-    // Clear all polygons
+    // Clear current markers entirely
     for (var name in locationStates) {
       var entry = locationStates[name];
       if (entry && entry.marker) {
         entry.marker.setStyle(BASE_STYLE);
-        entry.marker.closePopup();
+        if (openPopupName !== name) entry.marker.closePopup();
       }
     }
     locationStates = {};
 
-    // Replay history up to targetTime (limit replay to current selected day if possible)
-    var dayStart = currentTimelineDay ? new Date(currentTimelineDay).setHours(0,0,0,0) : 0;
-
-    var accumulated = {}; // {location: {state, since}}
+    var lookbackTime = targetTime - ALERT_MAX_AGE_MS;
+    var accumulated = {};
     var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+
+    // Replay from lookbackTime to targetTime
     for (var i = 0; i < extendedHistory.length; i++) {
       var e = extendedHistory[i];
-      if (currentTimelineDay && e.alertDate < dayStart) continue; // skip older days to start clean
       if (e.alertDate > targetTime) break;
+      if (e.alertDate < lookbackTime) continue;
+
       var existing = accumulated[e.location];
       if (existing) {
         if (e.state === 'green') {
@@ -1709,25 +1753,20 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       var sinceTime = accumulated[loc].since;
       var polygon = locationPolygons[loc] || null;
       if (!polygon) continue;
+
+      var elapsed = targetTime - sinceTime;
       if (s === 'green') {
-        var elapsed = targetTime - sinceTime;
-        if (elapsed >= GREEN_FADE_MS) continue; // already faded
+        if (elapsed >= GREEN_FADE_MS) continue;
         var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
         polygon.setStyle({
-          color: COLORS.green,
-          fillColor: COLORS.green,
-          fillOpacity: opacity,
-          opacity: opacity + 0.15,
-          weight: 1
+          color: COLORS.green, fillColor: COLORS.green,
+          fillOpacity: opacity, opacity: opacity + 0.15, weight: 1
         });
       } else {
-        if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
+        if (elapsed >= ALERT_MAX_AGE_MS) continue;
         polygon.setStyle({
-          color: COLORS[s],
-          fillColor: COLORS[s],
-          fillOpacity: 0.3,
-          opacity: 0.45,
-          weight: s === 'red' ? 0.5 : 1
+          color: COLORS[s], fillColor: COLORS[s],
+          fillOpacity: 0.3, opacity: 0.45, weight: s === 'red' ? 0.5 : 1
         });
       }
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
@@ -1783,12 +1822,16 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   function initStats() {
     var statsBtn = document.getElementById('stats-btn');
     var btnRow = document.getElementById('stats-btn-row');
+    var customDatesDiv = document.getElementById('stats-custom-dates');
     var fromDateInput = document.getElementById('stats-from-date');
     var toDateInput = document.getElementById('stats-to-date');
-    var applyBtn = document.getElementById('stats-apply-btn');
     var categorySelect = document.getElementById('stats-category');
+    var rangeLabelDiv = document.getElementById('stats-range-label');
 
-    // Set max dates to today
+    var currentStatsMode = 1; // 1=24h, 2=7d, 3=30d, 0=custom
+    var currentStatsEntries = [];
+    var statsLoadToken = 0;
+
     var today = new Date();
     var yyyy = today.getFullYear();
     var mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -1797,28 +1840,181 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     fromDateInput.max = maxDateStr;
     toDateInput.max = maxDateStr;
 
-    // Default to last 7 days
-    var lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    fromDateInput.value = lastWeek.getFullYear() + '-' + String(lastWeek.getMonth()+1).padStart(2,'0') + '-' + String(lastWeek.getDate()).padStart(2,'0');
+    var yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    fromDateInput.value = yesterday.getFullYear() + '-' + String(yesterday.getMonth()+1).padStart(2,'0') + '-' + String(yesterday.getDate()).padStart(2,'0');
     toDateInput.value = maxDateStr;
 
+    function parseIsoDayStart(dayStr) {
+      var parts = (dayStr || '').split('-');
+      if (parts.length !== 3) return null;
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+      var dt = new Date(y, m, d, 0, 0, 0, 0);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function endOfDayMs(dayStart) {
+      return new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 23, 59, 59, 999).getTime();
+    }
+
+    function buildStatsRequest() {
+      var now = Date.now();
+      if (currentStatsMode === 1 || currentStatsMode === 2 || currentStatsMode === 3) {
+        var hours = currentStatsMode === 1 ? 24 : (currentStatsMode === 2 ? 24 * 7 : 24 * 30);
+        return {
+          mode: String(currentStatsMode),
+          fromDate: null,
+          toDate: null,
+          startMs: now - hours * 60 * 60 * 1000,
+          endMs: now
+        };
+      }
+
+      var fromStart = parseIsoDayStart(fromDateInput.value);
+      var toStart = parseIsoDayStart(toDateInput.value);
+      if (!fromStart || !toStart) return null;
+      if (fromStart.getTime() > toStart.getTime()) return null;
+
+      var endMs = endOfDayMs(toStart);
+      if (endMs > now) endMs = now;
+
+      return {
+        mode: '0',
+        fromDate: fromStart,
+        toDate: toStart,
+        startMs: fromStart.getTime(),
+        endMs: endMs
+      };
+    }
+
+    function updateRangeLabel() {
+      var label = '';
+      if (currentStatsMode === 1) {
+        label = 'מציג 24 שעות אחרונות';
+      } else if (currentStatsMode === 2) {
+        label = 'מציג שבוע אחרון';
+      } else if (currentStatsMode === 3) {
+        label = 'מציג חודש אחרון';
+      } else if (currentStatsMode === 0) {
+        var fromStr = fromDateInput.value;
+        var toStr = toDateInput.value;
+        if (fromStr && toStr) label = fromStr + ' עד ' + toStr;
+      }
+      rangeLabelDiv.textContent = label;
+    }
+
+    function setModeButtonStyles(mode) {
+      document.querySelectorAll('.stats-mode-btn').forEach(function(btn) {
+        if (btn.getAttribute('data-mode') === String(mode)) {
+          btn.style.background = '#93c5fd';
+          btn.style.borderColor = '#3b82f6';
+        } else {
+          btn.style.background = '#f0f0f0';
+          btn.style.borderColor = '#ccc';
+        }
+      });
+    }
+
     function populateCategories(entries) {
-        var uniqueCategories = new Set();
+      var previousSelection = categorySelect.value || 'all';
+      var uniqueCategories = new Set();
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i].state !== 'green') uniqueCategories.add(entries[i].category_desc);
+      }
+
+      categorySelect.innerHTML = '<option value="all">הכל</option>';
+      var sorted = Array.from(uniqueCategories).sort();
+      for (var j = 0; j < sorted.length; j++) {
+        var opt = document.createElement('option');
+        opt.value = sorted[j];
+        opt.textContent = sorted[j];
+        categorySelect.appendChild(opt);
+      }
+
+      if (previousSelection === 'all' || sorted.indexOf(previousSelection) >= 0) {
+        categorySelect.value = previousSelection;
+      } else {
+        categorySelect.value = 'all';
+      }
+    }
+
+    function applyStatsHeatMap(entries) {
+      if (isLiveMode) {
+        saveLiveState();
+        isLiveMode = false;
+      }
+      isStatsMode = true;
+
+      for (var name in locationStates) {
+        removeLocation(name);
+      }
+      locationStates = {};
+
+      var selectedCategory = categorySelect.value || 'all';
+      statsCounts = {};
+      maxStatsCount = 0;
+
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (e.state === 'green') continue;
+        if (selectedCategory !== 'all' && e.category_desc !== selectedCategory) continue;
+        statsCounts[e.location] = (statsCounts[e.location] || 0) + 1;
+        if (statsCounts[e.location] > maxStatsCount) maxStatsCount = statsCounts[e.location];
+      }
+
+      for (var locName in locationPolygons) {
+        var p = locationPolygons[locName];
+        var count = statsCounts[locName] || 0;
+        p.setStyle(getStatsStyle(locName));
+        p.unbindTooltip();
+        if (count > 0) {
+          p.bindTooltip('<b>' + locName + '</b><br>התרעות: ' + count, { direction: 'top', offset: [0, -20] });
+        } else {
+          p.bindTooltip(locName, { direction: 'top', offset: [0, -20] });
+        }
+      }
+
+      document.getElementById('historyTimeLabel').style.display = 'block';
+      document.getElementById('historyTimeLabel').textContent = 'מציג מפת חום לפי מספר התרעות';
+      setStatus('err', 'מצב סטטיסטיקה');
+    }
+
+    function reloadStatsData() {
+      var req = buildStatsRequest();
+      if (!req) {
+        currentStatsEntries = [];
+        populateCategories([]);
+        applyStatsHeatMap([]);
+        return;
+      }
+
+      var myToken = ++statsLoadToken;
+      categorySelect.disabled = true;
+      categorySelect.innerHTML = '<option value="all">טוען...</option>';
+
+      fetchExtendedHistory(req.fromDate, req.toDate, function(entries) {
+        if (myToken !== statsLoadToken) return;
+
+        var filtered = [];
         for (var i = 0; i < entries.length; i++) {
-            // ignore green/all-clear events from stats
-            if (entries[i].state !== 'green') {
-                uniqueCategories.add(entries[i].category_desc);
-            }
+          var ts = entries[i].alertDate;
+          if (ts >= req.startMs && ts <= req.endMs) filtered.push(entries[i]);
         }
 
-        categorySelect.innerHTML = '<option value="all">הכל</option>';
-        var sorted = Array.from(uniqueCategories).sort();
-        for (var j = 0; j < sorted.length; j++) {
-            var opt = document.createElement('option');
-            opt.value = sorted[j];
-            opt.textContent = sorted[j];
-            categorySelect.appendChild(opt);
-        }
+        currentStatsEntries = filtered;
+        populateCategories(filtered);
+        categorySelect.disabled = false;
+        applyStatsHeatMap(filtered);
+      }, req.mode, { replaceHistory: true });
+    }
+
+    function setStatsMode(mode) {
+      currentStatsMode = parseInt(mode, 10);
+      setModeButtonStyles(currentStatsMode);
+      customDatesDiv.style.display = (currentStatsMode === 0) ? 'block' : 'none';
+      updateRangeLabel();
+      reloadStatsData();
     }
 
     function closeStats() {
@@ -1826,149 +2022,66 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       isStatsMode = false;
       statsCounts = {};
       maxStatsCount = 0;
+      currentStatsEntries = [];
       document.getElementById('historyTimeLabel').style.display = 'none';
 
-      // Remove tooltips and reset styles
       for (var name in locationPolygons) {
         var p = locationPolygons[name];
         p.setStyle(BASE_STYLE);
         p.unbindTooltip();
-        p.bindTooltip(name, { direction: 'top', offset: [0, -20] }); // Restore default tooltip
+        p.bindTooltip(name, { direction: 'top', offset: [0, -20] });
       }
 
       enterLiveMode();
       updateOverlay();
     }
 
-    btnRow.addEventListener('click', function(e) {
-        if (e.target.classList.contains('tl-close')) {
-            closeStats();
-            popPanelHistory();
-            return;
-        }
-        if (statsBtn.classList.contains('open')) {
-            statsBtn.classList.remove('open');
-            popPanelHistory();
-            updateOverlay();
-        } else {
-            closeTimelinePanel();
-            closeSoundPanel();
-            map.closePopup();
-
-            statsBtn.classList.add('open');
-            pushPanelHistory();
-            updateOverlay();
-
-            // Initial fetch to populate categories if needed
-            if (extendedHistory.length === 0) {
-               fetchExtendedHistory(new Date(fromDateInput.value), new Date(toDateInput.value), function(entries) {
-                   populateCategories(entries);
-               });
-            } else {
-               populateCategories(extendedHistory);
-            }
-        }
+    document.querySelectorAll('.stats-mode-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        var mode = btn.getAttribute('data-mode');
+        if (String(currentStatsMode) === mode) return;
+        setStatsMode(mode);
+      });
     });
 
-    // When date changes, we might want to refresh the available categories, but that requires a fetch
-    // To prevent spamming, we only do it when they actually click apply, or they can just leave it as 'all'
-    var dateChangeHandler = function() {
-        var fromStr = fromDateInput.value;
-        var toStr = toDateInput.value;
-        if (!fromStr || !toStr) return;
-
-        var fromDate = new Date(fromStr);
-        var toDate = new Date(toStr);
-        if (fromDate > toDate) return;
-
-        categorySelect.innerHTML = '<option value="all">טוען קטגוריות...</option>';
-        fetchExtendedHistory(fromDate, toDate, function(entries) {
-            populateCategories(entries);
-        });
+    var onCustomDateChange = function() {
+      if (currentStatsMode !== 0) return;
+      updateRangeLabel();
+      reloadStatsData();
     };
-    fromDateInput.addEventListener('change', dateChangeHandler);
-    toDateInput.addEventListener('change', dateChangeHandler);
+    fromDateInput.addEventListener('change', onCustomDateChange);
+    toDateInput.addEventListener('change', onCustomDateChange);
 
-    applyBtn.addEventListener('click', function() {
-        var fromStr = fromDateInput.value;
-        var toStr = toDateInput.value;
-        if (!fromStr || !toStr) return;
+    categorySelect.addEventListener('change', function() {
+      if (!statsBtn.classList.contains('open') || !isStatsMode) return;
+      applyStatsHeatMap(currentStatsEntries);
+    });
 
-        var fromDate = new Date(fromStr);
-        var toDate = new Date(toStr);
+    btnRow.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tl-close')) {
+        closeStats();
+        popPanelHistory();
+        return;
+      }
+      if (statsBtn.classList.contains('open')) return;
 
-        if (fromDate > toDate) {
-           alert("תאריך התחלה לא יכול להיות אחרי תאריך סיום");
-           return;
-        }
+      closeTimelinePanel();
+      closeSoundPanel();
+      map.closePopup();
+      statsBtn.classList.add('open');
+      pushPanelHistory();
+      updateOverlay();
 
-        applyBtn.disabled = true;
-        applyBtn.textContent = 'טוען נתונים...';
+      setStatsMode(1);
+    });
 
-        if (isLiveMode) {
-          saveLiveState();
-          isLiveMode = false;
-        }
-        isStatsMode = true;
-
-        // clear map
-        for (var name in locationStates) {
-            removeLocation(name);
-        }
-        locationStates = {};
-
-        fetchExtendedHistory(fromDate, toDate, function(fetchedEntries) {
-            applyBtn.disabled = false;
-            applyBtn.textContent = 'הצג נתונים';
-
-            var selectedCategory = categorySelect.value;
-
-            // if we needed to refresh categories, do it and retain selection if possible
-            if (categorySelect.options.length <= 1) {
-                populateCategories(fetchedEntries);
-                if (Array.from(categorySelect.options).some(function(o) { return o.value === selectedCategory; })) {
-                    categorySelect.value = selectedCategory;
-                } else {
-                    selectedCategory = 'all';
-                }
-            }
-
-            statsCounts = {};
-            maxStatsCount = 0;
-
-            var startTs = fromDate.getTime();
-            var endTs = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999).getTime();
-
-            for (var i = 0; i < extendedHistory.length; i++) {
-                var e = extendedHistory[i];
-                if (e.alertDate >= startTs && e.alertDate <= endTs && e.state !== 'green') {
-                    if (selectedCategory === 'all' || e.category_desc === selectedCategory) {
-                        statsCounts[e.location] = (statsCounts[e.location] || 0) + 1;
-                        if (statsCounts[e.location] > maxStatsCount) {
-                            maxStatsCount = statsCounts[e.location];
-                        }
-                    }
-                }
-            }
-
-            // Apply heat map colors and tooltips
-            for (var locName in locationPolygons) {
-                 var p = locationPolygons[locName];
-                 var count = statsCounts[locName] || 0;
-                 p.setStyle(getStatsStyle(locName));
-
-                 p.unbindTooltip();
-                 if (count > 0) {
-                     p.bindTooltip('<b>' + locName + '</b><br>התרעות: ' + count, { direction: 'top', offset: [0, -20] });
-                 } else {
-                     p.bindTooltip(locName, { direction: 'top', offset: [0, -20] });
-                 }
-            }
-
-            document.getElementById('historyTimeLabel').style.display = 'block';
-            document.getElementById('historyTimeLabel').textContent = 'מציג מפת חום לפי מספר התרעות';
-            setStatus('err', 'מצב סטטיסטיקה'); // Use grey dot for stats mode
-        });
+    statsBtn.querySelector('.tl-close').addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (statsBtn.classList.contains('open')) {
+        closeStats();
+        popPanelHistory();
+      }
     });
   }
 
@@ -1979,111 +2092,163 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var label = document.getElementById('timeline-label');
     var playBtn = document.getElementById('tl-play');
     var datePicker = document.getElementById('timeline-date-picker');
+    var mode24hBtn = document.getElementById('tl-mode-24h');
+    var modeDateBtn = document.getElementById('tl-mode-date');
 
     var prevBtn = document.getElementById('tl-prev');
     var nextBtn = document.getElementById('tl-next');
     var ticksEl = document.getElementById('timeline-ticks');
-
 
     var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
     var PLAY_SPEED = 600;
 
     var viewTimelineMin = 0;
     var viewTimelineMax = 0;
+    var timelineMode = '24h'; // '24h' or 'date'
 
-    // init the input date to today
+    // init the input date to today by default
     var today = new Date();
     var yyyy = today.getFullYear();
     var mm = String(today.getMonth() + 1).padStart(2, '0');
     var dd = String(today.getDate()).padStart(2, '0');
     datePicker.max = yyyy + '-' + mm + '-' + dd;
     datePicker.value = yyyy + '-' + mm + '-' + dd;
+    datePicker.style.display = 'none'; // Hidden by default in 24h mode
 
-    function setTimelineDayBounds(dayStr, isFromUser) {
-      if (!dayStr) return;
-      currentTimelineDay = dayStr;
-
-      var parts = dayStr.split('-');
-      var y = parseInt(parts[0], 10);
-      var m = parseInt(parts[1], 10) - 1;
-      var d = parseInt(parts[2], 10);
-
-      var startOfDay = new Date(y, m, d, 0, 0, 0, 0).getTime();
-      var endOfDay = new Date(y, m, d, 23, 59, 59, 999).getTime();
-
-      // If it's today, cap at current time
-      var now = Date.now();
-      if (endOfDay > now) endOfDay = now;
-
-      // Find actual event bounds within this day to narrow the slider
-      var firstEvent = null;
-      var lastEvent = null;
-      for (var i = 0; i < extendedHistory.length; i++) {
-        var t = extendedHistory[i].alertDate;
-        if (t >= startOfDay && t <= endOfDay) {
-          if (!firstEvent || t < firstEvent) firstEvent = t;
-          if (!lastEvent || t > lastEvent) lastEvent = t;
-        }
-      }
-
-      // If we don't have events for this day yet and user selected it, fetch it
-      if (!firstEvent && isFromUser) {
-          fetchExtendedHistory(new Date(y, m, d), null, function() {
-            setTimelineDayBounds(dayStr, false); // call again without user flag
-          });
-          return;
-      }
-
-      if (firstEvent && lastEvent) {
-         // add a little buffer
-         viewTimelineMin = Math.max(startOfDay, firstEvent - 5 * 60000);
-         viewTimelineMax = Math.min(endOfDay, lastEvent + 15 * 60000);
+    // Set mode button styling
+    function setTimelineMode(mode) {
+      timelineMode = mode;
+      if (mode === '24h') {
+        mode24hBtn.style.background = '#93c5fd';
+        mode24hBtn.style.borderColor = '#3b82f6';
+        modeDateBtn.style.background = '#f0f0f0';
+        modeDateBtn.style.borderColor = '#ccc';
+        datePicker.style.display = 'none';
       } else {
-         // default whole day if no events
-         viewTimelineMin = startOfDay;
-         viewTimelineMax = endOfDay;
-      }
-
-      renderTicks();
-
-      // Seek to the end of the newly selected day
-      if (eventPeaks.length > 0) {
-        seekTo(eventPeaks[eventPeaks.length - 1]);
-      } else {
-        slider.value = 999;
-        enterHistoryMode(viewTimelineMax);
+        mode24hBtn.style.background = '#f0f0f0';
+        mode24hBtn.style.borderColor = '#ccc';
+        modeDateBtn.style.background = '#93c5fd';
+        modeDateBtn.style.borderColor = '#3b82f6';
+        datePicker.style.display = 'inline-block';
       }
     }
 
-    datePicker.addEventListener('change', function() {
+    function getTodayIsoDate() {
+      var now = new Date();
+      return now.getFullYear() + '-' +
+             String(now.getMonth() + 1).padStart(2, '0') + '-' +
+             String(now.getDate()).padStart(2, '0');
+    }
+
+    function parseIsoDayStart(dayStr) {
+      var parts = (dayStr || '').split('-');
+      if (parts.length !== 3) return null;
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+      var dt = new Date(y, m, d, 0, 0, 0, 0);
+      return isNaN(dt.getTime()) ? null : dt;
+    }
+
+    function buildTimelineRequest() {
+      var now = Date.now();
+      if (timelineMode === '24h') {
+        currentTimelineDay = null;
+        return {
+          mode: '1',
+          fromDate: null,
+          toDate: null,
+          startMs: now - (24 * 60 * 60 * 1000),
+          endMs: now
+        };
+      }
+
+      var selectedDay = datePicker.value || getTodayIsoDate();
+      var startDateObj = parseIsoDayStart(selectedDay);
+      if (!startDateObj) {
+        selectedDay = getTodayIsoDate();
+        datePicker.value = selectedDay;
+        startDateObj = parseIsoDayStart(selectedDay);
+      }
+      currentTimelineDay = selectedDay;
+
+      var y = startDateObj.getFullYear();
+      var m = startDateObj.getMonth();
+      var d = startDateObj.getDate();
+      var startMs = startDateObj.getTime();
+      var endMs = new Date(y, m, d, 23, 59, 59, 999).getTime();
+      if (endMs > now) endMs = now;
+
+      return {
+        mode: '0',
+        fromDate: new Date(y, m, d, 0, 0, 0, 0),
+        toDate: new Date(y, m, d, 0, 0, 0, 0),
+        startMs: startMs,
+        endMs: endMs
+      };
+    }
+
+    function applyTimelineRange(startMs, endMs) {
+      viewTimelineMin = startMs;
+      viewTimelineMax = endMs;
+      if (viewTimelineMax <= viewTimelineMin) {
+        viewTimelineMax = viewTimelineMin + 1000;
+      }
+
+      computeEventPeaks();
+      renderTicks();
+      slider.value = 999;
+      enterHistoryMode(viewTimelineMax);
+    }
+
+    var timelineLoadToken = 0;
+    function reloadTimelineData() {
+      var req = buildTimelineRequest();
+      var myToken = ++timelineLoadToken;
+      fetchExtendedHistory(req.fromDate, req.toDate, function() {
+        if (myToken !== timelineLoadToken) return;
+        container.classList.add('has-data');
+        applyTimelineRange(req.startMs, req.endMs);
+      }, req.mode, { replaceHistory: true });
+    }
+
+    // Mode button handlers
+    mode24hBtn.addEventListener('click', function() {
       stopPlay();
-      setTimelineDayBounds(datePicker.value, true);
+      datePicker.value = getTodayIsoDate();
+      setTimelineMode('24h');
+      reloadTimelineData();
+    });
+
+    modeDateBtn.addEventListener('click', function() {
+      stopPlay();
+      setTimelineMode('date');
+      reloadTimelineData();
+    });
+
+    datePicker.addEventListener('change', function() {
+      if (timelineMode !== 'date') return;
+      stopPlay();
+      reloadTimelineData();
     });
 
     // --- Open / Close ---
     function isOpen() { return container.classList.contains('open'); }
 
     function openTimeline() {
-      if (extendedHistory.length === 0 && !currentTimelineDay) {
-          fetchExtendedHistory(new Date(), null, function() {
-              openTimeline();
-          });
-          return;
-      }
-
-      container.classList.add('has-data');
       closeSoundPanel();
       var statsBtn = document.getElementById('stats-btn');
       if (statsBtn && statsBtn.classList.contains('open')) {
-          statsBtn.classList.remove('open');
-          isStatsMode = false;
+        statsBtn.querySelector('.tl-close').click();
       }
       map.closePopup();
       container.classList.add('open');
       pushPanelHistory();
 
-      setTimelineDayBounds(datePicker.value, false);
-
+      // Make sure mode is styled correctly on open
+      datePicker.value = getTodayIsoDate();
+      setTimelineMode('24h');
+      reloadTimelineData();
       updateOverlay();
     }
 
@@ -2101,34 +2266,52 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     };
 
     btnRow.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tl-close')) {
+         closeTimeline();
+         popPanelHistory();
+         return;
+      }
+
       if (isOpen()) {
-        closeTimeline();
-        popPanelHistory();
+        // Do nothing if clicking bar while open, user must use 'X'
       } else {
         openTimeline();
       }
+    });
+
+    // Explicit close handler for the X button
+    container.querySelector('.tl-close').addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (isOpen()) {
+            closeTimeline();
+            popPanelHistory();
+        }
     });
 
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         var statsBtn = document.getElementById('stats-btn');
         if (statsBtn && statsBtn.classList.contains('open')) {
-             statsBtn.classList.remove('open');
-             isStatsMode = false;
-             enterLiveMode();
+             statsBtn.querySelector('.tl-close').click();
         }
-        if (isOpen()) closeTimeline();
-        popPanelHistory();
+        if (isOpen()) {
+            closeTimeline();
+            popPanelHistory();
+        }
       }
     });
 
     // --- Helpers ---
     function timeFromSlider(val) {
-      return viewTimelineMin + (val / 999) * (viewTimelineMax - viewTimelineMin);
+      var range = viewTimelineMax - viewTimelineMin;
+      if (range <= 0) return viewTimelineMin;
+      return viewTimelineMin + (val / 999) * range;
     }
 
     function sliderFromTime(time) {
-      return Math.round(((time - viewTimelineMin) / (viewTimelineMax - viewTimelineMin)) * 999);
+      var range = viewTimelineMax - viewTimelineMin;
+      if (range <= 0) return 999;
+      return Math.round(((time - viewTimelineMin) / range) * 999);
     }
 
     function formatTime(ms) {
@@ -2186,114 +2369,35 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
 
     function computeEventPeaks() {
-      eventPeaks = [];
-      var lastNonGreenTime = null;
-      var prevWasGreen = false;
+      var peaks = new Set();
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
-        if (e.alertDate < viewTimelineMin || e.alertDate > viewTimelineMax) continue;
-
-        if (e.state !== 'green') {
-          prevWasGreen = false;
-          lastNonGreenTime = e.alertDate;
-        } else {
-          if (!prevWasGreen && lastNonGreenTime !== null) {
-            eventPeaks.push(lastNonGreenTime);
-          }
-          prevWasGreen = true;
+        if (e.alertDate >= viewTimelineMin && e.alertDate <= viewTimelineMax && e.state !== 'green') {
+          var rounded = Math.floor(e.alertDate / 10000) * 10000;
+          peaks.add(rounded);
         }
       }
-      // Ongoing event: last entry was non-green
-      if (!prevWasGreen && lastNonGreenTime !== null) {
-        eventPeaks.push(lastNonGreenTime);
-      }
+      eventPeaks = Array.from(peaks).sort(function(a,b){return a-b;});
     }
 
     function renderTicks() {
       ticksEl.innerHTML = '';
-      computedBands = [];
-      computeEventPeaks();
-      if (extendedHistory.length === 0) return;
       var range = viewTimelineMax - viewTimelineMin;
       if (range <= 0) return;
 
-      // Walk events, track per-location active state, emit bands
-      var locStates = {}; // location -> {state, since}
-      var bands = [];     // [{start, end, state}]
-      var curState = null;
-      var curStart = 0;
-
-      function dominantState() {
-        var best = null, bestP = -1;
-        for (var loc in locStates) {
-          var p = STATE_PRIORITY[locStates[loc].state] || 0;
-          if (p > bestP) { bestP = p; best = locStates[loc].state; }
-        }
-        return best;
-      }
-
-      function expireStale(atTime) {
-        for (var loc in locStates) {
-          if (atTime - locStates[loc].since >= ALERT_MAX_AGE_MS) delete locStates[loc];
-        }
-      }
-
+      var frag = document.createDocumentFragment();
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
+        if (e.alertDate < viewTimelineMin || e.alertDate > viewTimelineMax || e.state === 'green') continue;
 
-        // Skip events completely outside the day, but we still need to process them to know ongoing state at day start
-        if (e.alertDate > viewTimelineMax) break;
-
-        expireStale(e.alertDate);
-        if (e.state === 'green') {
-          delete locStates[e.location];
-        } else {
-          locStates[e.location] = { state: e.state, since: e.alertDate };
-        }
-
-        var newDom = dominantState();
-        if (newDom !== curState) {
-          if (curState) {
-            // clip band to view
-            var bandStart = Math.max(curStart, viewTimelineMin);
-            var bandEnd = Math.min(e.alertDate, viewTimelineMax);
-            if (bandEnd > bandStart) {
-                bands.push({ start: bandStart, end: bandEnd, state: curState });
-            }
-          }
-          curState = newDom;
-          curStart = e.alertDate;
-        }
-      }
-      // Close final band, capped at staleness limit
-      if (curState) {
-        // Band ends at the latest location expiry, capped by viewTimelineMax
-        var latestExpiry = 0;
-        for (var loc in locStates) {
-          var exp = locStates[loc].since + ALERT_MAX_AGE_MS;
-          if (exp > latestExpiry) latestExpiry = exp;
-        }
-        var bandStart = Math.max(curStart, viewTimelineMin);
-        var bandEnd = Math.min(latestExpiry, viewTimelineMax);
-        if (bandEnd > bandStart) {
-            bands.push({ start: bandStart, end: bandEnd, state: curState });
-        }
-      }
-
-      computedBands = bands;
-
-      // Render bands as spans
-      for (var j = 0; j < bands.length; j++) {
-        var b = bands[j];
-        var leftPct = ((b.start - viewTimelineMin) / range) * 100;
-        var widthPct = ((b.end - b.start) / range) * 100;
-        if (widthPct < 0.1) widthPct = 0.1; // min visible width
+        var pct = ((e.alertDate - viewTimelineMin) / range) * 100;
         var span = document.createElement('span');
-        span.style.left = leftPct + '%';
-        span.style.width = widthPct + '%';
-        span.style.background = TICK_COLORS[b.state] || TICK_COLORS.red;
-        ticksEl.appendChild(span);
+        span.style.left = pct + '%';
+        span.style.width = '2px';
+        span.style.background = TICK_COLORS[e.state] || TICK_COLORS.red;
+        frag.appendChild(span);
       }
+      ticksEl.appendChild(frag);
     }
 
     // --- Play / Pause ---
@@ -2343,28 +2447,23 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     prevBtn.addEventListener('click', function() {
       stopPlay();
       for (var i = eventPeaks.length - 1; i >= 0; i--) {
-        if (eventPeaks[i] < currentViewTime - 500) {
+        if (eventPeaks[i] < currentViewTime - 5000) {
           seekTo(eventPeaks[i]);
           return;
         }
       }
+      seekTo(viewTimelineMin);
     });
 
     nextBtn.addEventListener('click', function() {
       stopPlay();
       for (var i = 0; i < eventPeaks.length; i++) {
-        if (eventPeaks[i] > currentViewTime + 500) {
+        if (eventPeaks[i] > currentViewTime + 5000) {
           seekTo(eventPeaks[i]);
           return;
         }
       }
-    });
-
-    // initial fetch of extended history, no longer in main init
-    fetchExtendedHistory(new Date(), null, function() {
-       if (extendedHistory.length > 0) {
-           container.classList.add('has-data');
-       }
+      seekTo(viewTimelineMax);
     });
 
   }
@@ -2386,6 +2485,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         fetchLiveAlerts();
         updateLiveStatus();
         if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+
+        // Ensure timeline button starts visible if history data exists from initial live poll
+        var container = document.getElementById('timeline-btn');
+        if (extendedHistory.length > 0 && container) {
+           container.classList.add('has-data');
+        }
       }
       fetchHistory(function() { historyDone = true; onHistoryDone(); });
     }).catch(function(err) {
@@ -2465,6 +2570,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   function openSoundPanel() {
     closeTimelinePanel();
+    var statsBtn = document.getElementById('stats-btn');
+    if (statsBtn && statsBtn.classList.contains('open')) {
+         statsBtn.querySelector('.tl-close').click();
+    }
+
     map.closePopup();
     soundBtn.classList.add('open');
     pushPanelHistory();
@@ -2546,9 +2656,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     var statsBtn = document.getElementById('stats-btn');
     if (statsBtn && statsBtn.classList.contains('open')) {
-        statsBtn.classList.remove('open');
-        isStatsMode = false;
-        enterLiveMode();
+        statsBtn.querySelector('.tl-close').click();
     }
 
     map.closePopup();
@@ -2598,3 +2706,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+

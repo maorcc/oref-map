@@ -6,23 +6,31 @@ const OREF_HEADERS = {
 const ROUTES = {
   '/api2/alerts': 'https://www.oref.org.il/warningMessages/alert/Alerts.json',
   '/api2/history': 'https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json',
+  // '/api2/alarms-history': 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx',
+  // if Running local server
+  '/api2/alarms-history': 'http://127.0.0.1:5000/Shared/Ajax/GetAlarmsHistory.aspx',
 };
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     
-    let target;
+    let target = ROUTES[url.pathname];
     if (url.pathname === '/api2/alarms-history') {
+      const targetUrl = new URL(target);
+      targetUrl.searchParams.set('lang', 'he');
+      const mode = url.searchParams.get('mode') || '1';
       const fromDate = url.searchParams.get('fromDate');
       const toDate = url.searchParams.get('toDate');
-      // target = 'http://127.0.0.1:5000/Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=0';
-      target = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=0';
-      if (fromDate && toDate) {
-         target += `&fromDate=${fromDate}&toDate=${toDate}`;
+      
+      if (fromDate && toDate && mode === '0') {
+        targetUrl.searchParams.set('mode', '0');
+        targetUrl.searchParams.set('fromDate', fromDate);
+        targetUrl.searchParams.set('toDate', toDate);
+      } else {
+        targetUrl.searchParams.set('mode', mode);
       }
-    } else {
-      target = ROUTES[url.pathname];
+      target = targetUrl.toString();
     }
 
     if (!target) return new Response('Not found', { status: 404 });
