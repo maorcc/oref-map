@@ -6,8 +6,8 @@ export async function onRequestGet(context) {
   const toDate = url.searchParams.get('toDate');
   const mode = url.searchParams.get('mode') || '1'; // Default to last 24h
 
-  // let target = 'http://127.0.0.1:5000/Shared/Ajax/GetAlarmsHistory.aspx';
-  let target = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx'
+  let target = 'http://127.0.0.1:5000/Shared/Ajax/GetAlarmsHistory.aspx';
+  // let target = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx'
 
   const targetUrl = new URL(target)
   targetUrl.searchParams.set('lang', 'he');
