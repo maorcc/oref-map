@@ -378,6 +378,12 @@ function initStats() {
       popPanelHistory();
     }
   });
+
+  window.addEventListener('history-provider-changed', function() {
+    if (statsBtn.classList.contains('open')) {
+      reloadStatsData();
+    }
+  });
 }
 
 function initTimeline() {
@@ -761,4 +767,9 @@ function initTimeline() {
     seekTo(viewTimelineMax);
   });
 
+  window.addEventListener('history-provider-changed', function() {
+    if (isOpen()) {
+      reloadTimelineData();
+    }
+  });
 }

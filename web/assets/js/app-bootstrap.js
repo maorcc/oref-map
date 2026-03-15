@@ -96,37 +96,40 @@ function updateSoundButton() {
 }
 updateSoundButton();
 
-function updateHistoryProviderControl() {
-  var select = document.getElementById('history-provider-select');
-  if (!select) return;
-  select.value = getHistoryProvider();
+function updateHistoryProviderControls() {
+  var provider = getHistoryProvider();
+  var selects = document.querySelectorAll('.history-provider-select');
+  selects.forEach(function(select) {
+    if (select.value !== provider) {
+      select.value = provider;
+    }
+  });
 }
 
-function initHistoryProviderControl() {
-  var wrapper = document.getElementById('history-provider-control');
-  var label = document.getElementById('history-provider-label');
-  var select = document.getElementById('history-provider-select');
-  if (!wrapper || !label || !select) return;
+function initHistoryProviderControls() {
+  var officialText = 'רשמי - פיקוד העורף';
+  var tzevaAdomText = 'ארכיון - צבע אדום';
 
-  wrapper.title = '\u05de\u05e7\u05d5\u05e8 \u05e0\u05ea\u05d5\u05e0\u05d9 \u05d4\u05d9\u05e1\u05d8\u05d5\u05e8\u05d9\u05d4';
-  label.textContent = '\u05de\u05e7\u05d5\u05e8 \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd';
-
-  var officialOpt = select.querySelector('option[value=\"official\"]');
-  var tzevaOpt = select.querySelector('option[value=\"tzeva-adom\"]');
-  if (officialOpt) officialOpt.textContent = '\u05e8\u05e9\u05de\u05d9';
-  if (tzevaOpt) tzevaOpt.textContent = '\u05e6\u05d1\u05e2 \u05d0\u05d3\u05d5\u05dd';
-
-  updateHistoryProviderControl();
-
-  select.addEventListener('change', function() {
-    setHistoryProvider(select.value);
-    updateHistoryProviderControl();
+  document.querySelectorAll('.history-provider-control').forEach(function(wrapper) {
+    wrapper.title = 'מקור נתוני היסטוריה';
   });
 
-  window.addEventListener('history-provider-changed', updateHistoryProviderControl);
+  document.querySelectorAll('.history-provider-select').forEach(function(select) {
+    var officialOpt = select.querySelector('option[value="official"]');
+    var tzevaOpt = select.querySelector('option[value="tzeva-adom"]');
+    if (officialOpt) officialOpt.textContent = officialText;
+    if (tzevaOpt) tzevaOpt.textContent = tzevaAdomText;
+
+    select.addEventListener('change', function(e) {
+      setHistoryProvider(e.target.value);
+    });
+  });
+
+  window.addEventListener('history-provider-changed', updateHistoryProviderControls);
+  updateHistoryProviderControls();
 }
 
-initHistoryProviderControl();
+initHistoryProviderControls();
 
 function isSoundOpen() { return soundBtn.classList.contains('open'); }
 

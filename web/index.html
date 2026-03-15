@@ -47,13 +47,6 @@
   <span id="statusText">מתחבר...</span>
   <div id="historyTimeLabel"></div>
 </div>
-<div id="history-provider-control">
-  <label id="history-provider-label" for="history-provider-select"></label>
-  <select id="history-provider-select">
-    <option value="official"></option>
-    <option value="tzeva-adom"></option>
-  </select>
-</div>
 <div id="errorDetail"></div>
 
 <div id="about-backdrop" class="modal-backdrop">
@@ -126,7 +119,14 @@
     <label>סוג התרעה</label>
     <select id="stats-category">
       <option value="all">טוען...</option>
-    </select>
+    </select>ש
+    <div class="history-provider-control">
+      <label class="history-provider-label" for="history-provider-select-stats">מקור:</label>
+      <select id="history-provider-select-stats" class="history-provider-select">
+        <option value="official"></option>
+        <option value="tzeva-adom"></option>
+      </select>
+    </div>
   </div>
 </div>
 
@@ -136,8 +136,8 @@
   </div>
   <div id="timeline-controls">
     <div id="timeline-mode-buttons">
-      <button id="tl-mode-24h">24 שעות אחרונות</button>
-      <button id="tl-mode-date">בחר תאריך</button>
+      <button id="tl-mode-24h" class="stats-mode-btn">24 שעות אחרונות</button>
+      <button id="tl-mode-date" class="stats-mode-btn">בחר תאריך</button>
     </div>
     <div id="timeline-slider-wrap">
       <div id="timeline-ticks"></div>
@@ -150,6 +150,13 @@
       <button id="tl-play" title="נגן/עצור">▶</button>
       <button id="tl-next" title="אירוע הבא">⏭</button>
     </div>
+    <div class="history-provider-control">
+      <label class="history-provider-label" for="history-provider-select-timeline">מקור:</label>
+      <select id="history-provider-select-timeline" class="history-provider-select">
+        <option value="official"></option>
+        <option value="tzeva-adom"></option>
+      </select>
+    </div>
   </div>
 </div>
 <button id="test-danger-btn" title="בדיקת צליל סכנה">🚨</button>
@@ -161,4 +168,3 @@
 <script src="/assets/js/sw-register.js"></script>
 </body>
 </html>
-
