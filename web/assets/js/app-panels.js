@@ -518,6 +518,7 @@ function initTimeline() {
     }
 
     computeEventPeaks();
+    computeTimelineBands();
     renderTicks();
     slider.value = 999;
     enterHistoryMode(viewTimelineMax);
@@ -709,22 +710,123 @@ function initTimeline() {
     eventPeaks = Array.from(peaks).sort(function(a,b){return a-b;});
   }
 
+  function computeTimelineBands() {
+    var TWENTY_MINS = 20 * 60 * 1000;
+
+    // 1. Generate raw bands for each non-green event
+    var rawBands = [];
+    for (var i = 0; i < extendedHistory.length; i++) {
+        var event = extendedHistory[i];
+        if (event.state === 'green') continue;
+
+        var endTime;
+        var nextEvent = null;
+        for (var j = i + 1; j < extendedHistory.length; j++) {
+            if (extendedHistory[j].location === event.location) {
+                nextEvent = extendedHistory[j];
+                break;
+            }
+        }
+
+        var capTime = event.alertDate + TWENTY_MINS;
+        var endConditionMet = false;
+        if (nextEvent) {
+            if (event.state === 'yellow' && (nextEvent.state === 'green' || nextEvent.state === 'red' || nextEvent.state === 'purple')) {
+                endConditionMet = true;
+            } else if ((event.state === 'red' || event.state === 'purple') && nextEvent.state === 'green') {
+                endConditionMet = true;
+            }
+        }
+
+        if (endConditionMet) {
+            endTime = Math.min(nextEvent.alertDate, capTime);
+        } else {
+            endTime = capTime;
+        }
+
+        rawBands.push({
+            start: event.alertDate,
+            end: endTime,
+            state: event.state,
+            priority: STATE_PRIORITY[event.state]
+        });
+    }
+
+    // 2. Merge bands by finding the dominant state over each time interval
+    var points = new Set([viewTimelineMin, viewTimelineMax]);
+    for (var k = 0; k < rawBands.length; k++) {
+        var band = rawBands[k];
+        if (band.start < viewTimelineMax && band.end > viewTimelineMin) {
+            points.add(Math.max(viewTimelineMin, band.start));
+            points.add(Math.min(viewTimelineMax, band.end));
+        }
+    }
+
+    var sortedPoints = Array.from(points).sort(function(a, b) { return a - b; });
+    var mergedBands = [];
+    for (var p = 0; p < sortedPoints.length - 1; p++) {
+        var start = sortedPoints[p];
+        var end = sortedPoints[p + 1];
+        if (start >= end) continue;
+
+        var midPoint = start + (end - start) / 2;
+        var bestState = 'green';
+        var bestPriority = -1;
+
+        for (var b = 0; b < rawBands.length; b++) {
+            var rawBand = rawBands[b];
+            if (midPoint >= rawBand.start && midPoint < rawBand.end) {
+                if (rawBand.priority > bestPriority) {
+                    bestPriority = rawBand.priority;
+                    bestState = rawBand.state;
+                }
+            }
+        }
+
+        if (bestState !== 'green') {
+            mergedBands.push({ start: start, end: end, state: bestState });
+        }
+    }
+
+    // 3. Coalesce adjacent bands of the same state
+    if (mergedBands.length === 0) {
+        computedBands = [];
+        return;
+    }
+    var finalBands = [];
+    var currentBand = Object.assign({}, mergedBands[0]);
+    for (var m = 1; m < mergedBands.length; m++) {
+        var nextBand = mergedBands[m];
+        if (nextBand.start === currentBand.end && nextBand.state === currentBand.state) {
+            currentBand.end = nextBand.end;
+        } else {
+            finalBands.push(currentBand);
+            currentBand = Object.assign({}, nextBand);
+        }
+    }
+    finalBands.push(currentBand);
+    computedBands = finalBands;
+  }
+
   function renderTicks() {
     ticksEl.innerHTML = '';
     var range = viewTimelineMax - viewTimelineMin;
     if (range <= 0) return;
 
     var frag = document.createDocumentFragment();
-    for (var i = 0; i < extendedHistory.length; i++) {
-      var e = extendedHistory[i];
-      if (e.alertDate < viewTimelineMin || e.alertDate > viewTimelineMax || e.state === 'green') continue;
+    for (var i = 0; i < computedBands.length; i++) {
+        var band = computedBands[i];
+        var startPct = ((band.start - viewTimelineMin) / range) * 100;
+        var endPct = ((band.end - viewTimelineMin) / range) * 100;
+        var widthPct = endPct - startPct;
 
-      var pct = ((e.alertDate - viewTimelineMin) / range) * 100;
-      var span = document.createElement('span');
-      span.style.left = pct + '%';
-      span.style.width = '2px';
-      span.style.background = TICK_COLORS[e.state] || TICK_COLORS.red;
-      frag.appendChild(span);
+        if (widthPct <= 0) continue;
+
+        var span = document.createElement('span');
+        span.style.left = startPct + '%';
+        span.style.width = widthPct + '%';
+        span.style.background = TICK_COLORS[band.state] || TICK_COLORS.red;
+        frag.appendChild(span);
     }
     ticksEl.appendChild(frag);
   }
