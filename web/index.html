@@ -1874,6 +1874,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       else computeEventPeaks();
       stopPlay();
       if (eventPeaks.length > 0) seekTo(eventPeaks[eventPeaks.length - 1]);
+      else seekTo(timelineMax);
     };
 
     btnRow.addEventListener('click', function(e) {
