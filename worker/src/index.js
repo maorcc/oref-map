@@ -13,7 +13,10 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const target = ROUTES[url.pathname];
-    if (!target) return new Response('Not found', { status: 404 });
+    if (!target) return new Response('Not found', {
+      status: 404,
+      headers: { 'Access-Control-Allow-Origin': 'https://oref-map.org' },
+    });
 
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
