@@ -742,17 +742,24 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   initUserLocation();
 
+  // --- State ---
+  var isZoomedToEvent = false;
+  var isZoomingProgrammatically = false;
+
+  map.on('moveend', function() {
+    if (!isZoomingProgrammatically) isZoomedToEvent = false;
+    isZoomingProgrammatically = false;
+  });
+
   document.getElementById('locate-btn').addEventListener('click', function() {
     if (isZoomedToEvent) {
+      isZoomingProgrammatically = true;
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
       isZoomedToEvent = false;
     } else {
       maybeZoomToEvent();
     }
   });
-
-  // --- State ---
-  var isZoomedToEvent = false;
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
   var lastHistoryDate = null;    // track newest history entry
@@ -782,6 +789,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var isHullMode = location.search.indexOf('hull') !== -1;
   var isPlaying = false;
   var playRAF = null;
+  var playFlyHandler = null;
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
   var closeTimelinePanel = function() {}; // set by initTimeline
@@ -1486,6 +1494,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   function maybeZoomToEvent() {
     var bounds = getActiveEventBounds();
+    isZoomingProgrammatically = true;
     if (bounds) {
       map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
       isZoomedToEvent = true;
@@ -1851,6 +1860,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       container.classList.remove('open');
       stopPlay();
 
+      isZoomingProgrammatically = true;
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
       isZoomedToEvent = false;
       enterLiveMode();
@@ -1861,7 +1871,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     openTimelineToLastEvent = function() {
       if (extendedHistory.length === 0) return;
       if (!isOpen()) openTimeline();
-      computeEventPeaks();
+      else computeEventPeaks();
+      stopPlay();
       if (eventPeaks.length > 0) seekTo(eventPeaks[eventPeaks.length - 1]);
     };
 
@@ -1942,16 +1953,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var computedBands = []; // [{start, end, state}] - visual tick bands
     var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
     var eventPeakSizes = []; // [number] — unique location count for each peak
+    var eventStarts = []; // [timestamp] — first non-green of each event group
+    var eventGroupLocs = []; // [Set] — location sets for each event group
 
     function computeEventPeaks() {
       eventPeaks = [];
       eventPeakSizes = [];
+      eventStarts = [];
+      eventGroupLocs = [];
       var lastNonGreenTime = null;
+      var firstNonGreenTime = null;
       var prevWasGreen = false;
       var groupLocs = new Set();
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
         if (e.state !== 'green') {
+          if (prevWasGreen || firstNonGreenTime === null) firstNonGreenTime = e.alertDate;
           prevWasGreen = false;
           lastNonGreenTime = e.alertDate;
           groupLocs.add(e.location);
@@ -1959,6 +1976,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           if (!prevWasGreen && lastNonGreenTime !== null) {
             eventPeaks.push(lastNonGreenTime);
             eventPeakSizes.push(groupLocs.size);
+            eventStarts.push(firstNonGreenTime);
+            eventGroupLocs.push(groupLocs);
           }
           prevWasGreen = true;
           groupLocs = new Set();
@@ -1968,7 +1987,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (!prevWasGreen && lastNonGreenTime !== null) {
         eventPeaks.push(lastNonGreenTime);
         eventPeakSizes.push(groupLocs.size);
+        eventStarts.push(firstNonGreenTime);
+        eventGroupLocs.push(groupLocs);
       }
+    }
+
+    function boundsForEvent(idx) {
+      var locs = eventGroupLocs[idx];
+      if (!locs) return null;
+      var bounds = null;
+      locs.forEach(function(loc) {
+        var polygon = locationPolygons[loc];
+        if (!polygon) return;
+        if (!bounds) bounds = L.latLngBounds(polygon.getBounds());
+        else bounds.extend(polygon.getBounds());
+      });
+      return bounds;
     }
 
     function biggestEventPeak() {
@@ -2058,6 +2092,23 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       isPlaying = false;
       playBtn.textContent = '▶';
       if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+      if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
+    }
+
+    var GAP_SKIP_MS = 1000; // real-time ms before skipping a dead gap
+
+    function isInBand(time) {
+      for (var i = 0; i < computedBands.length; i++) {
+        if (time >= computedBands[i].start && time <= computedBands[i].end) return true;
+      }
+      return false;
+    }
+
+    function nextBandStart(time) {
+      for (var i = 0; i < computedBands.length; i++) {
+        if (computedBands[i].start > time) return computedBands[i].start;
+      }
+      return null;
     }
 
     function startPlay() {
@@ -2065,10 +2116,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       isPlaying = true;
       playBtn.textContent = '⏸';
       var lastFrame = performance.now();
+      var gapEnterFrame = null;
+      var playEventIdx = -1;
       if (parseInt(slider.value) >= 999) {
         slider.value = 0;
         enterHistoryMode(timelineMin);
       }
+
+      function findEventIdx(time) {
+        for (var i = 0; i < eventStarts.length; i++) {
+          var end = (i + 1 < eventStarts.length) ? eventStarts[i + 1] : timelineMax;
+          if (time >= eventStarts[i] && time < end) return i;
+        }
+        return -1;
+      }
+
       function tick(now) {
         if (!isPlaying) return;
         var dt = now - lastFrame;
@@ -2078,8 +2140,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           slider.value = 0;
           enterHistoryMode(timelineMin);
           lastFrame = now;
+          gapEnterFrame = null;
+          playEventIdx = -1;
           playRAF = requestAnimationFrame(tick);
           return;
+        }
+        if (!isInBand(newTime)) {
+          if (gapEnterFrame === null) gapEnterFrame = now;
+          if (now - gapEnterFrame >= GAP_SKIP_MS) {
+            var next = nextBandStart(newTime);
+            if (next !== null) {
+              newTime = next;
+              gapEnterFrame = null;
+            }
+          }
+        } else {
+          gapEnterFrame = null;
         }
         slider.value = Math.min(sliderFromTime(newTime), 999);
         currentViewTime = newTime;
@@ -2087,6 +2163,31 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         label.textContent = timeStr;
         document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
         reconstructStateAt(newTime);
+
+        // Auto-zoom: fly to event area when entering a new event group
+        var curIdx = findEventIdx(newTime);
+        if (curIdx !== playEventIdx) {
+          playEventIdx = curIdx;
+          var bounds = curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+          if (bounds) {
+            isZoomingProgrammatically = true;
+            isPlaying = false;
+            if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+            if (playFlyHandler) map.off('moveend', playFlyHandler);
+            playFlyHandler = function() {
+              map.off('moveend', playFlyHandler);
+              playFlyHandler = null;
+              isZoomingProgrammatically = false;
+              isPlaying = true;
+              lastFrame = performance.now();
+              playRAF = requestAnimationFrame(tick);
+            };
+            map.on('moveend', playFlyHandler);
+            map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+            return;
+          }
+        }
+
         playRAF = requestAnimationFrame(tick);
       }
       playRAF = requestAnimationFrame(tick);
