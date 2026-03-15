@@ -580,7 +580,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   function apiFetch(endpoint) {
     return fetch(PROXY_BASE + apiPrefix + '/' + endpoint).then(function(resp) {
       if (apiPrefix === '/api' && resp.url && resp.url.indexOf('/api2/') !== -1) {
-        console.log('Non-TLV colo detected, switching to /api2');
+        var u = new URL(resp.url);
+        PROXY_BASE = u.origin !== location.origin ? u.origin : '';
+        console.log('Non-TLV colo detected, switching to ' + PROXY_BASE + '/api2');
         apiPrefix = '/api2';
       }
       return resp;

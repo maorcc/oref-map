@@ -20,6 +20,7 @@ export default {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': 'https://oref-map.org',
+          'Access-Control-Expose-Headers': 'X-CF-Colo, X-Served-By',
           'Access-Control-Allow-Methods': 'GET',
           'Access-Control-Max-Age': '86400',
         },
@@ -36,6 +37,7 @@ export default {
       const resp = new Response(cached.body, cached);
       resp.headers.set('X-CF-Colo', colo);
       resp.headers.set('Access-Control-Allow-Origin', 'https://oref-map.org');
+      resp.headers.set('Access-Control-Expose-Headers', 'X-CF-Colo, X-Served-By');
       return resp;
     }
 
@@ -49,6 +51,7 @@ export default {
         'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
         'Cache-Control': 's-maxage=4, max-age=2',
         'Access-Control-Allow-Origin': 'https://oref-map.org',
+        'Access-Control-Expose-Headers': 'X-CF-Colo, X-Served-By',
         'X-CF-Colo': colo,
         'X-Served-By': 'worker',
       },
