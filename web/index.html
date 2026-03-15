@@ -415,7 +415,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   height: 4px;
   border-radius: 2px;
   background: #93c5fd;
-  outline: none;
+}
+#timeline-slider:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
 }
 #timeline-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -1959,6 +1962,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
 
     function biggestEventPeak() {
+      if (eventPeaks.length === 0 || eventPeakSizes.length === 0) return timelineMax;
       var bestIdx = 0;
       for (var i = 1; i < eventPeakSizes.length; i++) {
         if (eventPeakSizes[i] >= eventPeakSizes[bestIdx]) bestIdx = i;
