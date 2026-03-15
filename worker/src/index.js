@@ -35,7 +35,7 @@ export default {
       status: resp.status,
       headers: {
         'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
-        'Cache-Control': 's-maxage=1, max-age=2',
+        'Cache-Control': 's-maxage=4, max-age=2',
         'X-CF-Colo': colo,
         'X-Served-By': 'worker',
       },
