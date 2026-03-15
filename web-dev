@@ -1,5 +1,5 @@
 #!/bin/sh
-# Start local dev server at http://localhost:8788.
+# Start local dev server at http://localhost:8788 (binds to 0.0.0.0 — also accessible via http://<your-ip>:8788).
 
 POLYGONS=web/locations_polygons.json
 if [ ! -f "$POLYGONS" ]; then
