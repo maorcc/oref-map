@@ -157,11 +157,47 @@ var soundLocation = 'all';
 var audioCtx = null;
 var lastSoundTime = 0;
 var dangerBuffer = null;
+var HISTORY_PROVIDER_STORAGE_KEY = 'oref-history-provider';
+var HISTORY_PROVIDER_OFFICIAL = 'official';
+var HISTORY_PROVIDER_TZEVA_ADOM = 'tzeva-adom';
+var historyProvider = HISTORY_PROVIDER_OFFICIAL;
 
 try {
   soundMuted = localStorage.getItem('oref-sound-muted') !== 'false';
   soundLocation = localStorage.getItem('oref-sound-location') || 'all';
+  historyProvider = normalizeHistoryProvider(localStorage.getItem(HISTORY_PROVIDER_STORAGE_KEY));
 } catch(e) {}
+
+function normalizeHistoryProvider(value) {
+  var normalized = String(value || HISTORY_PROVIDER_OFFICIAL)
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+    .replace(/\s+/g, '-');
+
+  if (!normalized || normalized === HISTORY_PROVIDER_OFFICIAL) return HISTORY_PROVIDER_OFFICIAL;
+  if (normalized === HISTORY_PROVIDER_TZEVA_ADOM || normalized === 'tzevaadom') return HISTORY_PROVIDER_TZEVA_ADOM;
+  return HISTORY_PROVIDER_OFFICIAL;
+}
+
+function getHistoryProvider() {
+  return historyProvider;
+}
+
+function setHistoryProvider(nextProvider) {
+  var normalized = normalizeHistoryProvider(nextProvider);
+  if (normalized === historyProvider) return false;
+
+  historyProvider = normalized;
+  try {
+    localStorage.setItem(HISTORY_PROVIDER_STORAGE_KEY, historyProvider);
+  } catch(e) {}
+
+  window.dispatchEvent(new CustomEvent('history-provider-changed', {
+    detail: { provider: historyProvider }
+  }));
+  return true;
+}
 
 // --- Timeline state ---
 var extendedHistory = [];     // sorted ascending by alertDate ms
@@ -981,18 +1017,29 @@ function formatDateForApi(dateObj) {
 function fetchExtendedHistory(fromDateObj, toDateObj, onDone, mode, options) {
   options = options || {};
   var apiPath = 'alarms-history';
+  var queryParts = [];
 
   // If mode is specified (1, 2, 3), use it
   if (mode && mode !== '0') {
-    apiPath += '?mode=' + mode;
+    queryParts.push('mode=' + encodeURIComponent(mode));
   } else if (fromDateObj && toDateObj) {
     // Custom date range (mode 0)
     var dStrFrom = formatDateForApi(fromDateObj);
     var dStrTo = formatDateForApi(toDateObj);
-    apiPath += '?fromDate=' + dStrFrom + '&toDate=' + dStrTo + '&mode=0';
+    queryParts.push('fromDate=' + encodeURIComponent(dStrFrom));
+    queryParts.push('toDate=' + encodeURIComponent(dStrTo));
+    queryParts.push('mode=0');
   } else if (fromDateObj) {
     var dStr = formatDateForApi(fromDateObj);
-    apiPath += '?fromDate=' + dStr + '&toDate=' + dStr + '&mode=0';
+    queryParts.push('fromDate=' + encodeURIComponent(dStr));
+    queryParts.push('toDate=' + encodeURIComponent(dStr));
+    queryParts.push('mode=0');
+  }
+
+  queryParts.push('provider=' + encodeURIComponent(getHistoryProvider()));
+
+  if (queryParts.length > 0) {
+    apiPath += '?' + queryParts.join('&');
   }
 
   if (options.replaceHistory) {

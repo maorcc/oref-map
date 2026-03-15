@@ -203,13 +203,13 @@ function initStats() {
       }
       var minuteLabel = String(minuteIdx).padStart(2, '0');
       var barColor = minuteCount > 0 ? '#3b82f6' : '#e5e7eb';
-      minuteBars += '<span title="' + minuteLabel + ' - ' + minuteCount + '" style="display:inline-block;width:4px;height:' + barHeight + 'px;background:' + barColor + ';border-radius:2px;"></span>';
+      minuteBars += '<span title="' + minuteLabel + ' - ' + minuteCount + '" style="display:block;width:100%;height:' + barHeight + 'px;background:' + barColor + ';border-radius:2px;"></span>';
     }
 
     var minuteHistogramHtml =
       '<div style="margin-top:10px;font-size:12px;color:#333;">\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d4\u05ea\u05e8\u05e2\u05d5\u05ea \u05dc\u05e4\u05d9 \u05d3\u05e7\u05d4 \u05d1\u05e9\u05e2\u05d4 (00-59)</div>' +
       '<div style="margin-top:4px;border:1px solid #e5e7eb;border-radius:6px;padding:6px;">' +
-        '<div style="display:flex;align-items:flex-end;gap:1px;height:36px;direction:ltr;">' + minuteBars + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(60,minmax(0,1fr));column-gap:1px;align-items:end;height:36px;direction:ltr;">' + minuteBars + '</div>' +
         '<div style="display:flex;justify-content:space-between;font-size:10px;color:#666;direction:ltr;margin-top:4px;">' +
           '<span>00</span><span>15</span><span>30</span><span>45</span><span>59</span>' +
         '</div>' +
