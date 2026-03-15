@@ -743,10 +743,16 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   initUserLocation();
 
   document.getElementById('locate-btn').addEventListener('click', function() {
-    maybeZoomToEvent();
+    if (isZoomedToEvent) {
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+      isZoomedToEvent = false;
+    } else {
+      maybeZoomToEvent();
+    }
   });
 
   // --- State ---
+  var isZoomedToEvent = false;
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
   var lastHistoryDate = null;    // track newest history entry
@@ -1482,8 +1488,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var bounds = getActiveEventBounds();
     if (bounds) {
       map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+      isZoomedToEvent = true;
     } else {
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+      isZoomedToEvent = false;
     }
   }
 
@@ -1844,6 +1852,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       stopPlay();
 
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+      isZoomedToEvent = false;
       enterLiveMode();
       updateOverlay();
     }
@@ -1852,6 +1861,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     openTimelineToLastEvent = function() {
       if (extendedHistory.length === 0) return;
       if (!isOpen()) openTimeline();
+      computeEventPeaks();
       if (eventPeaks.length > 0) seekTo(eventPeaks[eventPeaks.length - 1]);
     };
 
