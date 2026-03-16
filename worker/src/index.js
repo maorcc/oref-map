@@ -28,7 +28,8 @@ const OFFICIAL_CATEGORY_MAP = {
   7: "אירוע רדיולוגי",
   10: "חשש לאירוע ביולוגי",
   13: "האירוע הסתיים",
-  14: "התרעה מוקדמת"
+  14: "התרעה מוקדמת",
+  99: "ללא שיוך" // Added from functions/api/alarms-history.js
 };
 
 const ROUTES = {
@@ -66,8 +67,21 @@ function formatYmd(dateObj) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Updated formatIsoSeconds from functions/api/alarms-history.js
 function formatIsoSeconds(dateObj) {
-  return dateObj.toISOString().slice(0, 19);
+    const options = {
+        timeZone: 'Asia/Jerusalem',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+    };
+    // The 'sv' locale (Swedish) is commonly used to get an ISO-like format.
+    // It produces 'YYYY-MM-DD HH:mm:ss'. We just need to replace the space with a 'T'.
+    return new Intl.DateTimeFormat('sv', options).format(dateObj).replace(' ', 'T');
 }
 
 function parseDdMmYyyy(dateStr, endOfDay) {
@@ -88,6 +102,7 @@ function parseDdMmYyyy(dateStr, endOfDay) {
   return parsed;
 }
 
+// Updated buildRange from functions/api/alarms-history.js
 function buildRange(modeRaw, fromDateStr, toDateStr) {
   let mode = String(modeRaw || '1');
   if (fromDateStr && toDateStr) mode = '0';
@@ -101,6 +116,7 @@ function buildRange(modeRaw, fromDateStr, toDateStr) {
     const endTs = nowTs;
     return {
       ok: true,
+      mode: mode,
       startTs: startTs,
       endTs: endTs,
       tFrom: formatYmd(new Date(startTs * 1000)),
@@ -119,6 +135,7 @@ function buildRange(modeRaw, fromDateStr, toDateStr) {
     }
     return {
       ok: true,
+      mode: mode,
       startTs: Math.floor(startDate.getTime() / 1000),
       endTs: Math.floor(endDate.getTime() / 1000),
       tFrom: formatYmd(startDate),
@@ -138,9 +155,10 @@ function mapTzevaTypeToOfficialCategory(typeValue) {
   if (Object.prototype.hasOwnProperty.call(TZEVA_ADOM_TO_OFFICIAL_API, asString)) {
     return TZEVA_ADOM_TO_OFFICIAL_API[asString];
   }
-  return 8;
+  return 8; // Fallback category
 }
 
+// Updated transformTzevaPayload from functions/api/alarms-history.js
 function transformTzevaPayload(payload, startTs, endTs) {
   const alerts = Array.isArray(payload && payload.alerts) ? payload.alerts : [];
   if (alerts.length === 0) return [];
@@ -149,36 +167,60 @@ function transformTzevaPayload(payload, startTs, endTs) {
 
   for (let i = 0; i < alerts.length; i++) {
     const alert = alerts[i] || {};
-    const startTime = Number(alert.startTime);
-    if (!Number.isFinite(startTime)) continue;
-    if (startTime < startTs || startTime > endTs) continue;
-
     const cities = Array.isArray(alert.cities) ? alert.cities : [];
     if (cities.length === 0) continue;
 
-    const category = mapTzevaTypeToOfficialCategory(alert.type);
-    const categoryDesc = OFFICIAL_CATEGORY_MAP[category] || OFFICIAL_CATEGORY_MAP[8];
-    const alertDate = formatIsoSeconds(new Date(startTime * 1000));
+    // Create "start" event
+    const startTime = Number(alert.startTime);
+    if (Number.isFinite(startTime) && startTime >= startTs && startTime <= endTs) {
+      const startCategory = mapTzevaTypeToOfficialCategory(alert.type);
+      const startCategoryDesc = OFFICIAL_CATEGORY_MAP[startCategory] || OFFICIAL_CATEGORY_MAP[99];
+      const startAlertDate = formatIsoSeconds(new Date(startTime * 1000));
 
-    for (let c = 0; c < cities.length; c++) {
-      const city = cities[c];
-      if (city === null || city === undefined) continue;
-      const cityName = String(city).trim();
-      if (!cityName) continue;
+      for (let c = 0; c < cities.length; c++) {
+        const city = cities[c];
+        if (city === null || city === undefined) continue;
+        const cityName = String(city).trim();
+        if (!cityName) continue;
 
-      transformed.push({
-        data: cityName,
-        alertDate: alertDate,
-        category_desc: categoryDesc,
-        category: category,
-        rid: 0,
-        __startTime: startTime,
-      });
+        transformed.push({
+          data: cityName,
+          alertDate: startAlertDate,
+          category_desc: startCategoryDesc,
+          category: startCategory,
+          rid: 0,
+          __timestamp: startTime,
+        });
+      }
+    }
+
+    // Create "end" event
+    const endTime = Number(alert.endTime);
+    if (Number.isFinite(endTime) && endTime > 0 && endTime >= startTs && endTime <= endTs) {
+      const endCategory = 13;
+      const endCategoryDesc = OFFICIAL_CATEGORY_MAP[endCategory];
+      const endAlertDate = formatIsoSeconds(new Date(endTime * 1000));
+
+      for (let c = 0; c < cities.length; c++) {
+        const city = cities[c];
+        if (city === null || city === undefined) continue;
+        const cityName = String(city).trim();
+        if (!cityName) continue;
+
+        transformed.push({
+          data: cityName,
+          alertDate: endAlertDate,
+          category_desc: endCategoryDesc,
+          category: endCategory,
+          rid: 0,
+          __timestamp: endTime,
+        });
+      }
     }
   }
 
   transformed.sort(function(a, b) {
-    return b.__startTime - a.__startTime;
+    return b.__timestamp - a.__timestamp;
   });
 
   return transformed.map(function(entry) {
@@ -191,6 +233,7 @@ function transformTzevaPayload(payload, startTs, endTs) {
     };
   });
 }
+
 
 async function fetchTzevaAdomHistory(range) {
   const target = `${TZEVA_ADOM_TARGET}/${range.tFrom}/${range.tTo}`;
@@ -250,6 +293,7 @@ export default {
         }
       }
 
+      // Official provider logic
       const targetUrl = new URL(OFFICIAL_ALARMS_HISTORY_TARGET);
       targetUrl.searchParams.set('lang', 'he');
       if (fromDate && toDate) {
@@ -292,6 +336,7 @@ export default {
       return response;
     }
 
+    // Keep existing logic for other routes
     let target = ROUTES[url.pathname];
     if (!target) return new Response('Not found', { status: 404 });
 
@@ -299,7 +344,6 @@ export default {
     const cache = caches.default;
     const cacheKey = new Request(url.toString(), { method: 'GET' });
 
-    // Check Cache API (edge-local, 1s TTL)
     const cached = await cache.match(cacheKey);
     if (cached) {
       const resp = new Response(cached.body, cached);
@@ -307,7 +351,6 @@ export default {
       return resp;
     }
 
-    // Fetch from Oref
     const resp = await fetch(target, { headers: OREF_HEADERS });
     const body = await resp.arrayBuffer();
 
@@ -321,7 +364,6 @@ export default {
       },
     });
 
-    // Cache successful responses
     if (resp.ok) {
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
     }
