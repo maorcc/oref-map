@@ -3,6 +3,9 @@ const OREF_HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
+const CORS_ALLOW_ORIGIN = 'https://oref-map.org';
+const CORS_EXPOSE_HEADERS = 'X-CF-Colo, X-Served-By';
+
 const PROVIDERS = {
   OFFICIAL: 'official',
   TZEVA_ADOM: 'tzeva-adom',
@@ -38,11 +41,17 @@ const ROUTES = {
   '/api2/alarms-history': OFFICIAL_ALARMS_HISTORY_TARGET,
 };
 
+function resolveOfficialTarget(env) {
+  return (env && env.ALARMS_HISTORY_TARGET) ? env.ALARMS_HISTORY_TARGET : OFFICIAL_ALARMS_HISTORY_TARGET;
+}
+
 function jsonResponse(body, status, extraHeaders) {
   return new Response(JSON.stringify(body), {
     status: status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
+      'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
       ...extraHeaders,
     },
   });
@@ -265,6 +274,17 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
+          'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
+          'Access-Control-Allow-Methods': 'GET',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+
     if (url.pathname === '/api2/alarms-history') {
       const providerRaw = url.searchParams.get('provider') || url.searchParams.get('service') || PROVIDERS.OFFICIAL;
       const provider = normalizeProvider(providerRaw);
@@ -297,7 +317,7 @@ export default {
       }
 
       // Official provider logic
-      const targetUrl = new URL(OFFICIAL_ALARMS_HISTORY_TARGET);
+      const targetUrl = new URL(resolveOfficialTarget(env));
       targetUrl.searchParams.set('lang', 'he');
       if (fromDate && toDate) {
         targetUrl.searchParams.set('mode', '0');
@@ -316,6 +336,8 @@ export default {
       if (cached) {
         const resp = new Response(cached.body, cached);
         resp.headers.set('X-CF-Colo', colo);
+        resp.headers.set('Access-Control-Allow-Origin', CORS_ALLOW_ORIGIN);
+        resp.headers.set('Access-Control-Expose-Headers', CORS_EXPOSE_HEADERS);
         return resp;
       }
 
@@ -326,7 +348,9 @@ export default {
         status: resp.status,
         headers: {
           'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
-          'Cache-Control': 's-maxage=1, max-age=2',
+          'Cache-Control': 's-maxage=4, max-age=3',
+          'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
+          'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
           'X-CF-Colo': colo,
           'X-Served-By': 'worker',
         },
@@ -341,7 +365,10 @@ export default {
 
     // Keep existing logic for other routes
     let target = ROUTES[url.pathname];
-    if (!target) return new Response('Not found', { status: 404 });
+    if (!target) return new Response('Not found', {
+      status: 404,
+      headers: { 'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN },
+    });
 
     const colo = request.cf?.colo || '';
     const cache = caches.default;
@@ -351,6 +378,8 @@ export default {
     if (cached) {
       const resp = new Response(cached.body, cached);
       resp.headers.set('X-CF-Colo', colo);
+      resp.headers.set('Access-Control-Allow-Origin', CORS_ALLOW_ORIGIN);
+      resp.headers.set('Access-Control-Expose-Headers', CORS_EXPOSE_HEADERS);
       return resp;
     }
 
@@ -361,7 +390,9 @@ export default {
       status: resp.status,
       headers: {
         'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
-        'Cache-Control': 's-maxage=1, max-age=2',
+        'Cache-Control': 's-maxage=4, max-age=3',
+        'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
+        'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
         'X-CF-Colo': colo,
         'X-Served-By': 'worker',
       },

@@ -256,19 +256,12 @@
   function initLocateButton() {
     var locateBtn = document.getElementById('locate-btn');
     locateBtn.addEventListener('click', function() {
-      var alertNames = Object.keys(locationStates).filter(function(name) {
-        return locationStates[name].state !== 'green';
-      });
-      if (alertNames.length > 0) {
-        var alertBounds = L.latLngBounds();
-        alertNames.forEach(function(name) {
-          if (locationPolygons[name]) {
-            alertBounds.extend(locationPolygons[name].getBounds());
-          }
-        });
-        if (alertBounds.isValid()) {
-          map.fitBounds(alertBounds, { padding: [50, 50] });
-        }
+      if (isZoomedToEvent) {
+        isZoomingProgrammatically = true;
+        map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+        isZoomedToEvent = false;
+      } else {
+        maybeZoomToEvent();
       }
     });
   }

@@ -283,7 +283,7 @@ export async function onRequestGet(context) {
 
     return orefProxy(context, {
       target: targetUrl.toString(),
-      redirectPath: '/api2/alarms-history' + url.search,
+      redirectSuffix: '/api2/alarms-history' + url.search,
       kind: 'alarms-history',
     });
   }

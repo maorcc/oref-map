@@ -286,7 +286,7 @@ window.initStats = function() {
     categorySelect.innerHTML = '<option value="all">טוען...</option>';
 
     fetchExtendedHistory(req.fromDate, req.toDate, function(entries) {
-      if (myToken !== statsLoadToken) return;
+      if (myToken !== statsLoadToken || !statsBtn.classList.contains('open')) return;
 
       var filtered = [];
       for (var i = 0; i < entries.length; i++) {
@@ -311,6 +311,7 @@ window.initStats = function() {
   }
 
   function closeStats() {
+    statsLoadToken++;
     statsBtn.classList.remove('open');
     getStatsPopupHtml = null;
     isStatsMode = false;
@@ -391,6 +392,7 @@ window.initTimeline = function() {
   var slider = document.getElementById('timeline-slider');
   var label = document.getElementById('timeline-label');
   var playBtn = document.getElementById('tl-play');
+  var playFlyHandler = null;
   var datePicker = document.getElementById('timeline-date-picker');
   var mode3hBtn = document.getElementById('tl-mode-3h');
   var mode24hBtn = document.getElementById('tl-mode-24h');
@@ -519,8 +521,12 @@ window.initTimeline = function() {
     computeEventPeaks();
     computeTimelineBands();
     renderTicks();
-    slider.value = 999;
-    enterHistoryMode(viewTimelineMax);
+    if (eventPeaks.length > 0) {
+      seekTo(biggestEventPeak());
+    } else {
+      slider.value = 999;
+      enterHistoryMode(viewTimelineMax);
+    }
   }
 
   var timelineLoadToken = 0;
@@ -585,13 +591,21 @@ window.initTimeline = function() {
     container.classList.remove('open');
     stopPlay();
 
+    isZoomingProgrammatically = true;
+    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+    isZoomedToEvent = false;
     enterLiveMode();
     updateOverlay();
   }
   closeTimelinePanel = closeTimeline;
 
   openTimelineToLastEvent = function() {
+    if (extendedHistory.length === 0) return;
     if (!isOpen()) openTimeline();
+    else computeEventPeaks();
+    stopPlay();
+    if (eventPeaks.length > 0) seekTo(eventPeaks[eventPeaks.length - 1]);
+    else seekTo(viewTimelineMax);
   };
 
   btnRow.addEventListener('click', function(e) {
@@ -695,18 +709,67 @@ window.initTimeline = function() {
   // --- Timeline bands (show duration of active alerts) ---
   var STATE_PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
   var computedBands = []; // [{start, end, state}] - visual tick bands
-  var eventPeaks = []; // [timestamp] - last non-green before each all-clear wave
+  var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
+  var eventPeakSizes = []; // [number] — unique location count for each peak
+  var eventStarts = []; // [timestamp] — first non-green of each event group
+  var eventGroupLocs = []; // [Set] — location sets for each event group
 
   function computeEventPeaks() {
-    var peaks = new Set();
-    for (var i = 0; i < extendedHistory.length; i++) {
-      var e = extendedHistory[i];
-      if (e.alertDate >= viewTimelineMin && e.alertDate <= viewTimelineMax && e.state !== 'green') {
-        var rounded = Math.floor(e.alertDate / 10000) * 10000;
-        peaks.add(rounded);
+    eventPeaks = [];
+    eventPeakSizes = [];
+    eventStarts = [];
+    eventGroupLocs = [];
+    var lastNonGreenTime = null;
+    var firstNonGreenTime = null;
+    var prevWasGreen = false;
+    var groupLocs = new Set();
+    for (var j = 0; j < extendedHistory.length; j++) {
+      var entry = extendedHistory[j];
+      if (entry.alertDate < viewTimelineMin || entry.alertDate > viewTimelineMax) continue;
+      if (entry.state !== 'green') {
+        if (prevWasGreen || firstNonGreenTime === null) firstNonGreenTime = entry.alertDate;
+        prevWasGreen = false;
+        lastNonGreenTime = entry.alertDate;
+        groupLocs.add(entry.location);
+      } else {
+        if (!prevWasGreen && lastNonGreenTime !== null) {
+          eventPeaks.push(lastNonGreenTime);
+          eventPeakSizes.push(groupLocs.size);
+          eventStarts.push(firstNonGreenTime);
+          eventGroupLocs.push(groupLocs);
+        }
+        prevWasGreen = true;
+        groupLocs = new Set();
       }
     }
-    eventPeaks = Array.from(peaks).sort(function(a,b){return a-b;});
+    if (!prevWasGreen && lastNonGreenTime !== null) {
+      eventPeaks.push(lastNonGreenTime);
+      eventPeakSizes.push(groupLocs.size);
+      eventStarts.push(firstNonGreenTime);
+      eventGroupLocs.push(groupLocs);
+    }
+  }
+
+  function boundsForEvent(idx) {
+    var locs = eventGroupLocs[idx];
+    if (!locs) return null;
+    var bounds = null;
+    locs.forEach(function(loc) {
+      var polygon = locationPolygons[loc];
+      if (!polygon) return;
+      if (!bounds) bounds = L.latLngBounds(polygon.getBounds());
+      else bounds.extend(polygon.getBounds());
+    });
+    return bounds;
+  }
+
+  function biggestEventPeak() {
+    if (eventPeaks.length === 0 || eventPeakSizes.length === 0) return viewTimelineMax;
+    var bestIdx = 0;
+    for (var i = 1; i < eventPeakSizes.length; i++) {
+      if (eventPeakSizes[i] >= eventPeakSizes[bestIdx]) bestIdx = i;
+    }
+    return eventPeaks[bestIdx];
   }
 
   function computeTimelineBands() {
@@ -835,6 +898,23 @@ window.initTimeline = function() {
     isPlaying = false;
     playBtn.textContent = '\u25B6';
     if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+    if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
+  }
+
+  var GAP_SKIP_MS = 1000; // real-time ms before skipping a dead gap
+
+  function isInBand(time) {
+    for (var i = 0; i < computedBands.length; i++) {
+      if (time >= computedBands[i].start && time <= computedBands[i].end) return true;
+    }
+    return false;
+  }
+
+  function nextBandStart(time) {
+    for (var i = 0; i < computedBands.length; i++) {
+      if (computedBands[i].start > time) return computedBands[i].start;
+    }
+    return null;
   }
 
   function startPlay() {
@@ -842,9 +922,21 @@ window.initTimeline = function() {
     isPlaying = true;
     playBtn.textContent = '\u23F8';
     var lastFrame = performance.now();
+    var gapEnterFrame = null;
+    var playEventIdx = -1;
     if (parseInt(slider.value) >= 999) {
       slider.value = 0;
       enterHistoryMode(viewTimelineMin);
+      lastFrame = performance.now();
+      gapEnterFrame = null;
+      playEventIdx = -1;
+    }
+    function findEventIdx(time) {
+      for (var i = 0; i < eventStarts.length; i++) {
+        var end = (i + 1 < eventStarts.length) ? eventStarts[i + 1] : viewTimelineMax;
+        if (time >= eventStarts[i] && time < end) return i;
+      }
+      return -1;
     }
     function tick(now) {
       if (!isPlaying) return;
@@ -855,8 +947,22 @@ window.initTimeline = function() {
         slider.value = 0;
         enterHistoryMode(viewTimelineMin);
         lastFrame = now;
+        gapEnterFrame = null;
+        playEventIdx = -1;
         playRAF = requestAnimationFrame(tick);
         return;
+      }
+      if (!isInBand(newTime)) {
+        if (gapEnterFrame === null) gapEnterFrame = now;
+        if (now - gapEnterFrame >= GAP_SKIP_MS) {
+          var next = nextBandStart(newTime);
+          if (next !== null) {
+            newTime = next;
+            gapEnterFrame = null;
+          }
+        }
+      } else {
+        gapEnterFrame = null;
       }
       slider.value = Math.min(sliderFromTime(newTime), 999);
       currentViewTime = newTime;
@@ -864,6 +970,30 @@ window.initTimeline = function() {
       label.textContent = timeStr;
       document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
       reconstructStateAt(newTime);
+
+      var curIdx = findEventIdx(newTime);
+      if (curIdx !== playEventIdx) {
+        playEventIdx = curIdx;
+        var bounds = curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+        if (bounds) {
+          isZoomingProgrammatically = true;
+          isPlaying = false;
+          if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+          if (playFlyHandler) map.off('moveend', playFlyHandler);
+          playFlyHandler = function() {
+            map.off('moveend', playFlyHandler);
+            playFlyHandler = null;
+            isZoomingProgrammatically = false;
+            isPlaying = true;
+            lastFrame = performance.now();
+            playRAF = requestAnimationFrame(tick);
+          };
+          map.on('moveend', playFlyHandler);
+          map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+          return;
+        }
+      }
+
       playRAF = requestAnimationFrame(tick);
     }
     playRAF = requestAnimationFrame(tick);
