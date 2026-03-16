@@ -8,7 +8,7 @@ const PROVIDERS = {
   TZEVA_ADOM: 'tzeva-adom',
 };
 
-const OFFICIAL_ALARMS_HISTORY_TARGET = 'http://127.0.0.1:5000/api/alerts-history/summary/custom/';
+const OFFICIAL_ALARMS_HISTORY_TARGET = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx';
 const TZEVA_ADOM_TARGET = 'https://tzevadom.com/api/alerts-history/summary/custom';
 
 const TZEVA_ADOM_TO_OFFICIAL_API = {
@@ -19,12 +19,16 @@ const TZEVA_ADOM_TO_OFFICIAL_API = {
 };
 
 const OFFICIAL_CATEGORY_MAP = {
-  1: '\u05d9\u05e8\u05d9 \u05e8\u05e7\u05d8\u05d5\u05ea \u05d5\u05d8\u05d9\u05dc\u05d9\u05dd',
-  2: '\u05d7\u05d3\u05d9\u05e8\u05ea \u05db\u05dc\u05d9 \u05d8\u05d9\u05e1 \u05e2\u05d5\u05d9\u05df',
-  4: '\u05d7\u05d3\u05d9\u05e8\u05ea \u05de\u05d7\u05d1\u05dc\u05d9\u05dd',
-  13: '\u05d4\u05d0\u05d9\u05e8\u05d5\u05e2 \u05d4\u05e1\u05ea\u05d9\u05d9\u05dd',
-  14: '\u05d1\u05d3\u05e7\u05d5\u05ea \u05d4\u05e7\u05e8\u05d5\u05d1\u05d5\u05ea \u05e6\u05e4\u05d5\u05d9\u05d5\u05ea \u05dc\u05d4\u05ea\u05e7\u05d1\u05dc \u05d4\u05ea\u05e8\u05e2\u05d5\u05ea \u05d1\u05d0\u05d6\u05d5\u05e8\u05da',
-  8: '\u05d4\u05ea\u05e8\u05e2\u05d4',
+  1: "ירי רקטות וטילים",
+  2: "חדירת כלי טיס עוין",
+  3: "חדירת מחבלים",
+  4: "רעידת אדמה",
+  5: "חשש לצונאמי",
+  6: "אירוע חומרים מסוכנים",
+  7: "אירוע רדיולוגי",
+  10: "חשש לאירוע ביולוגי",
+  13: "האירוע הסתיים",
+  14: "התרעה מוקדמת"
 };
 
 const ROUTES = {

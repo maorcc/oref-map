@@ -13,6 +13,7 @@ function init() {
           setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
           setInterval(fadeGreenMarkers, FADE_TICK_MS);
           fetchLiveAlerts();
+          fetchExtendedHistory();
           updateLiveStatus();
           if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
 

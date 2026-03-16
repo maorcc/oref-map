@@ -7,8 +7,8 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 .leaflet-control-zoom a:first-child { border-radius: 6px 6px 0 0 !important; }
 .leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
-@keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes toastFade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tap-hint-fade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes toast-fade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
 
 #legend {
@@ -98,7 +98,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   padding: 8px 12px;
   font-size: 12px;
   max-width: 220px;
-  word-break: break-word;
+  overflow-wrap: break-word;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   z-index: 1001;
   direction: ltr;
@@ -195,7 +195,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   z-index: 1001;
   direction: rtl;
   text-align: center;
-  animation: tapHintFade 5s forwards;
+  animation: tap-hint-fade 5s forwards;
   pointer-events: none;
 }
 
