@@ -7,27 +7,21 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 .leaflet-control-zoom a:first-child { border-radius: 6px 6px 0 0 !important; }
 .leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
-@keyframes tap-hint-fade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes toast-fade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes toastFade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
 
-#right-panel {
-  position: fixed;
-  right: 24px;
-  bottom: 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  z-index: 1000;
-}
 #legend {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
   background: rgba(255,255,255,0.92);
   border-radius: 8px;
   padding: 12px 16px;
   font-size: 14px;
   line-height: 1.8;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
   direction: rtl;
   max-width: calc(100vw - 32px);
 }
@@ -42,8 +36,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #status {
   position: fixed;
-  top: 50px;
-  left: 12px;
+  top: 80px;
+  left: 10px;
   background: rgba(255,255,255,0.92);
   border-radius: 6px;
   padding: 6px 12px;
@@ -51,28 +45,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   z-index: 1000;
   direction: rtl;
-}
-.history-provider-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  direction: rtl;
-}
-.history-provider-control label {
-  font-size: 12px;
-  color: #333;
-  white-space: nowrap;
-}
-.history-provider-select {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #fff;
-  color: #111;
-  font-size: 12px;
-  padding: 3px 6px;
-  font-family: inherit;
-  flex: 1;
 }
 #status .indicator {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;
@@ -97,15 +69,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #errorDetail {
   display: none;
   position: fixed;
-  top: 48px;
-  left: 12px;
+  top: 112px;
+  left: 10px;
   background: #fff;
   border: 1px solid #e00;
   border-radius: 6px;
   padding: 8px 12px;
   font-size: 12px;
   max-width: 220px;
-  overflow-wrap: break-word;
+  word-break: break-word;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   z-index: 1001;
   direction: ltr;
@@ -202,11 +174,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   z-index: 1001;
   direction: rtl;
   text-align: center;
-  animation: tap-hint-fade 5s forwards;
+  animation: tapHintFade 5s forwards;
   pointer-events: none;
 }
 
 #sound-btn, #timeline-btn, #stats-btn, #location-btn, #locate-btn {
+  position: fixed;
+  right: 24px;
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -224,29 +198,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     border-color: #93c5fd;
   }
 }
-#gps-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
 #locate-btn {
+  bottom: 352px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 40px;
+  max-width: 40px;
+  height: 40px;
+  padding: 0;
   font: inherit;
   -webkit-appearance: none;
   appearance: none;
 }
-#locate-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
 #location-btn {
+  bottom: 304px;
   direction: ltr;
   display: flex;
   align-items: center;
@@ -264,6 +230,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: pointer;
 }
 #sound-btn {
+  bottom: 256px;
   direction: ltr;
   display: flex;
   flex-direction: column-reverse;
@@ -275,16 +242,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 1001;
 }
 #sound-btn-row {
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 6px 12px;
-  height: auto;
-  min-height: 31px;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
   direction: rtl;
   cursor: pointer;
 }
@@ -332,6 +296,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 
 #stats-btn {
+  bottom: 208px;
   direction: ltr;
   display: flex;
   flex-direction: column-reverse;
@@ -343,7 +308,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
-  z-index: 1001;
 }
 #stats-btn-row {
   display: flex;
@@ -432,17 +396,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
 #timeline-btn {
   display: flex; /* THIS MUST BE FLEX TO BE VISIBLE */
+  bottom: 160px;
   direction: ltr; /* This sets content to flow LTR by default inside the button */
   flex-direction: column-reverse;
-}
-#timeline-btn.has-data {
-  background: rgba(219, 234, 254, 0.92);
-  border-color: #93c5fd;
-}
-#right-panel:has(#timeline-btn.open) #gps-row,
-#right-panel:has(#timeline-btn.open) #sound-btn,
-#right-panel:has(#timeline-btn.open) #stats-btn {
-  display: none;
 }
 #timeline-btn.open {
   width: 620px;
@@ -451,7 +407,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: default;
   border-radius: 12px;
   background: rgba(255,255,255,0.97);
-  z-index: 1001;
 }
 #timeline-btn-row {
   display: flex;
@@ -531,20 +486,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   gap: 8px;
   margin-bottom: 10px;
   flex-wrap: wrap;
-  direction: rtl; /* Ensure slider behaves left-to-right */
 }
 #timeline-mode-buttons button {
   flex: 1;
-  min-width: 80px;
+  min-width: 100px;
   padding: 6px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
   font-size: 12px;
-}
-#tl-mode-3h {
-  background: #93c5fd;
-  border: 1px solid #3b82f6;
 }
 #tl-mode-24h {
   background: #93c5fd;
@@ -576,11 +526,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #timeline-transport button:hover { background: #eee; }
 #timeline-transport button:active { background: #ddd; }
-#timeline-transport #tl-prev, #timeline-transport #tl-next {
-  font-size: 19px;
-  background: rgba(219, 234, 254, 0.92);
-  border-color: #93c5fd;
-}
 #timeline-slider-wrap {
   position: relative;
   width: 100%;
@@ -588,8 +533,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #timeline-ticks {
   position: relative;
-  width: calc(100% - 16px);
-  margin: 0 8px;
+  width: 100%;
   height: 8px;
   pointer-events: none;
   border-radius: 4px;
@@ -606,32 +550,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   width: 100%;
   cursor: pointer;
   direction: ltr; /* Ensure slider behaves left-to-right */
-  -webkit-appearance: none;
-  appearance: none;
-  height: 4px;
-  border-radius: 2px;
-  background: #93c5fd;
-}
-#timeline-slider:focus-visible {
-  outline: 2px solid #1d4ed8;
-  outline-offset: 2px;
-}
-#timeline-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 13px;
-  height: 20px;
-  background: #3b82f6;
-  clip-path: polygon(50% 0%, 100% 45%, 100% 100%, 0% 100%, 0% 45%);
-  cursor: pointer;
-}
-#timeline-slider::-moz-range-thumb {
-  width: 13px;
-  height: 20px;
-  background: #3b82f6;
-  clip-path: polygon(50% 0%, 100% 45%, 100% 100%, 0% 100%, 0% 45%);
-  cursor: pointer;
-  border: none;
 }
 #timeline-label {
   font-size: 15px;
@@ -653,72 +571,72 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 
 @media (max-width: 480px) {
-  #right-panel {
-    right: 12px;
-    bottom: 28px;
-    gap: 6px;
-  }
   #legend {
+    bottom: 12px;
+    right: 12px;
     padding: 8px 12px;
     font-size: 13px;
     line-height: 1.6;
   }
   #legend .dot { width: 12px; height: 12px; }
   #status {
-    top: 60px;
-    left: 12px;
-    padding: 6px 10px;
+    top: 80px;
+    left: 10px;
+    padding: 5px 10px;
     font-size: 13px;
   }
-  .history-provider-control {
-    padding: 5px 8px;
-    gap: 5px;
-  }
-  .history-provider-control label {
-    font-size: 11px;
-  }
-  .history-provider-select {
-    font-size: 11px;
-    padding: 2px 6px;
-  }
   #errorDetail {
-    top: 48px;
-    left: 12px;
+    top: 110px;
+    left: 8px;
   }
   #sound-btn, #timeline-btn, #stats-btn, #location-btn, #locate-btn {
+    right: 12px;
     max-height: 36px;
   }
-  #gps-row {
-    gap: 6px;
-  }
-  #locate-btn-row {
+  #locate-btn {
+    bottom: 292px;
+    width: 36px;
+    max-width: 36px;
     height: 36px;
-    padding: 0 10px;
-    gap: 5px;
+  }
+  #location-btn {
+    bottom: 248px;
   }
   #location-btn-row {
     height: 36px;
     padding: 0 10px;
     gap: 5px;
   }
+  #sound-btn {
+    bottom: 204px;
+  }
   #sound-btn.open {
     max-width: calc(100vw - 24px);
+    right: 12px;
   }
   #sound-btn-row {
     height: 36px;
     padding: 0 10px;
     gap: 5px;
   }
+  #stats-btn {
+    bottom: 160px;
+  }
   #stats-btn.open {
     max-width: calc(100vw - 24px);
+    right: 12px;
   }
   #stats-btn-row {
     height: 36px;
     padding: 0 10px;
     gap: 5px;
   }
+  #timeline-btn {
+    bottom: 116px;
+  }
   #timeline-btn.open {
     max-width: calc(100vw - 24px);
+    right: 12px;
   }
   #timeline-btn-row {
     height: 36px;
