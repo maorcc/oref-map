@@ -792,6 +792,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   var playFlyHandler = null;
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
+  var polygonHintInterval = null; // showPolygonHint animation interval
+  var polygonHintTargets = null;  // targets being pulsed by showPolygonHint
   var closeTimelinePanel = function() {}; // set by initTimeline
   var openTimelineToLastEvent = function() {}; // set by initTimeline
 
@@ -1359,7 +1361,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     if (targets.length === 0) return;
 
     var step = 0, totalSteps = 30; // 3 cycles * 10 steps per cycle
-    var interval = setInterval(function() {
+    polygonHintTargets = targets;
+    polygonHintInterval = setInterval(function() {
       var t = (step % 10) / 10;
       var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
       for (var i = 0; i < targets.length; i++) {
@@ -1370,12 +1373,27 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
       step++;
       if (step >= totalSteps) {
-        clearInterval(interval);
+        clearInterval(polygonHintInterval);
+        polygonHintInterval = null;
         for (var j = 0; j < targets.length; j++) {
           targets[j].polygon.setStyle(targets[j].origStyle);
         }
+        polygonHintTargets = null;
       }
     }, 100);
+  }
+
+  function cancelPolygonHint() {
+    if (polygonHintInterval) {
+      clearInterval(polygonHintInterval);
+      polygonHintInterval = null;
+    }
+    if (polygonHintTargets) {
+      for (var i = 0; i < polygonHintTargets.length; i++) {
+        polygonHintTargets[i].polygon.setStyle(BASE_STYLE);
+      }
+      polygonHintTargets = null;
+    }
   }
 
   // --- Process alerts ---
@@ -1517,7 +1535,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
     }
     if (dominant) {
-      setStatus(dominant, 'התרעות פעילות');
+      setStatusHTML(dominant, '<a href="#" id="zoomAlertsLink">התרעות פעילות</a>');
     } else {
       var rel = formatRelativeTime(lastDangerTime);
       if (rel) {
@@ -1556,6 +1574,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         e.preventDefault();
         e.stopPropagation();
         openTimelineToLastEvent();
+      });
+    }
+    var zoomLink = document.getElementById('zoomAlertsLink');
+    if (zoomLink) {
+      zoomLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        maybeZoomToEvent();
       });
     }
     statusEl.style.cursor = '';
@@ -1708,6 +1734,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   function reconstructStateAt(targetTime) {
+    cancelPolygonHint();
     // Clear all polygons
     for (var name in locationStates) {
       var entry = locationStates[name];
