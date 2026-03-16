@@ -192,8 +192,8 @@ var historyProvider = HISTORY_PROVIDER_DEFAULT;
 // Configure the default provider per usage/mode.
 // Use keys like "timeline:3h", "timeline:24h", "timeline:date", "stats:1", "stats:2", "stats:3", "stats:0".
 var HISTORY_PROVIDER_BY_MODE = {
-  'timeline:3h': HISTORY_PROVIDER_OFFICIAL,
-  'timeline:24h': HISTORY_PROVIDER_TZEVA_ADOM,
+  'timeline:3h': [HISTORY_PROVIDER_OFFICIAL, HISTORY_PROVIDER_TZEVA_ADOM],
+  'timeline:24h': [HISTORY_PROVIDER_TZEVA_ADOM, HISTORY_PROVIDER_OFFICIAL],
   'timeline:date': HISTORY_PROVIDER_TZEVA_ADOM,
   'stats:1': HISTORY_PROVIDER_TZEVA_ADOM,
   'stats:2': HISTORY_PROVIDER_TZEVA_ADOM,
