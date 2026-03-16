@@ -1,7 +1,12 @@
-var CACHE_NAME = 'oref-map-v1';
+var CACHE_NAME = 'oref-map-v2';
 var SHELL_URLS = [
   '/',
-  '/mixkit-clear-announce-tones-2861.wav'
+  '/mixkit-clear-announce-tones-2861.wav',
+  '/assets/css/main.css',
+  '/assets/js/app-bootstrap.js',
+  '/assets/js/app-core.js',
+  '/assets/js/app-panels.js',
+  '/assets/js/sw-register.js'
 ];
 
 self.addEventListener('install', function(event) {
