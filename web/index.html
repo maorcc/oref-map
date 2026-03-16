@@ -1,34 +1,35 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-<script src="https://t.contentsquare.net/uxa/1d8a4cde7672c.js"></script>
-<meta charset="utf-8">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#1a1a2e">
-<link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/assets/icon-192.png">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="מפת העורף">
-<title>מפת העורף - מפת התרעות פיקוד העורף</title>
-<link rel="canonical" href="https://oref-map.org/">
-<meta name="description" content="מפת העורף - מפת התרעות פיקוד העורף בזמן אמת">
-<meta property="og:title" content="מפת העורף">
-<meta property="og:description" content="מפת התרעות פיקוד העורף בזמן אמת">
-<meta property="og:type" content="website">
-<meta property="og:locale" content="he_IL">
-<meta property="og:image" content="https://oref-map.org/og-image.jpg">
-<meta property="og:image:type" content="image/jpeg">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta property="og:url" content="https://oref-map.org">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="מפת העורף">
-<meta name="twitter:description" content="מפת התרעות פיקוד העורף בזמן אמת">
-<meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="/assets/css/main.css">
+    <script src="https://t.contentsquare.net/uxa/1d8a4cde7672c.js"></script>
+    <meta charset="utf-8">
+    <link rel="icon"
+          href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="מפת העורף">
+    <title>מפת העורף - מפת התרעות פיקוד העורף</title>
+    <link rel="canonical" href="https://oref-map.org/">
+    <meta name="description" content="מפת העורף - מפת התרעות פיקוד העורף בזמן אמת">
+    <meta property="og:title" content="מפת העורף">
+    <meta property="og:description" content="מפת התרעות פיקוד העורף בזמן אמת">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="he_IL">
+    <meta property="og:image" content="https://oref-map.org/og-image.jpg">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:url" content="https://oref-map.org">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="מפת העורף">
+    <meta name="twitter:description" content="מפת התרעות פיקוד העורף בזמן אמת">
+    <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
 <div id="map"></div>
@@ -36,129 +37,163 @@
 <h1 id="page-title">מפת העורף</h1>
 
 <div id="legend">
-  <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
-  <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
-  <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
-  <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
+    <div class="row">
+        <div class="dot dot-red"></div>
+        <span>ירי רקטות וטילים</span></div>
+    <div class="row">
+        <div class="dot dot-purple"></div>
+        <span>חדירת כטב״מ</span></div>
+    <div class="row">
+        <div class="dot dot-yellow"></div>
+        <span>התרעה מוקדמת</span></div>
+    <div class="row">
+        <div class="dot dot-green"></div>
+        <span>האירוע הסתיים</span></div>
 </div>
 
 <div id="status">
-  <span class="indicator indicator-err" id="statusDot"></span>
-  <span id="statusText">מתחבר...</span>
-  <div id="historyTimeLabel"></div>
+    <span class="indicator indicator-err" id="statusDot"></span>
+    <span id="statusText">מתחבר...</span>
+    <div id="historyTimeLabel"></div>
 </div>
 <div id="errorDetail"></div>
 
 <div id="about-backdrop" class="modal-backdrop">
-  <div id="about-modal" class="modal-content">
-    <button id="about-close" class="modal-close">&times;</button>
-    <h2>אודות מפת העורף</h2>
-    <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
-    <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
-    <p>מפה זו אינה רשמית ואינה מופעלת על ידי פיקוד העורף. אין להסתמך עליה כמקור יחיד למידע ביטחוני. לקבלת הנחיות רשמיות, יש לפנות לאתר <a href="https://www.oref.org.il/" target="_blank" rel="noopener">פיקוד העורף</a>.</p>
-    <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.</p>
-    <p>נתקלתם בבעיה או יש לכם הצעה? <a href="https://github.com/maorcc/oref-map/issues/new" target="_blank" rel="noopener">פתחו קריאה ב-GitHub</a>.</p>
-  </div>
+    <div id="about-modal" class="modal-content">
+        <button id="about-close" class="modal-close">&times;</button>
+        <h2>אודות מפת העורף</h2>
+        <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
+        <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
+        <p>מפה זו אינה רשמית ואינה מופעלת על ידי פיקוד העורף. אין להסתמך עליה כמקור יחיד למידע ביטחוני. לקבלת הנחיות
+            רשמיות, יש לפנות לאתר <a href="https://www.oref.org.il/" target="_blank" rel="noopener">פיקוד העורף</a>.</p>
+        <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.
+        </p>
+        <p>נתקלתם בבעיה או יש לכם הצעה? <a href="https://github.com/maorcc/oref-map/issues/new" target="_blank"
+                                           rel="noopener">פתחו קריאה ב-GitHub</a>.</p>
+    </div>
 </div>
 
 
 <div id="tap-hint">
-  לחצו על המפה לצפייה בהיסטוריית התרעות
+    לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
 <button id="locate-btn" type="button" title="הצג התרעות במפה">
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round">
+        <circle cx="10.5" cy="10.5" r="7"/>
+        <line x1="15.5" y1="15.5" x2="21" y2="21"/>
+    </svg>
 </button>
 <button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
-  <div id="location-btn-row">
-    <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
-  </div>
+    <div id="location-btn-row">
+        <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
+    </div>
 </button>
 
 <div id="sound-btn" title="השמעת צלילים">
-  <div id="sound-btn-row">
-    <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
-  </div>
-  <div id="sound-panel">
-    <p class="sound-panel-title">בחר מיקום לקבלת התראות קוליות:</p>
-    <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl">
-    <div id="sound-results"></div>
-    <div class="sound-actions">
-      <button id="sound-all-btn">כל הארץ</button>
+    <div id="sound-btn-row">
+        <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
     </div>
-  </div>
+    <div id="sound-panel">
+        <p class="sound-panel-title">בחר מיקום לקבלת התראות קוליות:</p>
+        <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl">
+        <div id="sound-results"></div>
+        <div class="sound-actions">
+            <button id="sound-all-btn">כל הארץ</button>
+        </div>
+    </div>
 </div>
 
 <div id="timeline-btn" title="ציר זמן">
-  <div id="timeline-btn-row">
-    <span class="btn-icon"><svg class="timeline-icon" width="18" height="18" viewBox="0 0 100 100"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
-  </div>
-  <div id="timeline-controls">
-    <div id="timeline-mode-buttons">
-      <button id="tl-mode-3h">3 שעות אחרונות</button>
-      <button id="tl-mode-24h">24 שעות אחרונות</button>
-      <button id="tl-mode-date">בחר תאריך</button>
+    <div id="timeline-btn-row">
+        <span class="btn-icon">
+            <svg class="timeline-icon" width="18" height="18" viewBox="0 0 100 100">
+                <path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z"
+                      fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/>
+                <circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/>
+                <g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/>
+                    <line x1="48" y1="60" x2="32" y2="68"/>
+                </g>
+                <circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/>
+                <g stroke="#333" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="48" y1="39" x2="48" y2="43"/>
+                    <line x1="69" y1="60" x2="65" y2="60"/>
+                    <line x1="48" y1="81" x2="48" y2="77"/>
+                    <line x1="27" y1="60" x2="31" y2="60"/>
+                </g>
+            </svg>
+        </span>
+        <span class="btn-text">התרעות קודמות</span>
+        <span class="tl-close">✕</span>
     </div>
-    <div id="timeline-slider-wrap">
-      <div id="timeline-ticks"></div>
-      <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+    <div id="timeline-controls">
+        <div id="timeline-mode-buttons">
+            <button id="tl-mode-3h">3 שעות אחרונות</button>
+            <button id="tl-mode-24h">24 שעות אחרונות</button>
+            <button id="tl-mode-date">בחר תאריך</button>
+        </div>
+        <div id="timeline-slider-wrap">
+            <div id="timeline-ticks"></div>
+            <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+        </div>
+        <div id="timeline-transport">
+            <input type="date" id="timeline-date-picker" title="בחר תאריך">
+            <span id="timeline-label"></span>
+            <button id="tl-prev" title="אירוע קודם">⏮</button>
+            <button id="tl-play" title="נגן/עצור">▶</button>
+            <button id="tl-next" title="אירוע הבא">⏭</button>
+        </div>
+        <div class="history-provider-control">
+            <label class="history-provider-label" for="history-provider-select-timeline">מקור:</label>
+            <select id="history-provider-select-timeline" class="history-provider-select">
+                <option value="official"></option>
+                <option value="tzeva-adom"></option>
+            </select>
+        </div>
     </div>
-    <div id="timeline-transport">
-      <input type="date" id="timeline-date-picker" title="בחר תאריך">
-      <span id="timeline-label"></span>
-      <button id="tl-prev" title="אירוע קודם">⏮</button>
-      <button id="tl-play" title="נגן/עצור">▶</button>
-      <button id="tl-next" title="אירוע הבא">⏭</button>
-    </div>
-    <div class="history-provider-control">
-      <label class="history-provider-label" for="history-provider-select-timeline">מקור:</label>
-      <select id="history-provider-select-timeline" class="history-provider-select">
-        <option value="official"></option>
-        <option value="tzeva-adom"></option>
-      </select>
-    </div>
-  </div>
 </div>
 
 <div id="stats-btn" title="סטטיסטיקות">
-  <div id="stats-btn-row">
-    <span class="btn-icon">📊</span><span class="btn-text">סטטיסטיקות</span><span class="tl-close">✕</span>
-  </div>
-  <div id="stats-panel">
-    <div class="stats-range-section">
-      <label class="stats-range-title">טווח זמן</label>
-      <div class="stats-mode-grid">
-        <button id="stats-mode-1-btn" class="stats-mode-btn" data-mode="1">24 שעות אחרונות</button>
-        <button id="stats-mode-2-btn" class="stats-mode-btn" data-mode="2">שבוע אחרון</button>
-        <button id="stats-mode-3-btn" class="stats-mode-btn" data-mode="3">חודש אחרון</button>
-        <button id="stats-mode-0-btn" class="stats-mode-btn" data-mode="0">מותאם אישית</button>
-      </div>
-      <div id="stats-custom-dates">
-        <div class="stats-custom-grid">
-          <div class="stats-date-col">
-            <label class="stats-date-label">מתאריך</label>
-            <input type="date" id="stats-from-date" max="">
-          </div>
-          <div class="stats-date-col">
-            <label class="stats-date-label">עד תאריך</label>
-            <input type="date" id="stats-to-date" max="">
-          </div>
+    <div id="stats-btn-row">
+        <span class="btn-icon">📊</span>
+        <span class="btn-text">סטטיסטיקות</span>
+        <span class="tl-close">✕</span>
+    </div>
+    <div id="stats-panel">
+        <div class="stats-range-section">
+            <label class="stats-range-title">טווח זמן</label>
+            <div class="stats-mode-grid">
+                <button id="stats-mode-1-btn" class="stats-mode-btn" data-mode="1">24 שעות אחרונות</button>
+                <button id="stats-mode-2-btn" class="stats-mode-btn" data-mode="2">שבוע אחרון</button>
+                <button id="stats-mode-3-btn" class="stats-mode-btn" data-mode="3">חודש אחרון</button>
+                <button id="stats-mode-0-btn" class="stats-mode-btn" data-mode="0">מותאם אישית</button>
+            </div>
+            <div id="stats-custom-dates">
+                <div class="stats-custom-grid">
+                    <div class="stats-date-col">
+                        <label class="stats-date-label">מתאריך</label>
+                        <input type="date" id="stats-from-date" max="">
+                    </div>
+                    <div class="stats-date-col">
+                        <label class="stats-date-label">עד תאריך</label>
+                        <input type="date" id="stats-to-date" max="">
+                    </div>
+                </div>
+            </div>
+            <div id="stats-range-label"></div>
         </div>
-      </div>
-      <div id="stats-range-label"></div>
+        <label>סוג התרעה</label>
+        <select id="stats-category">
+            <option value="all">טוען...</option>
+        </select>
+        <div class="history-provider-control">
+            <label class="history-provider-label" for="history-provider-select-stats">מקור:</label>
+            <select id="history-provider-select-stats" class="history-provider-select">
+                <option value="official"></option>
+                <option value="tzeva-adom"></option>
+            </select>
+        </div>
     </div>
-    <label>סוג התרעה</label>
-    <select id="stats-category">
-      <option value="all">טוען...</option>
-    </select>
-    <div class="history-provider-control">
-      <label class="history-provider-label" for="history-provider-select-stats">מקור:</label>
-      <select id="history-provider-select-stats" class="history-provider-select">
-        <option value="official"></option>
-        <option value="tzeva-adom"></option>
-      </select>
-    </div>
-  </div>
 </div>
 
 <button id="test-danger-btn" title="בדיקת צליל סכנה">🚨</button>
