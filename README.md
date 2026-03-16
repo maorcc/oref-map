@@ -6,8 +6,8 @@ Live map of Israel showing [Pikud HaOref](https://www.oref.org.il) (Home Front C
 
 <table>
   <tr>
-    <td align="center"><img src="web/og-image.jpg" width="480" alt="Desktop"/><br/>Desktop</td>
-    <td align="center"><img src="web/screenshot-mobile.jpg" width="200" alt="Mobile"/><br/>Mobile</td>
+    <td align="center"><img src="docs/og-image.jpg" width="480" alt="Desktop"/><br/>Desktop</td>
+    <td align="center"><img src="docs/screenshot-mobile.jpg" width="200" alt="Mobile"/><br/>Mobile</td>
   </tr>
 </table>
 

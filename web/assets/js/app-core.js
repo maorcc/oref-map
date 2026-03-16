@@ -16,9 +16,13 @@ var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-T
 function apiFetch(endpoint) {
   return fetch(PROXY_BASE + apiPrefix + '/' + endpoint).then(function(resp) {
     if (apiPrefix === '/api' && resp.url && resp.url.indexOf('/api2/') !== -1) {
+<<<<<<< HEAD
       var u = new URL(resp.url);
       PROXY_BASE = u.origin !== location.origin ? u.origin : '';
       console.log('Non-TLV colo detected, switching to ' + PROXY_BASE + '/api2');
+=======
+      console.log('Non-TLV colo detected, switching to /api2');
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
       apiPrefix = '/api2';
     }
     return resp;
@@ -40,6 +44,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18
 }).addTo(map);
 
+<<<<<<< HEAD
 var isZoomedToEvent = false;
 var isZoomingProgrammatically = false;
 
@@ -48,6 +53,8 @@ map.on('moveend', function() {
   isZoomingProgrammatically = false;
 });
 
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 // --- User location ---
 var userLocationMarker = null;
 
@@ -150,6 +157,13 @@ function initUserLocation() {
 
 initUserLocation();
 
+<<<<<<< HEAD
+=======
+document.getElementById('locate-btn').addEventListener('click', function() {
+  maybeZoomToEvent();
+});
+
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 // --- State ---
 var locationStates = {};       // {name: {state, since, marker}}
 var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
@@ -218,8 +232,11 @@ var isPlaying = false;
 var playRAF = null;
 var currentViewTime = 0;
 var liveLocationStates = null; // shadow copy of live state
+<<<<<<< HEAD
 var polygonHintInterval = null; // showPolygonHint animation interval
 var polygonHintTargets = null;  // targets being pulsed by showPolygonHint
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 var closeTimelinePanel = function() {}; // set by initTimeline
 var openTimelineToLastEvent = function() {}; // set by initTimeline
 var currentTimelineDay = null; // track currently selected day in timeline
@@ -708,8 +725,12 @@ function showPolygonHint() {
   if (targets.length === 0) return;
 
   var step = 0, totalSteps = 30; // 3 cycles * 10 steps per cycle
+<<<<<<< HEAD
   polygonHintTargets = targets;
   polygonHintInterval = setInterval(function() {
+=======
+  var interval = setInterval(function() {
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
     var t = (step % 10) / 10;
     var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
     for (var i = 0; i < targets.length; i++) {
@@ -720,16 +741,24 @@ function showPolygonHint() {
     }
     step++;
     if (step >= totalSteps) {
+<<<<<<< HEAD
       clearInterval(polygonHintInterval);
       polygonHintInterval = null;
       for (var j = 0; j < targets.length; j++) {
         targets[j].polygon.setStyle(targets[j].origStyle);
       }
       polygonHintTargets = null;
+=======
+      clearInterval(interval);
+      for (var j = 0; j < targets.length; j++) {
+        targets[j].polygon.setStyle(targets[j].origStyle);
+      }
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
     }
   }, 100);
 }
 
+<<<<<<< HEAD
 function cancelPolygonHint() {
   if (polygonHintInterval) {
     clearInterval(polygonHintInterval);
@@ -743,6 +772,8 @@ function cancelPolygonHint() {
   }
 }
 
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 // --- Process alerts ---
 function processLiveAlert(alert) {
   if (!alert || !alert.data || !alert.title) return;
@@ -860,6 +891,7 @@ function getActiveEventBounds() {
 
 function maybeZoomToEvent() {
   var bounds = getActiveEventBounds();
+<<<<<<< HEAD
   isZoomingProgrammatically = true;
   if (bounds) {
     map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
@@ -867,6 +899,12 @@ function maybeZoomToEvent() {
   } else {
     map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
     isZoomedToEvent = false;
+=======
+  if (bounds) {
+    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+  } else {
+    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
   }
 }
 
@@ -883,7 +921,11 @@ function updateLiveStatus() {
     }
   }
   if (dominant) {
+<<<<<<< HEAD
     setStatusHTML(dominant, '<a href="#" id="zoomAlertsLink">התרעות פעילות</a>');
+=======
+    setStatus(dominant, 'התרעות פעילות');
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
   } else {
     var rel = formatRelativeTime(lastDangerTime);
     if (rel) {
@@ -924,6 +966,7 @@ function setStatusHTML(state, html) {
       openTimelineToLastEvent();
     });
   }
+<<<<<<< HEAD
   var zoomLink = document.getElementById('zoomAlertsLink');
   if (zoomLink) {
     zoomLink.addEventListener('click', function(e) {
@@ -932,6 +975,8 @@ function setStatusHTML(state, html) {
       maybeZoomToEvent();
     });
   }
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
   statusEl.style.cursor = '';
   lastErrorMsg = '';
   document.getElementById('errorDetail').style.display = 'none';
@@ -1131,7 +1176,10 @@ function fetchExtendedHistory(fromDateObj, toDateObj, onDone, mode, options) {
 }
 
 function reconstructStateAt(targetTime) {
+<<<<<<< HEAD
   cancelPolygonHint();
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
   // Clear current markers entirely
   for (var name in locationStates) {
     var entry = locationStates[name];

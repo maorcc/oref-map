@@ -3,9 +3,12 @@ const OREF_HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
+<<<<<<< HEAD
 const CORS_ALLOW_ORIGIN = 'https://oref-map.org';
 const CORS_EXPOSE_HEADERS = 'X-CF-Colo, X-Served-By';
 
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 const PROVIDERS = {
   OFFICIAL: 'official',
   TZEVA_ADOM: 'tzeva-adom',
@@ -41,17 +44,23 @@ const ROUTES = {
   '/api2/alarms-history': OFFICIAL_ALARMS_HISTORY_TARGET,
 };
 
+<<<<<<< HEAD
 function resolveOfficialTarget(env) {
   return (env && env.ALARMS_HISTORY_TARGET) ? env.ALARMS_HISTORY_TARGET : OFFICIAL_ALARMS_HISTORY_TARGET;
 }
 
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 function jsonResponse(body, status, extraHeaders) {
   return new Response(JSON.stringify(body), {
     status: status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
+<<<<<<< HEAD
       'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
       'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
       ...extraHeaders,
     },
   });
@@ -274,6 +283,7 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+<<<<<<< HEAD
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
@@ -285,6 +295,8 @@ export default {
       });
     }
 
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
     if (url.pathname === '/api2/alarms-history') {
       const providerRaw = url.searchParams.get('provider') || url.searchParams.get('service') || PROVIDERS.OFFICIAL;
       const provider = normalizeProvider(providerRaw);
@@ -317,7 +329,11 @@ export default {
       }
 
       // Official provider logic
+<<<<<<< HEAD
       const targetUrl = new URL(resolveOfficialTarget(env));
+=======
+      const targetUrl = new URL(OFFICIAL_ALARMS_HISTORY_TARGET);
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
       targetUrl.searchParams.set('lang', 'he');
       if (fromDate && toDate) {
         targetUrl.searchParams.set('mode', '0');
@@ -336,8 +352,11 @@ export default {
       if (cached) {
         const resp = new Response(cached.body, cached);
         resp.headers.set('X-CF-Colo', colo);
+<<<<<<< HEAD
         resp.headers.set('Access-Control-Allow-Origin', CORS_ALLOW_ORIGIN);
         resp.headers.set('Access-Control-Expose-Headers', CORS_EXPOSE_HEADERS);
+=======
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
         return resp;
       }
 
@@ -348,9 +367,13 @@ export default {
         status: resp.status,
         headers: {
           'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
+<<<<<<< HEAD
           'Cache-Control': 's-maxage=4, max-age=3',
           'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
           'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
+=======
+          'Cache-Control': 's-maxage=1, max-age=2',
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
           'X-CF-Colo': colo,
           'X-Served-By': 'worker',
         },
@@ -365,10 +388,14 @@ export default {
 
     // Keep existing logic for other routes
     let target = ROUTES[url.pathname];
+<<<<<<< HEAD
     if (!target) return new Response('Not found', {
       status: 404,
       headers: { 'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN },
     });
+=======
+    if (!target) return new Response('Not found', { status: 404 });
+>>>>>>> 6bae34cb1d3e77edadde0470109ab90227b67925
 
     const colo = request.cf?.colo || '';
     const cache = caches.default;
