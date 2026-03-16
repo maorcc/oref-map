@@ -1,0 +1,26 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Map pin -->
+  <path d="M128 20
+           C80 20 44 56 44 104
+           C44 164 128 236 128 236
+           C128 236 212 164 212 104
+           C212 56 176 20 128 20Z"
+        fill="#1F3A5F"/>
+
+  <!-- Inner circle -->
+  <circle cx="128" cy="104" r="50" fill="white"/>
+
+  <!-- Civil defense triangle -->
+  <polygon points="128,70 160,130 96,130"
+           fill="#F26A21"/>
+
+  <!-- Missile -->
+  <g transform="rotate(-25 128 104)">
+      <rect x="124" y="80" width="8" height="50" fill="#333"/>
+      <polygon points="128,65 120,80 136,80" fill="#333"/>
+      <polygon points="124,130 118,140 124,138" fill="#F26A21"/>
+      <polygon points="132,130 138,140 132,138" fill="#F26A21"/>
+  </g>
+
+</svg>
