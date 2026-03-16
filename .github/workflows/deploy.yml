@@ -26,21 +26,33 @@ jobs:
           command: pages deploy web/ --project-name=oref-map
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
-  deploy-worker:
+  deploy-workers:
     concurrency:
-      group: worker-prod-main
+      group: workers-prod-main
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      matrix:
+        include:
+          - name: proxy1
+            account_id_secret: CLOUDFLARE_ACCOUNT_ID_PROXY
+            config: wrangler.toml
+          - name: proxy2
+            account_id_secret: CLOUDFLARE_ACCOUNT_ID_PROXY2
+            config: wrangler-proxy2.toml
+          - name: proxy3
+            account_id_secret: CLOUDFLARE_ACCOUNT_ID_PROXY3
+            config: wrangler-proxy3.toml
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy Worker
+      - name: Deploy Worker (${{ matrix.name }})
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN_PROXY }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID_PROXY }}
+          accountId: ${{ secrets[matrix.account_id_secret] }}
           wranglerVersion: "4"
-          command: deploy
+          command: deploy --config ${{ matrix.config }}
           workingDirectory: worker

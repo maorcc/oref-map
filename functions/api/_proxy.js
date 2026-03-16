@@ -3,6 +3,16 @@ const OREF_HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
+const PROXY_HOSTS = [
+  'https://proxy1.oref-proxy.workers.dev',
+  'https://proxy2.oref-proxy2.workers.dev',
+  'https://proxy3.oref-proxy3.workers.dev',
+];
+
+function randomProxy() {
+  return PROXY_HOSTS[Math.floor(Math.random() * PROXY_HOSTS.length)];
+}
+
 // --- Known title classification (mirrors client-side classifyTitle) ---
 
 function isKnownTitle(title) {
@@ -133,7 +143,7 @@ async function checkAndNotifyUnknownTitles(bodyText, kind, context) {
 
 // --- Shared proxy logic ---
 
-export async function orefProxy(context, { target, redirectPath, kind }) {
+export async function orefProxy(context, { target, redirectSuffix, kind }) {
   const colo = context.request.cf?.colo || '';
 
   // Non-TLV requests redirect to the Worker; title detection only runs on the
@@ -141,7 +151,7 @@ export async function orefProxy(context, { target, redirectPath, kind }) {
   if (colo !== 'TLV') {
     return new Response(null, {
       status: 303,
-      headers: { 'Location': redirectPath, 'X-CF-Colo': colo },
+      headers: { 'Location': randomProxy() + redirectSuffix, 'X-CF-Colo': colo },
     });
   }
 
