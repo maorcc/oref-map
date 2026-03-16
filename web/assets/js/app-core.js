@@ -203,6 +203,14 @@ var HISTORY_PROVIDER_BY_MODE = {
   'default': HISTORY_PROVIDER_TZEVA_ADOM
 };
 
+// If array: dropdown enabled and values are allowed choices.
+// If string: dropdown disabled and only that value is shown.
+var HISTORY_PROVIDER_CHOICES = [
+  HISTORY_PROVIDER_AUTO,
+  HISTORY_PROVIDER_OFFICIAL,
+  HISTORY_PROVIDER_TZEVA_ADOM
+];
+
 try {
   soundMuted = localStorage.getItem('oref-sound-muted') !== 'false';
   soundLocation = localStorage.getItem('oref-sound-location') || 'all';
@@ -222,11 +230,28 @@ function normalizeHistoryProvider(value) {
   return HISTORY_PROVIDER_DEFAULT;
 }
 
+function getHistoryProviderChoices() {
+  return HISTORY_PROVIDER_CHOICES;
+}
+
+function isHistoryProviderLocked() {
+  return !Array.isArray(HISTORY_PROVIDER_CHOICES);
+}
+
+function getLockedHistoryProvider() {
+  if (!isHistoryProviderLocked()) return null;
+  return normalizeHistoryProvider(HISTORY_PROVIDER_CHOICES);
+}
+
 function getHistoryProvider() {
+  if (isHistoryProviderLocked()) {
+    return getLockedHistoryProvider() || historyProvider;
+  }
   return historyProvider;
 }
 
 function setHistoryProvider(nextProvider) {
+  if (isHistoryProviderLocked()) return false;
   var normalized = normalizeHistoryProvider(nextProvider);
   if (normalized === historyProvider) return false;
 

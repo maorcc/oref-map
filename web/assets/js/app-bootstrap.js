@@ -206,6 +206,11 @@
     var autoText = 'אוטומטי (מומלץ)';
     var officialText = 'רשמי - פיקוד העורף';
     var tzevaAdomText = 'ארכיון - צבע אדום';
+    var labelMap = {
+      auto: autoText,
+      official: officialText,
+      'tzeva-adom': tzevaAdomText
+    };
 
     document.querySelectorAll('.history-provider-control').forEach(function(wrapper) {
       wrapper.title = 'מקור נתוני היסטוריה';
@@ -221,20 +226,41 @@
     }
 
     document.querySelectorAll('.history-provider-select').forEach(function(select) {
-      var autoOpt = select.querySelector('option[value="auto"]');
-      if (!autoOpt) {
-        autoOpt = document.createElement('option');
-        autoOpt.value = 'auto';
-        select.insertBefore(autoOpt, select.firstChild);
+      function rebuildOptions() {
+        var choices = (typeof getHistoryProviderChoices === 'function') ? getHistoryProviderChoices() : null;
+        var lockedValue = (typeof getLockedHistoryProvider === 'function') ? getLockedHistoryProvider() : null;
+        var isLocked = (typeof isHistoryProviderLocked === 'function') ? isHistoryProviderLocked() : false;
+
+        select.innerHTML = '';
+
+        if (Array.isArray(choices) && choices.length > 0) {
+          for (var i = 0; i < choices.length; i++) {
+            var val = choices[i];
+            var opt = document.createElement('option');
+            opt.value = val;
+            opt.textContent = labelMap[val] || val;
+            select.appendChild(opt);
+          }
+          select.disabled = false;
+          select.value = getHistoryProvider();
+        } else {
+          var locked = lockedValue || getHistoryProvider();
+          var optSingle = document.createElement('option');
+          optSingle.value = locked;
+          optSingle.textContent = labelMap[locked] || locked;
+          select.appendChild(optSingle);
+          select.disabled = true;
+          select.value = locked;
+        }
       }
-      var officialOpt = select.querySelector('option[value="official"]');
-      var tzevaOpt = select.querySelector('option[value="tzeva-adom"]');
-      if (autoOpt) autoOpt.textContent = autoText;
-      if (officialOpt) officialOpt.textContent = officialText;
-      if (tzevaOpt) tzevaOpt.textContent = tzevaAdomText;
+
+      rebuildOptions();
+
       select.addEventListener('change', function(e) {
         setHistoryProvider(e.target.value);
       });
+
+      window.addEventListener('history-provider-changed', rebuildOptions);
     });
 
     window.addEventListener('history-provider-changed', updateSelects);
