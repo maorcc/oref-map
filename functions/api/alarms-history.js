@@ -10,7 +10,7 @@ const PROVIDERS = {
 
 const TZEVA_ADOM_TO_OFFICIAL_API = {
   0: 1,
-  2: 4,
+  2: 3,
   5: 2,
   11: 14,
 };
@@ -154,7 +154,7 @@ function mapTzevaTypeToOfficialCategory(typeValue) {
   if (Object.prototype.hasOwnProperty.call(TZEVA_ADOM_TO_OFFICIAL_API, asString)) {
     return TZEVA_ADOM_TO_OFFICIAL_API[asString];
   }
-  return 8;
+  return 99;
 }
 
 function transformTzevaPayload(payload, startTs, endTs) {
