@@ -1,8 +1,5 @@
 import { orefProxy } from './_proxy.js';
 
-// local servers for testing
-// const OFFICIAL_TARGET = 'http://127.0.0.1:5000/api/alerts-history/summary/custom/';
-// const OFFICIAL_TARGET = 'http://127.0.0.1:5000/Shared/Ajax/GetAlarmsHistory.aspx';
 const OFFICIAL_TARGET = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx'
 const TZEVA_ADOM_TARGET = 'https://tzevadom.com/api/alerts-history/summary/custom';
 
@@ -29,6 +26,7 @@ const OFFICIAL_CATEGORY_MAP = {
   10: "חשש לאירוע ביולוגי",
   13: "האירוע הסתיים",
   14: "התרעה מוקדמת"
+  99: "ללא שיוך"
 };
 
 function jsonResponse(body, status, extraHeaders) {
@@ -174,7 +172,7 @@ function transformTzevaPayload(payload, startTs, endTs) {
     const startTime = Number(alert.startTime);
     if (Number.isFinite(startTime) && startTime >= startTs && startTime <= endTs) {
       const startCategory = mapTzevaTypeToOfficialCategory(alert.type);
-      const startCategoryDesc = OFFICIAL_CATEGORY_MAP[startCategory] || OFFICIAL_CATEGORY_MAP[8];
+      const startCategoryDesc = OFFICIAL_CATEGORY_MAP[startCategory] || OFFICIAL_CATEGORY_MAP[99];
       const startAlertDate = formatIsoSeconds(new Date(startTime * 1000));
 
       for (let c = 0; c < cities.length; c++) {
