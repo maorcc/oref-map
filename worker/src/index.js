@@ -176,6 +176,9 @@ function transformTzevaPayload(payload, startTs, endTs) {
       const startCategory = mapTzevaTypeToOfficialCategory(alert.type);
       const startCategoryDesc = OFFICIAL_CATEGORY_MAP[startCategory] || OFFICIAL_CATEGORY_MAP[99];
       const startAlertDate = formatIsoSeconds(new Date(startTime * 1000));
+      if (startCategory === 99) {
+        console.error(`Unknown Tzeva Adom type: ${alert.type}, at time: ${startAlertDate}`);
+      }
 
       for (let c = 0; c < cities.length; c++) {
         const city = cities[c];
