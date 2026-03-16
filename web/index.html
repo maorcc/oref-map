@@ -1598,6 +1598,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       zoomLink.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
+        closeTimelinePanel();
         maybeZoomToEvent();
       });
     }
@@ -1901,6 +1902,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
 
     function closeTimeline() {
+      if (!isOpen()) return;
       container.classList.remove('open');
       stopPlay();
 
