@@ -888,7 +888,7 @@ window.initTimeline = function() {
   nextBtn.addEventListener('click', function() {
     stopPlay();
     for (var i = 0; i < eventPeaks.length; i++) {
-      if (eventPeaks[i] > currentTime + 5000) {
+      if (eventPeaks[i] > currentViewTime + 5000) {
         seekTo(eventPeaks[i]);
         return;
       }

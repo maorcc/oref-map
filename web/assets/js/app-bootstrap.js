@@ -257,7 +257,7 @@
     var locateBtn = document.getElementById('locate-btn');
     locateBtn.addEventListener('click', function() {
       var alertNames = Object.keys(locationStates).filter(function(name) {
-        return locationStates[name] !== 'green';
+        return locationStates[name].state !== 'green';
       });
       if (alertNames.length > 0) {
         var alertBounds = L.latLngBounds();
