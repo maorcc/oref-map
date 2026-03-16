@@ -13,7 +13,7 @@ const TZEVA_ADOM_TARGET = 'https://tzevadom.com/api/alerts-history/summary/custo
 
 const TZEVA_ADOM_TO_OFFICIAL_API = {
   0: 1,
-  2: 4,
+  2: 3,
   5: 2,
   11: 14,
 };
@@ -155,7 +155,7 @@ function mapTzevaTypeToOfficialCategory(typeValue) {
   if (Object.prototype.hasOwnProperty.call(TZEVA_ADOM_TO_OFFICIAL_API, asString)) {
     return TZEVA_ADOM_TO_OFFICIAL_API[asString];
   }
-  return 8; // Fallback category
+  return 99 // Fallback category
 }
 
 // Updated transformTzevaPayload from functions/api/alarms-history.js

@@ -1,5 +1,4 @@
-// --- Stats Feature ---
-function initStats() {
+window.initStats = function() {
   var statsBtn = document.getElementById('stats-btn');
   var btnRow = document.getElementById('stats-btn-row');
   var customDatesDiv = document.getElementById('stats-custom-dates');
@@ -386,7 +385,7 @@ function initStats() {
   });
 }
 
-function initTimeline() {
+window.initTimeline = function() {
   var container = document.getElementById('timeline-btn');
   var btnRow = document.getElementById('timeline-btn-row');
   var slider = document.getElementById('timeline-slider');
@@ -889,7 +888,7 @@ function initTimeline() {
   nextBtn.addEventListener('click', function() {
     stopPlay();
     for (var i = 0; i < eventPeaks.length; i++) {
-      if (eventPeaks[i] > currentViewTime + 5000) {
+      if (eventPeaks[i] > currentTime + 5000) {
         seekTo(eventPeaks[i]);
         return;
       }
