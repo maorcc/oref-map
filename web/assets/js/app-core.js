@@ -16,7 +16,9 @@ var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-T
 function apiFetch(endpoint) {
   return fetch(PROXY_BASE + apiPrefix + '/' + endpoint).then(function(resp) {
     if (apiPrefix === '/api' && resp.url && resp.url.indexOf('/api2/') !== -1) {
-      console.log('Non-TLV colo detected, switching to /api2');
+      var u = new URL(resp.url);
+      PROXY_BASE = u.origin !== location.origin ? u.origin : '';
+      console.log('Non-TLV colo detected, switching to ' + PROXY_BASE + '/api2');
       apiPrefix = '/api2';
     }
     return resp;
@@ -37,6 +39,14 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 18
 }).addTo(map);
+
+var isZoomedToEvent = false;
+var isZoomingProgrammatically = false;
+
+map.on('moveend', function() {
+  if (!isZoomingProgrammatically) isZoomedToEvent = false;
+  isZoomingProgrammatically = false;
+});
 
 // --- User location ---
 var userLocationMarker = null;
@@ -140,10 +150,6 @@ function initUserLocation() {
 
 initUserLocation();
 
-document.getElementById('locate-btn').addEventListener('click', function() {
-  maybeZoomToEvent();
-});
-
 // --- State ---
 var locationStates = {};       // {name: {state, since, marker}}
 var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
@@ -212,6 +218,8 @@ var isPlaying = false;
 var playRAF = null;
 var currentViewTime = 0;
 var liveLocationStates = null; // shadow copy of live state
+var polygonHintInterval = null; // showPolygonHint animation interval
+var polygonHintTargets = null;  // targets being pulsed by showPolygonHint
 var closeTimelinePanel = function() {}; // set by initTimeline
 var openTimelineToLastEvent = function() {}; // set by initTimeline
 var currentTimelineDay = null; // track currently selected day in timeline
@@ -700,7 +708,8 @@ function showPolygonHint() {
   if (targets.length === 0) return;
 
   var step = 0, totalSteps = 30; // 3 cycles * 10 steps per cycle
-  var interval = setInterval(function() {
+  polygonHintTargets = targets;
+  polygonHintInterval = setInterval(function() {
     var t = (step % 10) / 10;
     var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
     for (var i = 0; i < targets.length; i++) {
@@ -711,12 +720,27 @@ function showPolygonHint() {
     }
     step++;
     if (step >= totalSteps) {
-      clearInterval(interval);
+      clearInterval(polygonHintInterval);
+      polygonHintInterval = null;
       for (var j = 0; j < targets.length; j++) {
         targets[j].polygon.setStyle(targets[j].origStyle);
       }
+      polygonHintTargets = null;
     }
   }, 100);
+}
+
+function cancelPolygonHint() {
+  if (polygonHintInterval) {
+    clearInterval(polygonHintInterval);
+    polygonHintInterval = null;
+  }
+  if (polygonHintTargets) {
+    for (var i = 0; i < polygonHintTargets.length; i++) {
+      polygonHintTargets[i].polygon.setStyle(BASE_STYLE);
+    }
+    polygonHintTargets = null;
+  }
 }
 
 // --- Process alerts ---
@@ -836,10 +860,13 @@ function getActiveEventBounds() {
 
 function maybeZoomToEvent() {
   var bounds = getActiveEventBounds();
+  isZoomingProgrammatically = true;
   if (bounds) {
     map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+    isZoomedToEvent = true;
   } else {
     map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+    isZoomedToEvent = false;
   }
 }
 
@@ -856,7 +883,7 @@ function updateLiveStatus() {
     }
   }
   if (dominant) {
-    setStatus(dominant, 'התרעות פעילות');
+    setStatusHTML(dominant, '<a href="#" id="zoomAlertsLink">התרעות פעילות</a>');
   } else {
     var rel = formatRelativeTime(lastDangerTime);
     if (rel) {
@@ -895,6 +922,14 @@ function setStatusHTML(state, html) {
       e.preventDefault();
       e.stopPropagation();
       openTimelineToLastEvent();
+    });
+  }
+  var zoomLink = document.getElementById('zoomAlertsLink');
+  if (zoomLink) {
+    zoomLink.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      maybeZoomToEvent();
     });
   }
   statusEl.style.cursor = '';
@@ -1096,6 +1131,7 @@ function fetchExtendedHistory(fromDateObj, toDateObj, onDone, mode, options) {
 }
 
 function reconstructStateAt(targetTime) {
+  cancelPolygonHint();
   // Clear current markers entirely
   for (var name in locationStates) {
     var entry = locationStates[name];

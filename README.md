@@ -6,8 +6,8 @@ Live map of Israel showing [Pikud HaOref](https://www.oref.org.il) (Home Front C
 
 <table>
   <tr>
-    <td align="center"><img src="docs/og-image.jpg" width="480" alt="Desktop"/><br/>Desktop</td>
-    <td align="center"><img src="docs/screenshot-mobile.jpg" width="200" alt="Mobile"/><br/>Mobile</td>
+    <td align="center"><img src="web/og-image.jpg" width="480" alt="Desktop"/><br/>Desktop</td>
+    <td align="center"><img src="web/screenshot-mobile.jpg" width="200" alt="Mobile"/><br/>Mobile</td>
   </tr>
 </table>
 
@@ -54,8 +54,10 @@ cd worker && npx wrangler deploy
 
 ```
 web/
-  index.html          # single-file map app (all JS/CSS inline)
-  cities_geo.json     # location → [lat, lng] lookup
+  index.html              # app shell
+  assets/css/main.css     # styles
+  assets/js/              # core map + panels + bootstrap
+  locations_polygons.json # downloaded polygon data (not in repo)
 functions/
   api/
     alerts.js         # proxies live alerts API
@@ -63,7 +65,7 @@ functions/
     alarms-history.js # proxies extended history API
 worker/
   src/index.js        # fallback proxy for non-TLV users (placement: azure:israelcentral)
-  wrangler.toml       # Worker config with placement and /api2/* route
+  wrangler.toml       # Worker config with placement
 ```
 
 ## Contributing
