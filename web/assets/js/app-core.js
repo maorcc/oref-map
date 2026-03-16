@@ -203,13 +203,9 @@ var HISTORY_PROVIDER_BY_MODE = {
   'default': HISTORY_PROVIDER_TZEVA_ADOM
 };
 
-// If array: dropdown enabled and values are allowed choices.
+// HISTORY_PROVIDER_BY_MODE values can be strings or arrays.
+// If array: dropdown enabled and values are allowed choices (in order).
 // If string: dropdown disabled and only that value is shown.
-var HISTORY_PROVIDER_CHOICES = [
-  HISTORY_PROVIDER_AUTO,
-  HISTORY_PROVIDER_OFFICIAL,
-  HISTORY_PROVIDER_TZEVA_ADOM
-];
 
 try {
   soundMuted = localStorage.getItem('oref-sound-muted') !== 'false';
@@ -230,28 +226,47 @@ function normalizeHistoryProvider(value) {
   return HISTORY_PROVIDER_DEFAULT;
 }
 
-function getHistoryProviderChoices() {
-  return HISTORY_PROVIDER_CHOICES;
+function getHistoryProviderConfig(context, modeKey) {
+  var ctx = context || 'default';
+  var key = modeKey !== undefined && modeKey !== null ? String(modeKey) : null;
+  if (key) {
+    var composite = ctx + ':' + key;
+    if (Object.prototype.hasOwnProperty.call(HISTORY_PROVIDER_BY_MODE, composite)) {
+      return HISTORY_PROVIDER_BY_MODE[composite];
+    }
+  }
+  if (key && Object.prototype.hasOwnProperty.call(HISTORY_PROVIDER_BY_MODE, key)) {
+    return HISTORY_PROVIDER_BY_MODE[key];
+  }
+  if (Object.prototype.hasOwnProperty.call(HISTORY_PROVIDER_BY_MODE, ctx)) {
+    return HISTORY_PROVIDER_BY_MODE[ctx];
+  }
+  return HISTORY_PROVIDER_BY_MODE['default'];
 }
 
-function isHistoryProviderLocked() {
-  return !Array.isArray(HISTORY_PROVIDER_CHOICES);
+function normalizeProviderList(list) {
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var normalized = normalizeHistoryProvider(list[i]);
+    if (!normalized) continue;
+    out.push(normalized);
+  }
+  return out;
 }
 
-function getLockedHistoryProvider() {
-  if (!isHistoryProviderLocked()) return null;
-  return normalizeHistoryProvider(HISTORY_PROVIDER_CHOICES);
+function getHistoryProviderChoices(modeKey, context) {
+  var cfg = getHistoryProviderConfig(context, modeKey);
+  if (Array.isArray(cfg)) {
+    return normalizeProviderList(cfg);
+  }
+  return normalizeHistoryProvider(cfg || HISTORY_PROVIDER_DEFAULT);
 }
 
 function getHistoryProvider() {
-  if (isHistoryProviderLocked()) {
-    return getLockedHistoryProvider() || historyProvider;
-  }
   return historyProvider;
 }
 
 function setHistoryProvider(nextProvider) {
-  if (isHistoryProviderLocked()) return false;
   var normalized = normalizeHistoryProvider(nextProvider);
   if (normalized === historyProvider) return false;
 
@@ -267,9 +282,6 @@ function setHistoryProvider(nextProvider) {
 }
 
 function resolveHistoryProvider(mode, options) {
-  var explicit = normalizeHistoryProvider(getHistoryProvider());
-  if (explicit && explicit !== HISTORY_PROVIDER_AUTO) return explicit;
-
   options = options || {};
   var context = options.context || 'default';
   var modeKey = options.modeKey;
@@ -286,12 +298,23 @@ function resolveHistoryProvider(mode, options) {
     modeKey = '1';
   }
 
-  var composite = context + ':' + modeKey;
-  return HISTORY_PROVIDER_BY_MODE[composite] ||
-    HISTORY_PROVIDER_BY_MODE[modeKey] ||
-    HISTORY_PROVIDER_BY_MODE[context] ||
-    HISTORY_PROVIDER_BY_MODE['default'] ||
-    HISTORY_PROVIDER_OFFICIAL;
+  var choices = getHistoryProviderChoices(modeKey, context);
+  var explicit = normalizeHistoryProvider(getHistoryProvider());
+
+  if (Array.isArray(choices)) {
+    if (explicit && explicit !== HISTORY_PROVIDER_AUTO && choices.indexOf(explicit) !== -1) {
+      return explicit;
+    }
+    for (var i = 0; i < choices.length; i++) {
+      if (choices[i] !== HISTORY_PROVIDER_AUTO) return choices[i];
+    }
+    return HISTORY_PROVIDER_BY_MODE['default'] || HISTORY_PROVIDER_OFFICIAL;
+  }
+
+  if (choices === HISTORY_PROVIDER_AUTO) {
+    return HISTORY_PROVIDER_BY_MODE['default'] || HISTORY_PROVIDER_OFFICIAL;
+  }
+  return choices || HISTORY_PROVIDER_OFFICIAL;
 }
 
 // --- Timeline state ---

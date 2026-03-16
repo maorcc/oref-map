@@ -8,6 +8,9 @@
   var rangeLabelDiv = document.getElementById('stats-range-label');
 
   var currentStatsMode = 1; // 1=24h, 2=7d, 3=30d, 0=custom
+  window.getStatsModeKey = function() {
+    return String(currentStatsMode || 1);
+  };
   var currentStatsEntries = [];
   var statsLoadToken = 0;
 
@@ -309,6 +312,9 @@
     setModeButtonStyles(currentStatsMode);
     customDatesDiv.style.display = (currentStatsMode === 0) ? 'block' : 'none';
     updateRangeLabel();
+    window.dispatchEvent(new CustomEvent('history-provider-mode-changed', {
+      detail: { context: 'stats', modeKey: String(currentStatsMode) }
+    }));
     reloadStatsData();
   }
 
@@ -410,6 +416,9 @@ window.initTimeline = function() {
   var viewTimelineMin = 0;
   var viewTimelineMax = 0;
   var timelineMode = '3h'; // '3h', '24h' or 'date'
+  window.getTimelineModeKey = function() {
+    return timelineMode || '3h';
+  };
 
   // init the input date to today by default
   var today = new Date();
@@ -447,6 +456,10 @@ window.initTimeline = function() {
     // 4. Toggle DatePicker visibility
     // Only show if mode is 'date'
     datePicker.style.display = (mode === 'date') ? 'inline-block' : 'none';
+
+    window.dispatchEvent(new CustomEvent('history-provider-mode-changed', {
+      detail: { context: 'timeline', modeKey: timelineMode }
+    }));
   }
 
   function getTodayIsoDate() {

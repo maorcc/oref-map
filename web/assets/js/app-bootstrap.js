@@ -226,10 +226,27 @@
     }
 
     document.querySelectorAll('.history-provider-select').forEach(function(select) {
+      function getContext() {
+        return select.getAttribute('data-history-context') || 'default';
+      }
+
+      function getModeKey() {
+        var context = getContext();
+        if (context === 'stats' && typeof window.getStatsModeKey === 'function') {
+          return window.getStatsModeKey();
+        }
+        if (context === 'timeline' && typeof window.getTimelineModeKey === 'function') {
+          return window.getTimelineModeKey();
+        }
+        return '1';
+      }
+
       function rebuildOptions() {
-        var choices = (typeof getHistoryProviderChoices === 'function') ? getHistoryProviderChoices() : null;
-        var lockedValue = (typeof getLockedHistoryProvider === 'function') ? getLockedHistoryProvider() : null;
-        var isLocked = (typeof isHistoryProviderLocked === 'function') ? isHistoryProviderLocked() : false;
+        var context = getContext();
+        var modeKey = getModeKey();
+        var choices = (typeof getHistoryProviderChoices === 'function')
+          ? getHistoryProviderChoices(modeKey, context)
+          : null;
 
         select.innerHTML = '';
 
@@ -242,9 +259,11 @@
             select.appendChild(opt);
           }
           select.disabled = false;
-          select.value = getHistoryProvider();
+          var current = getHistoryProvider();
+          if (choices.indexOf(current) === -1) current = choices[0];
+          select.value = current;
         } else {
-          var locked = lockedValue || getHistoryProvider();
+          var locked = choices || getHistoryProvider();
           var optSingle = document.createElement('option');
           optSingle.value = locked;
           optSingle.textContent = labelMap[locked] || locked;
@@ -261,6 +280,7 @@
       });
 
       window.addEventListener('history-provider-changed', rebuildOptions);
+      window.addEventListener('history-provider-mode-changed', rebuildOptions);
     });
 
     window.addEventListener('history-provider-changed', updateSelects);
