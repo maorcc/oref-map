@@ -43,6 +43,35 @@
 </div>
 <div id="errorDetail"></div>
 
+<div id="legend">
+    <div class="row">
+        <div class="dot dot-red"></div>
+        <span>ירי רקטות וטילים</span></div>
+    <div class="row">
+        <div class="dot dot-purple"></div>
+        <span>חדירת כטב״מ</span></div>
+    <div class="row">
+        <div class="dot dot-yellow"></div>
+        <span>התרעה מוקדמת</span></div>
+    <div class="row">
+        <div class="dot dot-green"></div>
+        <span>האירוע הסתיים</span></div>
+</div>
+
+<div id="sound-btn" title="השמעת צלילים">
+    <div id="sound-btn-row">
+        <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
+    </div>
+    <div id="sound-panel">
+        <p class="sound-panel-title">בחר מיקום לקבלת התראות קוליות:</p>
+        <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl">
+        <div id="sound-results"></div>
+        <div class="sound-actions">
+            <button id="sound-all-btn">כל הארץ</button>
+        </div>
+    </div>
+</div>
+
 <div id="about-backdrop" class="modal-backdrop">
     <div id="about-modal" class="modal-content">
         <button id="about-close" class="modal-close">&times;</button>
@@ -64,21 +93,6 @@
 </div>
 
 <div id="right-panel">
-    <div id="legend">
-        <div class="row">
-            <div class="dot dot-red"></div>
-            <span>ירי רקטות וטילים</span></div>
-        <div class="row">
-            <div class="dot dot-purple"></div>
-            <span>חדירת כטב״מ</span></div>
-        <div class="row">
-            <div class="dot dot-yellow"></div>
-            <span>התרעה מוקדמת</span></div>
-        <div class="row">
-            <div class="dot dot-green"></div>
-            <span>האירוע הסתיים</span></div>
-    </div>
-
     <div id="gps-row">
         <button id="locate-btn" type="button" title="הצג התרעות במפה">
             <div id="locate-btn-row">
@@ -90,20 +104,6 @@
                 <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
             </div>
         </button>
-    </div>
-
-    <div id="sound-btn" title="השמעת צלילים">
-        <div id="sound-btn-row">
-            <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
-        </div>
-        <div id="sound-panel">
-            <p class="sound-panel-title">בחר מיקום לקבלת התראות קוליות:</p>
-            <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl">
-            <div id="sound-results"></div>
-            <div class="sound-actions">
-                <button id="sound-all-btn">כל הארץ</button>
-            </div>
-        </div>
     </div>
 
     <div id="stats-btn" title="סטטיסטיקות">

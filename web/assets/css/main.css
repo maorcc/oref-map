@@ -22,18 +22,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   z-index: 1000;
 }
 #legend {
+  position: fixed;
+  top: 50px;
+  right: 12px;
   background: rgba(255,255,255,0.92);
-  border-radius: 8px;
-  padding: 12px 16px;
-  font-size: 14px;
-  line-height: 1.8;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   direction: rtl;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 24px);
+  z-index: 1000;
 }
-#legend .row { display: flex; align-items: center; gap: 8px; }
+#legend .row { display: flex; align-items: center; gap: 6px; }
 #legend .dot {
-  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
 }
 .dot-red    { background: #ff0000; }
 .dot-purple { background: #9922cc; }
@@ -264,6 +268,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: pointer;
 }
 #sound-btn {
+  position: fixed;
+  top: 96px;
+  left: 12px;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   direction: ltr;
   display: flex;
   flex-direction: column-reverse;
@@ -281,10 +290,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #sound-btn-row {
   display: flex;
   align-items: center;
-  gap: 0;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 6px 10px;
   height: auto;
-  min-height: 31px;
+  min-height: 28px;
   direction: rtl;
   cursor: pointer;
 }
@@ -659,16 +668,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     gap: 6px;
   }
   #legend {
-    padding: 8px 12px;
-    font-size: 13px;
-    line-height: 1.6;
+    top: 60px;
+    right: 12px;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.5;
   }
-  #legend .dot { width: 12px; height: 12px; }
+  #legend .dot { width: 10px; height: 10px; }
   #status {
     top: 60px;
     left: 12px;
     padding: 6px 10px;
     font-size: 13px;
+  }
+  #sound-btn {
+    top: 104px;
+    left: 12px;
   }
   .history-provider-control {
     padding: 5px 8px;
