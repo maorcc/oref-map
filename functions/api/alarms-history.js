@@ -10,7 +10,8 @@ const PROVIDERS = {
 
 const TZEVA_ADOM_TO_OFFICIAL_API = {
   0: 1,
-  2: 4,
+  2: 3,
+  3: 2, // an old alert type used only on2 26/10/2024 04:02 for Drone from Lebanon
   5: 2,
   11: 14
 };
@@ -25,7 +26,7 @@ const OFFICIAL_CATEGORY_MAP = {
   7: "אירוע רדיולוגי",
   10: "חשש לאירוע ביולוגי",
   13: "האירוע הסתיים",
-  14: "התרעה מוקדמת",
+  14: "בדקות הקרובות צפויות להתקבל התרעות באזורך",
   99: "ללא שיוך"
 };
 
@@ -172,6 +173,9 @@ function transformTzevaPayload(payload, startTs, endTs) {
     const startTime = Number(alert.startTime);
     if (Number.isFinite(startTime) && startTime >= startTs && startTime <= endTs) {
       const startCategory = mapTzevaTypeToOfficialCategory(alert.type);
+      if (startCategory === 99) {
+        console.error(`Unknown Tzeva Adom type: ${alert.type}, at time: ${startTime}`);
+      }
       const startCategoryDesc = OFFICIAL_CATEGORY_MAP[startCategory] || OFFICIAL_CATEGORY_MAP[99];
       const startAlertDate = formatIsoSeconds(new Date(startTime * 1000));
 
