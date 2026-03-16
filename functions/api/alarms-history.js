@@ -10,9 +10,9 @@ const PROVIDERS = {
 
 const TZEVA_ADOM_TO_OFFICIAL_API = {
   0: 1,
-  2: 3,
+  2: 4,
   5: 2,
-  11: 14,
+  11: 14
 };
 
 const OFFICIAL_CATEGORY_MAP = {
