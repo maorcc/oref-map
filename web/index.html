@@ -1,210 +1,2611 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <script src="https://t.contentsquare.net/uxa/1d8a4cde7672c.js"></script>
-    <meta charset="utf-8">
-    <link rel="icon" href="/icon-32.png" sizes="32x32">
-    <link rel="icon" href="/icon-192.png" sizes="192x192">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#1a1a2e">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/icon-180.png">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="מפת העורף">
-    <title>מפת העורף - מפת התרעות פיקוד העורף</title>
-    <link rel="canonical" href="https://oref-map.org/">
-    <meta name="description" content="מפת העורף - מפת התרעות פיקוד העורף בזמן אמת">
-    <meta property="og:title" content="מפת העורף">
-    <meta property="og:description" content="מפת התרעות פיקוד העורף בזמן אמת">
-    <meta property="og:type" content="website">
-    <meta property="og:locale" content="he_IL">
-    <meta property="og:image" content="https://oref-map.org/og-image.jpg">
-    <meta property="og:image:type" content="image/jpeg">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta property="og:url" content="https://oref-map.org">
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="מפת העורף">
-    <meta name="twitter:description" content="מפת התרעות פיקוד העורף בזמן אמת">
-    <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link rel="stylesheet" href="/assets/css/main.css">
+<script src="https://t.contentsquare.net/uxa/1d8a4cde7672c.js"></script>
+<meta charset="utf-8">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="מפת העורף">
+<title>מפת העורף - מפת התרעות פיקוד העורף</title>
+<link rel="canonical" href="https://oref-map.org/">
+<meta name="description" content="מפת העורף - מפת התרעות פיקוד העורף בזמן אמת">
+<meta property="og:title" content="מפת העורף">
+<meta property="og:description" content="מפת התרעות פיקוד העורף בזמן אמת">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="he_IL">
+<meta property="og:image" content="https://oref-map.org/og-image.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://oref-map.org">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="מפת העורף">
+<meta name="twitter:description" content="מפת התרעות פיקוד העורף בזמן אמת">
+<meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; font-family: Arial, sans-serif; }
+#map { width: 100%; height: 100%; direction: ltr; }
+.leaflet-interactive:focus { outline: none; }
+.leaflet-control-zoom { border-radius: 6px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border: none !important; }
+.leaflet-control-zoom a { border: none !important; }
+.leaflet-control-zoom a:first-child { border-radius: 6px 6px 0 0 !important; }
+.leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
+body.has-overlay .leaflet-interactive { pointer-events: none !important; }
+@keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes toastFade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
+.blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
+
+#legend {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+  direction: rtl;
+  max-width: calc(100vw - 32px);
+}
+#legend .row { display: flex; align-items: center; gap: 8px; }
+#legend .dot {
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+}
+.dot-red    { background: #ff0000; }
+.dot-purple { background: #9922cc; }
+.dot-yellow { background: #ffcc00; }
+.dot-green  { background: #00cc00; }
+
+#status {
+  position: fixed;
+  top: 80px;
+  left: 10px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  z-index: 1000;
+  direction: rtl;
+}
+#status .indicator {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-left: 6px; vertical-align: middle;
+}
+.indicator-red    { background: #ff0000; animation: pulse 3s ease-in-out infinite; }
+.indicator-purple { background: #9922cc; animation: pulse 3s ease-in-out infinite; }
+.indicator-yellow { background: #ffcc00; animation: pulse 3s ease-in-out infinite; }
+.indicator-green  { background: #00cc00; }
+.indicator-err    { background: #999; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+#lastAlertLink, #zoomAlertsLink { color: inherit; text-decoration: underline; cursor: pointer; }
+
+#errorDetail {
+  display: none;
+  position: fixed;
+  top: 112px;
+  left: 10px;
+  background: #fff;
+  border: 1px solid #e00;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  max-width: 220px;
+  word-break: break-word;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 1001;
+  direction: ltr;
+  color: #333;
+}
+
+#page-title {
+  margin: 0;
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.92);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  z-index: 1000;
+  direction: rtl;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.leaflet-popup-close-button {
+  right: auto !important;
+  left: 5px !important;
+}
+
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+}
+.modal-backdrop.visible { display: flex; }
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: calc(100vw - 32px);
+  direction: rtl;
+  position: relative;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.modal-content h2 { margin: 0 0 12px; font-size: 20px; }
+.modal-content p { margin: 0 0 10px; color: #444; }
+.modal-content a { color: #0066cc; }
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #888;
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+  text-align: center;
+  padding: 0;
+  border-radius: 4px;
+}
+.modal-close:hover { background: #eee; color: #333; }
+
+.location-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+.location-item:hover { background: #f5f5f5; }
+
+#sound-btn, #timeline-btn, #stats-btn, #location-btn, #locate-btn {
+  position: fixed;
+  right: 24px;
+  max-height: 40px;
+  max-width: 220px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+  overflow: hidden;
+  transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out;
+}
+@media (hover: hover) {
+  #sound-btn:not(.open):hover, #timeline-btn:not(.open):hover, #stats-btn:not(.open):hover, #location-btn:hover, #locate-btn:hover {
+    background: rgba(219, 234, 254, 0.92);
+    border-color: #93c5fd;
+  }
+}
+#locate-btn {
+  bottom: 352px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  max-width: 40px;
+  height: 40px;
+  padding: 0;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+#location-btn {
+  bottom: 304px;
+  direction: ltr;
+  display: flex;
+  align-items: center;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+#location-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
+#sound-btn {
+  bottom: 256px;
+  direction: ltr;
+  display: flex;
+  flex-direction: column-reverse;
+}
+#sound-btn.open {
+  width: 380px;
+  max-width: min(calc(100vw - 48px), 380px);
+  max-height: 400px;
+  cursor: default;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.97);
+}
+#sound-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
+#sound-btn.open #sound-panel {
+  border-bottom: 1px solid #ddd;
+}
+#sound-panel {
+  display: none;
+  padding: 12px;
+  direction: rtl;
+}
+#sound-btn.open #sound-panel { display: block; }
+
+#stats-btn {
+  bottom: 208px;
+  direction: ltr;
+  display: flex;
+  flex-direction: column-reverse;
+}
+#stats-btn.open {
+  width: 340px;
+  max-width: min(calc(100vw - 48px), 340px);
+  max-height: 250px;
+  cursor: default;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.97);
+}
+#stats-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
+#stats-btn.open #stats-panel {
+  border-bottom: 1px solid #ddd;
+}
+#stats-panel {
+  display: none;
+  padding: 12px;
+  direction: rtl;
+}
+#stats-btn.open #stats-panel { display: block; }
+#stats-panel label { display: block; margin-bottom: 5px; font-size: 13px; }
+#stats-panel input, #stats-panel select { width: 100%; padding: 6px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; font-family: inherit; }
+#stats-panel button { width: 100%; padding: 8px; background: #4285F4; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+#stats-panel button:hover { background: #3367D6; }
+
+#timeline-btn {
+  display: none;
+  bottom: 160px;
+  direction: ltr; /* This sets content to flow LTR by default inside the button */
+  flex-direction: column-reverse;
+}
+#timeline-btn.has-data { display: flex; }
+#timeline-btn.open {
+  width: 620px;
+  max-width: min(calc(100vw - 48px), 620px);
+  max-height: 250px;
+  cursor: default;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.97);
+}
+#timeline-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl; /* Label area keeps RTL */
+  cursor: pointer;
+}
+#timeline-btn.open #timeline-btn-row {
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  height: auto;
+  padding: 4px 0;
+  border: none;
+  z-index: 1;
+}
+.btn-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
+.btn-text { font-size: 13px; font-weight: 500; white-space: nowrap; }
+.tl-close { display: none; font-size: 16px; cursor: pointer; color: #888; margin-right: auto; }
+.tl-close:hover { color: #333; }
+#timeline-btn.open .tl-close { display: inline; }
+#stats-btn.open .tl-close { display: inline; }
+
+#test-danger-btn {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 120px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.92);
+  border: none;
+  border-radius: 8px;
+  font-size: 22px;
+  line-height: 40px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+  padding: 0;
+}
+#test-danger-btn:hover { background: #f0f0f0; }
+
+#test-all-clear-btn {
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  left: 168px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255,255,255,0.92);
+  border: none;
+  border-radius: 8px;
+  font-size: 22px;
+  line-height: 40px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+  padding: 0;
+}
+#test-all-clear-btn:hover { background: #f0f0f0; }
+
+#timeline-controls {
+  display: none;
+  padding: 10px 12px;
+  gap: 10px;
+  flex-direction: column;
+}
+#timeline-btn.open #timeline-controls { display: flex; }
+#timeline-transport {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  order: 2;
+  flex-wrap: wrap;
+  justify-content: flex-start; /* Ensure left alignment */
+}
+#timeline-transport button {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 12px;
+  line-height: 1;
+  color: #333;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#timeline-transport button:hover { background: #eee; }
+#timeline-transport button:active { background: #ddd; }
+#timeline-slider-wrap {
+  position: relative;
+  width: 100%;
+  order: 0;
+}
+#timeline-ticks {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  pointer-events: none;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #eee;
+}
+#timeline-ticks span {
+  position: absolute;
+  height: 100%;
+  top: 0;
+  opacity: 0.85;
+}
+#timeline-slider {
+  width: 100%;
+  cursor: pointer;
+  direction: ltr; /* Ensure slider behaves left-to-right */
+}
+#timeline-label {
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  order: 1;
+  margin-right: 12px; /* Push away from the buttons slightly */
+}
+
+#timeline-date-picker {
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  direction: ltr; /* Force LTR for calendar widget */
+  font-family: inherit;
+}
+
+@media (max-width: 480px) {
+  #legend {
+    bottom: 12px;
+    right: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  #legend .dot { width: 12px; height: 12px; }
+  #status {
+    top: 80px;
+    left: 10px;
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+  #errorDetail {
+    top: 110px;
+    left: 8px;
+  }
+  #sound-btn, #timeline-btn, #stats-btn, #location-btn, #locate-btn {
+    right: 12px;
+    max-height: 36px;
+  }
+  #locate-btn {
+    bottom: 292px;
+    width: 36px;
+    max-width: 36px;
+    height: 36px;
+  }
+  #location-btn {
+    bottom: 248px;
+  }
+  #location-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
+  }
+  #sound-btn {
+    bottom: 204px;
+  }
+  #sound-btn.open {
+    max-width: calc(100vw - 24px);
+    right: 12px;
+  }
+  #sound-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
+  }
+  #stats-btn {
+    bottom: 160px;
+  }
+  #stats-btn.open {
+    max-width: calc(100vw - 24px);
+    right: 12px;
+  }
+  #stats-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
+  }
+  #timeline-btn {
+    bottom: 116px;
+  }
+  #timeline-btn.open {
+    max-width: calc(100vw - 24px);
+    right: 12px;
+  }
+  #timeline-btn-row {
+    height: 36px;
+    padding: 0 10px;
+    gap: 5px;
+  }
+  #timeline-transport button { font-size: 16px; padding: 4px 10px; }
+  .btn-icon { font-size: 16px; }
+  .btn-text { font-size: 12px; }
+  #timeline-date-picker { font-size: 12px; padding: 2px 4px; }
+  #test-danger-btn {
+    bottom: 12px;
+    left: 100px;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    line-height: 36px;
+  }
+  #test-all-clear-btn {
+    bottom: 12px;
+    left: 144px;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    line-height: 36px;
+  }
+}
+</style>
 </head>
 <body>
 <div id="map"></div>
 
 <h1 id="page-title">מפת העורף</h1>
 
+<div id="legend">
+  <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
+  <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
+  <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
+  <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
+</div>
+
 <div id="status">
-    <span class="indicator indicator-err" id="statusDot"></span>
-    <span id="statusText">מתחבר...</span>
-    <div id="historyTimeLabel"></div>
+  <span class="indicator indicator-err" id="statusDot"></span>
+  <span id="statusText">מתחבר...</span>
+  <div id="historyTimeLabel" style="display:none; font-size:11px; color:#555; margin-top:5px; padding-top:5px; border-top:1px solid #ddd;"></div>
 </div>
 <div id="errorDetail"></div>
 
 <div id="about-backdrop" class="modal-backdrop">
-    <div id="about-modal" class="modal-content">
-        <button id="about-close" class="modal-close">&times;</button>
-        <h2>אודות מפת העורף</h2>
-        <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
-        <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
-        <p>מפה זו אינה רשמית ואינה מופעלת על ידי פיקוד העורף. אין להסתמך עליה כמקור יחיד למידע ביטחוני. לקבלת הנחיות
-            רשמיות, יש לפנות לאתר <a href="https://www.oref.org.il/" target="_blank" rel="noopener">פיקוד העורף</a>.</p>
-        <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.
-        </p>
-        <p>נתקלתם בבעיה או יש לכם הצעה? <a href="https://github.com/maorcc/oref-map/issues/new" target="_blank"
-                                           rel="noopener">פתחו קריאה ב-GitHub</a>.</p>
-    </div>
+  <div id="about-modal" class="modal-content">
+    <button id="about-close" class="modal-close">&times;</button>
+    <h2>אודות מפת העורף</h2>
+    <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
+    <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
+    <p>מפה זו אינה רשמית ואינה מופעלת על ידי פיקוד העורף. אין להסתמך עליה כמקור יחיד למידע ביטחוני. לקבלת הנחיות רשמיות, יש לפנות לאתר <a href="https://www.oref.org.il/" target="_blank" rel="noopener">פיקוד העורף</a>.</p>
+    <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.</p>
+    <p>נתקלתם בבעיה או יש לכם הצעה? <a href="https://github.com/maorcc/oref-map/issues/new" target="_blank" rel="noopener">פתחו קריאה ב-GitHub</a>.</p>
+  </div>
 </div>
 
 
-<div id="tap-hint">
-    לחצו על המפה לצפייה בהיסטוריית התרעות
+<div id="tap-hint" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; z-index:1001; direction:rtl; text-align:center; animation:tapHintFade 5s forwards; pointer-events:none;">
+  לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
 
-<div id="right-panel">
-    <div id="legend">
-        <div class="row">
-            <div class="dot dot-red"></div>
-            <span>ירי רקטות וטילים</span></div>
-        <div class="row">
-            <div class="dot dot-purple"></div>
-            <span>חדירת כטב״מ</span></div>
-        <div class="row">
-            <div class="dot dot-yellow"></div>
-            <span>התרעה מוקדמת</span></div>
-        <div class="row">
-            <div class="dot dot-green"></div>
-            <span>האירוע הסתיים</span></div>
-    </div>
+<button id="locate-btn" type="button" title="הצג התרעות במפה">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg>
+</button>
+<button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
+  <div id="location-btn-row">
+    <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
+  </div>
+</button>
 
-    <div id="gps-row">
-        <button id="locate-btn" type="button" title="הצג התרעות במפה">
-            <div id="locate-btn-row">
-                <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="7"/><line x1="15.5" y1="15.5" x2="21" y2="21"/></svg></span><span class="btn-text">זום</span>
-            </div>
-        </button>
-        <button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
-            <div id="location-btn-row">
-                <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
-            </div>
-        </button>
+<div id="sound-btn" title="השמעת צלילים">
+  <div id="sound-btn-row">
+    <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
+  </div>
+  <div id="sound-panel">
+    <p style="margin:0 0 8px; font-weight:bold; direction:rtl;">בחר מיקום לקבלת התראות קוליות:</p>
+    <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
+           style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
+    <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
+    <div style="display:flex; gap:8px;">
+      <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
     </div>
-
-    <div id="sound-btn" title="השמעת צלילים">
-        <div id="sound-btn-row">
-            <span class="btn-icon">🔇</span><span class="btn-text">ללא התראה קולית</span>
-        </div>
-        <div id="sound-panel">
-            <p class="sound-panel-title">בחר מיקום לקבלת התראות קוליות:</p>
-            <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl">
-            <div id="sound-results"></div>
-            <div class="sound-actions">
-                <button id="sound-all-btn">כל הארץ</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="stats-btn" title="סטטיסטיקות">
-        <div id="stats-btn-row">
-            <span class="btn-icon">📊</span>
-            <span class="btn-text">סטטיסטיקות</span>
-            <span class="tl-close">✕</span>
-        </div>
-        <div id="stats-panel">
-            <div class="stats-range-section">
-                <label class="stats-range-title">טווח זמן</label>
-                <div class="stats-mode-grid">
-                    <button id="stats-mode-1-btn" class="stats-mode-btn" data-mode="1">24 שעות אחרונות</button>
-                    <button id="stats-mode-2-btn" class="stats-mode-btn" data-mode="2">שבוע אחרון</button>
-                    <button id="stats-mode-3-btn" class="stats-mode-btn" data-mode="3">חודש אחרון</button>
-                    <button id="stats-mode-0-btn" class="stats-mode-btn" data-mode="0">מותאם אישית</button>
-                </div>
-                <div id="stats-custom-dates">
-                    <div class="stats-custom-grid">
-                        <div class="stats-date-col">
-                            <label class="stats-date-label">מתאריך</label>
-                            <input type="date" id="stats-from-date" max="">
-                        </div>
-                        <div class="stats-date-col">
-                            <label class="stats-date-label">עד תאריך</label>
-                            <input type="date" id="stats-to-date" max="">
-                        </div>
-                    </div>
-                </div>
-                <div id="stats-range-label"></div>
-            </div>
-            <label>סוג התרעה</label>
-            <select id="stats-category">
-                <option value="all">טוען...</option>
-            </select>
-            <div class="history-provider-control">
-                <label class="history-provider-label" for="history-provider-select-stats">מקור:</label>
-                <select id="history-provider-select-stats" class="history-provider-select">
-                    <option value="official"></option>
-                    <option value="tzeva-adom"></option>
-                </select>
-            </div>
-        </div>
-    </div>
-
-    <div id="timeline-btn" title="ציר זמן">
-        <div id="timeline-btn-row">
-            <span class="btn-icon">
-                <svg class="timeline-icon" width="18" height="18" viewBox="0 0 100 100">
-                    <path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z"
-                          fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/>
-                    <circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/>
-                    <g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/>
-                        <line x1="48" y1="60" x2="32" y2="68"/>
-                    </g>
-                    <circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/>
-                    <g stroke="#333" stroke-width="2.5" stroke-linecap="round">
-                        <line x1="48" y1="39" x2="48" y2="43"/>
-                        <line x1="69" y1="60" x2="65" y2="60"/>
-                        <line x1="48" y1="81" x2="48" y2="77"/>
-                        <line x1="27" y1="60" x2="31" y2="60"/>
-                    </g>
-                </svg>
-            </span>
-            <span class="btn-text">התרעות קודמות</span>
-            <span class="tl-close">✕</span>
-        </div>
-        <div id="timeline-controls">
-            <div id="timeline-mode-buttons">
-                <button id="tl-mode-3h">3 שעות אחרונות</button>
-                <button id="tl-mode-24h">24 שעות אחרונות</button>
-                <button id="tl-mode-date">בחר תאריך</button>
-            </div>
-            <div id="timeline-slider-wrap">
-                <div id="timeline-ticks"></div>
-                <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
-            </div>
-            <div id="timeline-transport">
-                <input type="date" id="timeline-date-picker" title="בחר תאריך">
-                <span id="timeline-label"></span>
-                <button id="tl-prev" title="אירוע קודם">⏮</button>
-                <button id="tl-play" title="נגן/עצור">▶</button>
-                <button id="tl-next" title="אירוע הבא">⏭</button>
-            </div>
-            <div class="history-provider-control">
-                <label class="history-provider-label" for="history-provider-select-timeline">מקור:</label>
-                <select id="history-provider-select-timeline" class="history-provider-select">
-                    <option value="official"></option>
-                    <option value="tzeva-adom"></option>
-                </select>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
 
+<div id="stats-btn" title="סטטיסטיקות">
+  <div id="stats-btn-row">
+    <span class="btn-icon">📊</span><span class="btn-text">סטטיסטיקות</span><span class="tl-close">✕</span>
+  </div>
+  <div id="stats-panel">
+    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+      <div style="flex:1;">
+        <label>מתאריך</label>
+        <input type="date" id="stats-from-date" max="">
+      </div>
+      <div style="flex:1;">
+        <label>עד תאריך</label>
+        <input type="date" id="stats-to-date" max="">
+      </div>
+    </div>
+    <label>סוג התרעה</label>
+    <select id="stats-category">
+      <option value="all">טוען...</option>
+    </select>
+    <button id="stats-apply-btn">הצג נתונים</button>
+  </div>
+</div>
+
+<div id="timeline-btn" title="ציר זמן">
+  <div id="timeline-btn-row">
+    <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
+  </div>
+  <div id="timeline-controls">
+    <div id="timeline-slider-wrap">
+      <div id="timeline-ticks"></div>
+      <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+    </div>
+    <div id="timeline-transport">
+      <input type="date" id="timeline-date-picker" title="בחר תאריך">
+      <span id="timeline-label"></span>
+      <button id="tl-prev" title="אירוע קודם">⏮</button>
+      <button id="tl-play" title="נגן/עצור">▶</button>
+      <button id="tl-next" title="אירוע הבא">⏭</button>
+    </div>
+  </div>
+</div>
 <button id="test-danger-btn" title="בדיקת צליל סכנה">🚨</button>
 <button id="test-all-clear-btn" title="בדיקת צליל רגיעה">✅</button>
 
-<script src="/assets/js/app-core.js"></script>
-<script src="/assets/js/app-panels.js"></script>
-<script src="/assets/js/app-bootstrap.js"></script>
-<script src="/assets/js/sw-register.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // --- Config ---
+  // Set PROXY_BASE to the Cloudflare Worker URL for production, e.g.:
+  //   var PROXY_BASE = 'https://oref-proxy.YOUR_ACCOUNT.workers.dev';
+  var PROXY_BASE = '';
+  var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
+
+  function apiFetch(endpoint) {
+    return fetch(PROXY_BASE + apiPrefix + '/' + endpoint).then(function(resp) {
+      if (apiPrefix === '/api' && resp.url && resp.url.indexOf('/api2/') !== -1) {
+        console.log('Non-TLV colo detected, switching to /api2');
+        apiPrefix = '/api2';
+      }
+      return resp;
+    });
+  }
+  var LIVE_POLL_MS = 1000;
+  var HISTORY_POLL_MS = 10000;
+  var GREEN_FADE_MS = 120000; // 2 minutes
+  var ALERT_MAX_AGE_MS = 3600000; // 1 hour — safety net for stuck alerts
+  var FADE_TICK_MS = 1000;
+
+  // --- Map setup ---
+  var DEFAULT_CENTER = [31.6, 34.8], DEFAULT_ZOOM = 8;
+  var map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18
+  }).addTo(map);
+
+  // --- User location ---
+  var userLocationMarker = null;
+
+  function initUserLocation() {
+    var btn = document.getElementById('location-btn');
+    var btnText = btn.querySelector('.btn-text');
+    if (!navigator.geolocation) { btn.style.display = 'none'; return; }
+
+    var icon = L.divIcon({
+      html: '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>',
+      className: '',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+
+    var watchId = null;
+    var transientTimeout = null;
+
+    function setIdle() {
+      btnText.textContent = 'הראה אותי';
+      btnText.style.display = '';
+      btn.title = 'הצג מיקום שלי על המפה';
+    }
+
+    function setActive() {
+      if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+      btnText.textContent = '';
+      btnText.style.display = 'none';
+      btn.title = 'הסר מיקום מהמפה';
+    }
+
+    function setTransient(msg) {
+      if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+      btnText.style.display = '';
+      btnText.textContent = msg;
+      transientTimeout = setTimeout(function() { transientTimeout = null; setIdle(); }, 3000);
+    }
+
+    function showToast(msg) {
+      var el = document.createElement('div');
+      el.textContent = msg;
+      el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toastFade 3s forwards;pointer-events:none;';
+      document.body.appendChild(el);
+      setTimeout(function() { el.remove(); }, 3000);
+    }
+
+    function stopWatching() {
+      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+    }
+
+    function startWatching() {
+      if (watchId !== null) return;
+      watchId = navigator.geolocation.watchPosition(function(pos) {
+        var latlng = [pos.coords.latitude, pos.coords.longitude];
+        if (!isInIsrael(latlng)) {
+          stopWatching();
+          setTransient('בעיית GPS');
+          return;
+        }
+        if (!userLocationMarker) {
+          userLocationMarker = L.marker(latlng, {
+            icon: icon,
+            interactive: false,
+            zIndexOffset: 1000
+          }).addTo(map);
+          showToast('מראה מיקום על המפה');
+        } else {
+          userLocationMarker.setLatLng(latlng);
+        }
+        setActive();
+      }, function(err) {
+        console.warn('Geolocation error:', err.code, err.message);
+        if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+        setTransient('מיקום לא זמין');
+      }, { enableHighAccuracy: false, maximumAge: 30000 });
+    }
+
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+        if (result.state === 'granted' && localStorage.getItem('oref-location-hidden') !== 'true') {
+          startWatching();
+        }
+      }).catch(function() {});
+    }
+
+    document.getElementById('location-btn-row').addEventListener('click', function() {
+      if (watchId !== null || userLocationMarker) {
+        stopWatching();
+        showToast('מיקום הוסר מהמפה');
+        setIdle();
+        localStorage.setItem('oref-location-hidden', 'true');
+      } else {
+        setTransient('מאתר...');
+        startWatching();
+        localStorage.removeItem('oref-location-hidden');
+      }
+    });
+  }
+
+  initUserLocation();
+
+  document.getElementById('locate-btn').addEventListener('click', function() {
+    maybeZoomToEvent();
+  });
+
+  // --- State ---
+  var locationStates = {};       // {name: {state, since, marker}}
+  var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
+  var lastHistoryDate = null;    // track newest history entry
+  var liveErrors = 0;
+  var historyErrors = 0;
+  var lastErrorMsg = '';
+  var lastCfColo = '';
+  var lastDangerTime = 0;
+  var initialized = false;
+  var soundMuted = true;
+  var soundLocation = 'all';
+  var audioCtx = null;
+  var lastSoundTime = 0;
+  var dangerBuffer = null;
+
+  try {
+    soundMuted = localStorage.getItem('oref-sound-muted') !== 'false';
+    soundLocation = localStorage.getItem('oref-sound-location') || 'all';
+  } catch(e) {}
+
+  // --- Timeline state ---
+  var extendedHistory = [];     // sorted ascending by alertDate ms
+  var extendedRids = new Set(); // dedup by rid
+  var timelineMin = 0;
+  var timelineMax = 0;
+  var isLiveMode = true;
+  var isPlaying = false;
+  var playRAF = null;
+  var currentViewTime = 0;
+  var liveLocationStates = null; // shadow copy of live state
+  var closeTimelinePanel = function() {}; // set by initTimeline
+  var openTimelineToLastEvent = function() {}; // set by initTimeline
+  var currentTimelineDay = null; // track currently selected day in timeline
+
+  // --- Stats mode state ---
+  var isStatsMode = false;
+  var statsCounts = {}; // name -> count
+  var maxStatsCount = 0;
+
+  // --- Panel history (mobile back button closes panels) ---
+  var panelHistoryPushed = false;
+  function pushPanelHistory() {
+    if (!panelHistoryPushed) {
+      history.pushState({ panel: true }, '');
+      panelHistoryPushed = true;
+    }
+  }
+  function popPanelHistory() {
+    if (panelHistoryPushed) {
+      panelHistoryPushed = false;
+      history.back();
+    }
+  }
+
+  // --- Polygon state ---
+  var locationPolygons = {};  // name → L.polygon
+
+  // --- Colors ---
+  var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
+  var BASE_STYLE = { fillColor: '#888', fillOpacity: 0.01, color: '#888', opacity: 0 };
+
+  // --- Sound ---
+  function getAudioContext() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function playDangerSound() {
+    var ctx = getAudioContext();
+    if (!ctx) return;
+
+    function playSineHalf(startTime) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, startTime);
+      osc.frequency.linearRampToValueAtTime(440, startTime + 0.3);
+      gain.gain.setValueAtTime(0.3, startTime);
+      gain.gain.linearRampToValueAtTime(0, startTime + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.3);
+    }
+
+    function playSequence(buffer) {
+      var half = buffer.duration / 2;
+      var now = ctx.currentTime;
+      // 1. First half
+      var s1 = ctx.createBufferSource();
+      s1.buffer = buffer;
+      s1.connect(ctx.destination);
+      s1.start(now, 0, half);
+      // 2. Repeat first half
+      var s2 = ctx.createBufferSource();
+      s2.buffer = buffer;
+      s2.connect(ctx.destination);
+      s2.start(now + half, 0, half);
+      // 3. Entire file
+      var s3 = ctx.createBufferSource();
+      s3.buffer = buffer;
+      s3.connect(ctx.destination);
+      s3.start(now + (half * 2));
+    }
+
+    function playFallback() {
+      var now = ctx.currentTime;
+      playSineHalf(now);
+      playSineHalf(now + 0.4);
+      playSineHalf(now + 0.8);
+    }
+
+    if (dangerBuffer) {
+      playSequence(dangerBuffer);
+    } else {
+      fetch('mixkit-clear-announce-tones-2861.wav')
+        .then(function(r) { 
+          if (!r.ok) throw new Error('Fetch failed');
+          return r.arrayBuffer(); 
+        })
+        .then(function(b) { return ctx.decodeAudioData(b); })
+        .then(function(buffer) {
+          dangerBuffer = buffer;
+          playSequence(dangerBuffer);
+        })
+        .catch(function(err) { 
+          console.error('Failed to play danger WAV, falling back to sine:', err);
+          playFallback();
+        });
+    }
+  }
+
+  function playAllClearSound() {
+    var ctx = getAudioContext();
+    if (!ctx) return;
+    // First tone: C5 (523 Hz)
+    var osc1 = ctx.createOscillator();
+    var gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.value = 523;
+    gain1.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.2);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.2);
+    // Second tone: E5 (659 Hz)
+    var osc2 = ctx.createOscillator();
+    var gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.value = 659;
+    gain2.gain.setValueAtTime(0.25, ctx.currentTime + 0.2);
+    gain2.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.45);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.2);
+    osc2.stop(ctx.currentTime + 0.45);
+  }
+
+  function playSoundForState(state, locationName) {
+    if (!initialized || soundMuted || !isLiveMode) return;
+
+    // Filter by location if a specific one is selected
+    if (soundLocation && soundLocation !== 'all' && locationName !== soundLocation) {
+      return;
+    }
+
+    var now = Date.now();
+    if (now - lastSoundTime < 500) return;
+    lastSoundTime = now;
+    if (state === 'green') {
+      playAllClearSound();
+    } else {
+      playDangerSound();
+    }
+  }
+
+  // --- Israel bounding box (for GPS validation) ---
+  function isInIsrael(latlng) {
+    return latlng[0] >= 29.4 && latlng[0] <= 33.4 && latlng[1] >= 34.2 && latlng[1] <= 35.9;
+  }
+
+  // --- Build pre-computed polygons from locations_polygons.json ---
+  function buildPolygons(data) {
+    for (var name in data) {
+      var coords = data[name];
+      if (!Array.isArray(coords)) continue;
+      var isNested = Array.isArray(coords[0][0]);
+      var latlngs;
+      if (isNested) {
+        // Polygon with holes: [[[outer]], [[hole1]], ...]
+        latlngs = coords.map(function(ring) {
+          return ring.map(function(c) { return [c[1], c[0]]; });
+        });
+      } else {
+        // Simple polygon: [[lng,lat], ...]
+        latlngs = coords.map(function(c) { return [c[1], c[0]]; });
+      }
+      var polygon = L.polygon(latlngs, {
+        fillColor: '#888',
+        fillOpacity: 0.01,
+        color: '#888',
+        opacity: 0,
+        weight: 1,
+        interactive: true
+      }).addTo(map);
+      polygon.bindTooltip(name, { direction: 'top', offset: [0, -20] });
+      (function(n, poly) {
+        poly.on('click', function() {
+          if (document.body.classList.contains('has-overlay')) return;
+          if (isStatsMode) return; // Disable standard popup in stats mode
+          showPopup(n, poly);
+        });
+        poly.on('mouseover', function() {
+          if (document.body.classList.contains('has-overlay')) return;
+          if (isStatsMode) {
+            poly.setStyle({ fillOpacity: 0.9, weight: 3 });
+          } else {
+            poly.setStyle(ACTIVE_STYLE);
+          }
+        });
+        poly.on('mouseout', function() {
+          if (isStatsMode) {
+             poly.setStyle(getStatsStyle(n));
+          } else {
+             if (openPopupName === n) return;
+             poly.setStyle(currentLocationStyle(n));
+          }
+        });
+      })(name, polygon);
+      locationPolygons[name] = polygon;
+    }
+
+    // ?debug: show all polygon outlines
+    if (location.search.indexOf('debug') !== -1) {
+      document.getElementById('test-danger-btn').style.display = 'block';
+      document.getElementById('test-all-clear-btn').style.display = 'block';
+      var debugStyle = document.createElement('style');
+      debugStyle.textContent = '.leaflet-overlay-pane path { stroke: #555 !important; stroke-opacity: 1 !important; stroke-width: 1 !important; }';
+      document.head.appendChild(debugStyle);
+      for (var n in locationPolygons) {
+        locationPolygons[n].setStyle({ fillOpacity: 0.05 });
+      }
+      L.rectangle([[29.4, 34.2], [33.4, 35.9]], { color: '#0000ff', weight: 2, fill: false }).addTo(map);
+    }
+
+    console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
+  }
+
+  // --- Title classification ---
+  var OFFICIAL_CATEGORY_MAP = {
+      1: "ירי רקטות וטילים",           // Rocket and Missile Fire
+      2: "חדירת כלי טיס עוין",         // Hostile Aircraft Intrusion
+      3: "חדירת מחבלים",               // Terrorist Infiltration
+      4: "רעידת אדמה",                 // Earthquake
+      5: "חשש לצונאמי",                // Tsunami Warning
+      6: "אירוע חומרים מסוכנים",       // Hazardous Materials Event
+      7: "אירוע רדיולוגי",             // Radiological Event
+      10: "חשש לאירוע ביולוגי",        // Biological Event
+      13: "יציאה ממרחב מוגן",          // "All Clear" / Event Ended (Special Update)
+      14: "התרעה מוקדמת"               // Pre-Alert (usually for aircraft tracking)
+  };
+
+  function classifyTitle(title) {
+    title = title.replace(/\s+/g, ' ').trim();
+
+    // Green — all-clear / event over (fades out)
+    if (title.includes('האירוע הסתיים') ||
+        (title.includes('ניתן לצאת') && !title.includes('להישאר בקרבתו')) ||
+        title.includes('החשש הוסר') ||
+        title.includes('יכולים לצאת') ||
+        title.includes('אינם צריכים לשהות') ||
+        title.includes('סיום שהייה בסמיכות') ||
+        title === 'עדכון') {
+      return 'green';
+    }
+
+    // Yellow — early warning / preparedness / stay near shelter
+    if (title === 'בדקות הקרובות צפויות להתקבל התרעות באזורך' ||
+        title.includes('לשפר את המיקום למיגון המיטבי') ||
+        title === 'יש לשהות בסמיכות למרחב המוגן' ||
+        title.includes('להישאר בקרבתו')) {
+      return 'yellow';
+    }
+
+    // Purple — drone infiltration
+    if (title === 'חדירת כלי טיס עוין') {
+      return 'purple';
+    }
+
+    // Red — active danger (missiles / non-conventional / terrorists / shelter now)
+    if (title === 'ירי רקטות וטילים' ||
+        title === 'נשק לא קונבנציונלי' ||
+        title === 'חדירת מחבלים' ||
+        title === 'היכנסו מייד למרחב המוגן' ||
+        title === 'היכנסו למרחב המוגן') {
+      return 'red';
+    }
+
+    console.warn('Unknown alert title:', title);
+    return 'red'; // default to danger for unknown
+  }
+
+  // --- Marker management ---
+  function setLocationState(name, state, since) {
+    var existing = locationStates[name];
+
+    // Priority: red > purple > yellow. Green always overrides (all-clear).
+    var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    if (existing) {
+      if (state !== 'green') {
+        if (existing.state === state) return;
+        if ((PRIORITY[existing.state] || 0) > (PRIORITY[state] || 0)) return;
+      } else if (existing.state === 'green') {
+        return; // already green — don't reset the fade timer
+      }
+    }
+
+    var polygon = locationPolygons[name] || null;
+    if (!polygon) return;
+
+    var now = Date.now();
+    var opacity = state === 'green'
+      ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
+      : 0.3;
+    polygon.setStyle({
+      color: COLORS[state],
+      fillColor: COLORS[state],
+      fillOpacity: opacity,
+      opacity: opacity + 0.15,
+      weight: state === 'red' ? 0.5 : 1
+    });
+    locationStates[name] = {
+      state: state,
+      since: since || Date.now(),
+      marker: polygon
+    };
+
+    playSoundForState(state, name);
+  }
+
+  function removeLocation(name) {
+    var entry = locationStates[name];
+    if (entry && entry.marker) {
+      entry.marker.setStyle(BASE_STYLE);
+      entry.marker.closePopup();
+    }
+    delete locationStates[name];
+  }
+
+  // --- Alert history per location ---
+  var openPopupName = null;
+  var openPopupMarker = null;
+
+  function updateOverlay() {
+    var tlBtn = document.getElementById('timeline-btn');
+    var statsBtn = document.getElementById('stats-btn');
+    var panelOpen = document.getElementById('sound-btn').classList.contains('open') ||
+      (tlBtn && tlBtn.classList.contains('open')) ||
+      (statsBtn && statsBtn.classList.contains('open'));
+    var popupOpen = openPopupName !== null;
+    document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
+  }
+
+  function recordHistory(name, title, alertDate, state) {
+    if (!locationHistory[name]) locationHistory[name] = [];
+    var ts = parseAlertDate(alertDate);
+    // Skip entries older than 12 hours
+    if (ts && Date.now() - ts > 12 * 60 * 60 * 1000) return;
+    var arr = locationHistory[name];
+    // Dedup: same title within 1 minute
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].title === title) {
+        var existingTs = parseAlertDate(arr[i].alertDate);
+        if (ts && existingTs && Math.abs(ts - existingTs) <= 60000) return;
+        if (!ts && !existingTs) return;
+      }
+    }
+    arr.push({ title: title, alertDate: alertDate, state: state });
+    // Refresh popup if it's open for this location
+    if (openPopupName === name && openPopupMarker) {
+      openPopupMarker.getPopup().setContent(buildPopupHtml(name));
+    }
+  }
+
+  var TITLE_LABELS = {
+    'ירי רקטות וטילים': 'אזעקת רקטות וטילים',
+    'חדירת כלי טיס עוין': 'חדירת כטב״מ',
+    'נשק לא קונבנציונלי': 'נשק לא קונבנציונלי',
+    'חדירת מחבלים': 'חדירת מחבלים',
+    'בדקות הקרובות צפויות להתקבל התרעות באזורך': 'תיתכן אזעקת טילים בדקות הקרובות',
+    'היכנסו מייד למרחב המוגן': 'היכנסו מייד למרחב המוגן',
+    'היכנסו למרחב המוגן': 'היכנסו למרחב המוגן',
+    'על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך. במקרה של קבלת התרעה, יש להיכנס למרחב המוגן ולשהות בו עד להודעה חדשה.': 'שיפור מיקום למיגון מיטבי',
+    'יש לשהות בסמיכות למרחב המוגן': 'שהייה בסמיכות למרחב המוגן',
+    'ירי רקטות וטילים - האירוע הסתיים': 'רקטות וטילים - הסתיים',
+    'חדירת כלי טיס עוין - האירוע הסתיים': 'כטב״מ - האירוע הסתיים',
+    'ניתן לצאת מהמרחב המוגן': 'ניתן לצאת מהמרחב המוגן',
+    'ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו': 'ניתן לצאת מהמרחב המוגן',
+    'חדירת מחבלים - החשש הוסר': 'חדירת מחבלים - החשש הוסר',
+    'השוהים במרחב המוגן יכולים לצאת': 'ניתן לצאת מהמרחב המוגן',
+    'האירוע הסתיים': 'האירוע הסתיים',
+    'עדכון': 'ניתן לצאת מהמרחב המוגן',
+  };
+
+  function displayLabel(title) {
+    var norm = (title || '').replace(/\s+/g, ' ').trim();
+    if (TITLE_LABELS[norm]) return TITLE_LABELS[norm];
+    var keys = Object.keys(TITLE_LABELS);
+    for (var i = 0; i < keys.length; i++) {
+      if (norm.includes(keys[i])) return TITLE_LABELS[keys[i]];
+    }
+    return '\u26A0 ' + norm;
+  }
+
+  function buildPopupHtml(name) {
+    var entries = (locationHistory[name] || []).slice()
+      .sort(function(a, b) { return (b.alertDate || '').replace('T', ' ').localeCompare((a.alertDate || '').replace('T', ' ')); });
+    var rows = entries.map(function(e, i) {
+      var color = COLORS[e.state] || '#888';
+      var label = displayLabel(e.title);
+      var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
+      var border = i < entries.length - 1 ? 'border-bottom:1px solid #eee;' : '';
+      return '<div style="padding:4px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
+        (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
+        '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
+      '</div>';
+    }).join('');
+    return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' +
+      (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
+      '</div>';
+  }
+
+  var ACTIVE_STYLE = { fillOpacity: 0.5, opacity: 0.8, weight: 3 };
+
+  function getStatsStyle(name) {
+      var count = statsCounts[name] || 0;
+      if (count === 0) return BASE_STYLE;
+
+      // heatmap from yellow to red depending on intensity
+      var intensity = maxStatsCount > 0 ? (count / maxStatsCount) : 0;
+      var r = 255;
+      var g = Math.round(255 * (1 - intensity));
+      var b = 0;
+      var color = 'rgb(' + r + ',' + g + ',' + b + ')';
+
+      return {
+          fillColor: color,
+          color: color,
+          fillOpacity: 0.4 + (intensity * 0.4),
+          opacity: 0.6 + (intensity * 0.4),
+          weight: 1.5
+      };
+  }
+
+  function currentLocationStyle(name) {
+    if (isStatsMode) return getStatsStyle(name);
+
+    var entry = locationStates[name];
+    if (!entry) return BASE_STYLE;
+    if (entry.state === 'green') {
+      var opacity = 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS));
+      return { color: COLORS.green, fillColor: COLORS.green, fillOpacity: opacity, opacity: opacity + 0.15, weight: 1 };
+    }
+    return { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: 0.3, opacity: 0.45, weight: entry.state === 'red' ? 0.5 : 1 };
+  }
+
+  function showPopup(name, marker) {
+    openPopupName = name;
+    openPopupMarker = marker;
+    marker.setStyle(ACTIVE_STYLE);
+    marker.bindPopup(buildPopupHtml(name), { maxWidth: 350 })
+      .openPopup()
+      .on('popupclose', function() {
+        openPopupName = null; openPopupMarker = null;
+        marker.setStyle(currentLocationStyle(name));
+        updateOverlay();
+      });
+    updateOverlay();
+  }
+
+  // --- Polygon pulse hint (mobile) ---
+  function showPolygonHint() {
+    // Collect all currently colored polygons and those with recent history
+    var targets = []; // [{polygon, name, color, origStyle}]
+
+    for (var name in locationStates) {
+      var entry = locationStates[name];
+      var polygon = locationPolygons[name];
+      if (!polygon) continue;
+      var op = entry.state === 'green'
+        ? 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS))
+        : 0.3;
+      targets.push({
+        polygon: polygon,
+        color: COLORS[entry.state],
+        origStyle: { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: op, opacity: op + 0.15, weight: entry.state === 'red' ? 0.5 : 1 }
+      });
+    }
+
+    // Also include recently-faded polygons with history but no active state
+    if (targets.length === 0) {
+      for (var hName in locationHistory) {
+        if (locationHistory[hName].length > 0 && !locationStates[hName]) {
+          var hPoly = locationPolygons[hName];
+          if (hPoly) {
+            targets.push({ polygon: hPoly, color: COLORS.green, origStyle: BASE_STYLE });
+          }
+        }
+      }
+    }
+
+    if (targets.length === 0) return;
+
+    var step = 0, totalSteps = 30; // 3 cycles * 10 steps per cycle
+    var interval = setInterval(function() {
+      var t = (step % 10) / 10;
+      var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
+      for (var i = 0; i < targets.length; i++) {
+        targets[i].polygon.setStyle({
+          fillColor: targets[i].color, fillOpacity: opacity,
+          color: targets[i].color, opacity: Math.min(opacity + 0.15, 0.8), weight: 2
+        });
+      }
+      step++;
+      if (step >= totalSteps) {
+        clearInterval(interval);
+        for (var j = 0; j < targets.length; j++) {
+          targets[j].polygon.setStyle(targets[j].origStyle);
+        }
+      }
+    }, 100);
+  }
+
+  // --- Process alerts ---
+  function processLiveAlert(alert) {
+    if (!alert || !alert.data || !alert.title) return;
+    var title = (alert.desc || alert.title).replace(/\s+/g, ' ').trim();
+    var state = classifyTitle(title);
+    if (state !== 'green') lastDangerTime = Date.now();
+    var locations = alert.data;
+    if (!Array.isArray(locations)) return;
+    var now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    for (var i = 0; i < locations.length; i++) {
+      var loc = locations[i];
+      recordHistory(loc, title, now, state);
+      if (isLiveMode && !isStatsMode) {
+        setLocationState(loc, state);
+      } else if (liveLocationStates) {
+        updateShadowState(loc, state);
+      }
+    }
+  }
+
+  // Expose for debugging/external injection
+  window.injectAlert = function(mockAlert) {
+    console.log('Injecting mock alert:', mockAlert);
+    processLiveAlert(mockAlert);
+  };
+
+  function processHistoryEntry(entry) {
+    if (!entry || !entry.data || !entry.title) return;
+    var title = entry.title.replace(/\s+/g, ' ').trim();
+    var state = classifyTitle(title);
+    // History `data` is a string (single location)
+    var location = (typeof entry.data === 'string' ? entry.data : String(entry.data)).trim();
+    var since = parseAlertDate(entry.alertDate) || Date.now();
+    if (state !== 'green' && since > lastDangerTime) lastDangerTime = since;
+    recordHistory(location, title, entry.alertDate || '', state);
+
+    // Also feed into extendedHistory for timeline
+    var key = location + '|' + (entry.alertDate || '');
+    if (!extendedRids.has(key) && since) {
+      extendedRids.add(key);
+      extendedHistory.push({ location: location, title: title, alertDate: since, state: state, category_desc: title });
+      // Update global bounds but wait for panel open to re-render timeline day
+      timelineMin = timelineMin ? Math.min(timelineMin, since) : since;
+      timelineMax = Math.max(timelineMax, since, Date.now());
+    }
+
+    // Skip expired green markers — dont briefly flash old all-clears on page load
+    var expired = state === 'green' && (Date.now() - since) >= GREEN_FADE_MS;
+    if (isLiveMode && !isStatsMode) {
+      if (expired) {
+        if (locationStates[location]) removeLocation(location);
+      } else {
+        setLocationState(location, state, since);
+      }
+    } else if (liveLocationStates) {
+      if (expired) {
+        delete liveLocationStates[location];
+      } else {
+        updateShadowState(location, state, since);
+      }
+    }
+  }
+
+  // --- Green fade-out ---
+  function fadeGreenMarkers() {
+    if (!isLiveMode || isStatsMode) return;
+    var now = Date.now();
+    var toRemove = [];
+    for (var name in locationStates) {
+      var entry = locationStates[name];
+      if (entry.state !== 'green') {
+        if (now - entry.since >= ALERT_MAX_AGE_MS) toRemove.push(name);
+        continue;
+      }
+      var elapsed = now - entry.since;
+      if (elapsed >= GREEN_FADE_MS) {
+        toRemove.push(name);
+      } else {
+        var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
+        entry.marker.setStyle({ fillOpacity: opacity, opacity: opacity + 0.15 });
+      }
+    }
+    for (var i = 0; i < toRemove.length; i++) {
+      removeLocation(toRemove[i]);
+    }
+    if (toRemove.length > 0) updateLiveStatus();
+  }
+
+  function formatRelativeTime(ts) {
+    if (!ts) return '';
+    var diffMs = Date.now() - ts;
+    if (diffMs < 0) diffMs = 0;
+    var mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return 'לפני פחות מדקה';
+    if (mins < 60) return 'לפני ' + mins + ' דקות';
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return 'לפני ' + hours + ' שעות';
+    return '';
+  }
+
+  function getActiveEventBounds() {
+    var allBounds = null;
+    for (var name in locationStates) {
+      if (locationStates[name].state === 'green') continue;
+      var polygon = locationPolygons[name];
+      if (!polygon) continue;
+      if (!allBounds) {
+        allBounds = L.latLngBounds(polygon.getBounds());
+      } else {
+        allBounds.extend(polygon.getBounds());
+      }
+    }
+    return allBounds;
+  }
+
+  function maybeZoomToEvent() {
+    var bounds = getActiveEventBounds();
+    if (bounds) {
+      map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+    } else {
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+    }
+  }
+
+
+  function updateLiveStatus() {
+    if (!isLiveMode || isStatsMode) return;
+    var dominant = null, bestP = -1;
+    var P = { red: 3, purple: 2, yellow: 1 };
+    for (var name in locationStates) {
+      var s = locationStates[name].state;
+      if (s !== 'green' && (P[s] || 0) > bestP) {
+        bestP = P[s] || 0;
+        dominant = s;
+      }
+    }
+    if (dominant) {
+      setStatus(dominant, 'התרעות פעילות');
+    } else {
+      var rel = formatRelativeTime(lastDangerTime);
+      if (rel) {
+        setStatusHTML('green', 'אין כרגע התרעות<br><a href="#" id="lastAlertLink">התרעה אחרונה ' + rel + '</a>');
+      } else {
+        setStatus('green', 'אין התרעות פעילות');
+      }
+    }
+  }
+
+  // --- Status indicator ---
+  function setStatus(state, text) {
+    var dot = document.getElementById('statusDot');
+    var txt = document.getElementById('statusText');
+    var statusEl = document.getElementById('status');
+    dot.className = 'indicator indicator-' + state;
+    txt.textContent = text;
+    if (state !== 'err') {
+      statusEl.style.cursor = '';
+      lastErrorMsg = '';
+      document.getElementById('errorDetail').style.display = 'none';
+    } else {
+      statusEl.style.cursor = 'pointer';
+    }
+  }
+
+  function setStatusHTML(state, html) {
+    var dot = document.getElementById('statusDot');
+    var txt = document.getElementById('statusText');
+    var statusEl = document.getElementById('status');
+    dot.className = 'indicator indicator-' + state;
+    txt.innerHTML = html;
+    var link = document.getElementById('lastAlertLink');
+    if (link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openTimelineToLastEvent();
+      });
+    }
+    statusEl.style.cursor = '';
+    lastErrorMsg = '';
+    document.getElementById('errorDetail').style.display = 'none';
+  }
+
+  // --- Fetching ---
+  function stripBom(text) {
+    return text.replace(/^\ufeff/, '');
+  }
+
+  function fetchLiveAlerts() {
+    apiFetch('alerts')
+      .then(function(resp) {
+        lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.text();
+      })
+      .then(function(text) {
+        text = stripBom(text).trim();
+        liveErrors = 0;
+        try { sessionStorage.setItem('oref-last-poll', String(Date.now())); } catch(e) {}
+        if (initialized && isLiveMode && !isStatsMode && historyErrors <= 3) updateLiveStatus();
+        if (!text) return; // no active alert
+        var alert;
+        try { alert = JSON.parse(text); }
+        catch (e) { console.warn('Live JSON parse failed (' + text.length + ' chars), payload:', JSON.stringify(text), e); return; }
+        processLiveAlert(alert);
+      })
+      .catch(function(err) {
+        liveErrors++;
+        lastErrorMsg = 'Live alerts: ' + err.message;
+        if (liveErrors > 3 && !isStatsMode) {
+          setStatus('err', 'בעיית תקשורת לפיקוד העורף. מנסה שוב...');
+        }
+        console.error('Live poll error:', err);
+      });
+  }
+
+  function processHistoryEntries(entries) {
+    if (!Array.isArray(entries)) return;
+
+    entries.sort(function(a, b) {
+      return (a.alertDate || '').localeCompare(b.alertDate || '');
+    });
+
+    var newEntries = 0;
+    for (var i = 0; i < entries.length; i++) {
+      var entry = entries[i];
+      var alertDate = entry.alertDate || '';
+      if (lastHistoryDate && alertDate <= lastHistoryDate) continue;
+      processHistoryEntry(entry);
+      newEntries++;
+    }
+
+    if (entries.length > 0) {
+      lastHistoryDate = entries[entries.length - 1].alertDate || lastHistoryDate;
+    }
+
+    if (newEntries > 0) {
+      console.log('History: processed', newEntries, 'new entries');
+    }
+  }
+
+  function fetchHistory(onDone) {
+    apiFetch('history')
+      .then(function(resp) {
+        lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.text();
+      })
+      .then(function(text) {
+        text = stripBom(text).trim();
+        historyErrors = 0;
+        if (initialized && isLiveMode && !isStatsMode && liveErrors <= 3) updateLiveStatus();
+        if (!text) { if (onDone) onDone(); return; }
+        var entries;
+        try {
+          entries = JSON.parse(text);
+        } catch (parseErr) {
+          console.warn('History JSON truncated (' + text.length + ' chars), retrying...', parseErr);
+          return fetch(PROXY_BASE + apiPrefix + '/history', { cache: 'no-store' })
+            .then(function(r) { return r.text(); })
+            .then(function(t) {
+              t = stripBom(t).trim();
+              try { entries = JSON.parse(t); }
+              catch (e) { console.error('History retry also failed (' + t.length + ' chars):', e); throw e; }
+              processHistoryEntries(entries);
+              if (onDone) onDone();
+            });
+        }
+        processHistoryEntries(entries);
+        if (onDone) onDone();
+      })
+      .catch(function(err) {
+        historyErrors++;
+        lastErrorMsg = 'Alert history: ' + err.message;
+        if (historyErrors > 3 && !isStatsMode) {
+          setStatus('err', 'תקלה בטעינת התרעות קודמות. מנסה שוב...');
+        }
+        console.error('History fetch error:', err);
+        if (onDone) onDone();
+      });
+  }
+
+  function parseAlertDate(dateStr) {
+    // Format: "2026-03-03 12:34:56"
+    if (!dateStr) return null;
+    var d = new Date(dateStr.replace(' ', 'T'));
+    return isNaN(d.getTime()) ? null : d.getTime();
+  }
+
+  function formatDateForApi(dateObj) {
+    var dd = String(dateObj.getDate()).padStart(2, '0');
+    var mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    var yyyy = dateObj.getFullYear();
+    return dd + '.' + mm + '.' + yyyy;
+  }
+
+  // --- Extended history (timeline & stats) ---
+  function fetchExtendedHistory(fromDateObj, toDateObj, onDone) {
+    var apiPath = 'alarms-history';
+    if (fromDateObj && toDateObj) {
+      var dStrFrom = formatDateForApi(fromDateObj);
+      var dStrTo = formatDateForApi(toDateObj);
+      apiPath += '?fromDate=' + dStrFrom + '&toDate=' + dStrTo;
+    } else if (fromDateObj) {
+      var dStr = formatDateForApi(fromDateObj);
+      apiPath += '?fromDate=' + dStr + '&toDate=' + dStr;
+    }
+
+    apiFetch(apiPath)
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function(entries) {
+        var parsedEntries = [];
+        if (Array.isArray(entries)) {
+            for (var i = 0; i < entries.length; i++) {
+              var e = entries[i];
+              if (!e.data || !e.category_desc) continue;
+              var rid = String(e.rid || '');
+              if (rid && extendedRids.has(rid)) continue;
+              var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
+              var state = classifyTitle(title);
+              var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
+              var ts = parseAlertDate(e.alertDate);
+              if (!ts) continue;
+              if (rid) extendedRids.add(rid);
+              var entryObj = { location: location, title: title, alertDate: ts, state: state, category_desc: title };
+              extendedHistory.push(entryObj);
+              parsedEntries.push(entryObj);
+              recordHistory(location, title, e.alertDate || '', state);
+            }
+            // Sort ascending by time
+            extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
+            if (extendedHistory.length > 0) {
+              timelineMin = extendedHistory[0].alertDate;
+              timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
+            }
+        }
+        if (onDone) onDone(parsedEntries);
+      })
+      .catch(function(err) {
+        console.error('Extended history fetch error:', err);
+        if (onDone) onDone([]);
+      });
+  }
+
+  function reconstructStateAt(targetTime) {
+    // Clear all polygons
+    for (var name in locationStates) {
+      var entry = locationStates[name];
+      if (entry && entry.marker) {
+        entry.marker.setStyle(BASE_STYLE);
+        entry.marker.closePopup();
+      }
+    }
+    locationStates = {};
+
+    // Replay history up to targetTime (limit replay to current selected day if possible)
+    var dayStart = currentTimelineDay ? new Date(currentTimelineDay).setHours(0,0,0,0) : 0;
+
+    var accumulated = {}; // {location: {state, since}}
+    var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    for (var i = 0; i < extendedHistory.length; i++) {
+      var e = extendedHistory[i];
+      if (currentTimelineDay && e.alertDate < dayStart) continue; // skip older days to start clean
+      if (e.alertDate > targetTime) break;
+      var existing = accumulated[e.location];
+      if (existing) {
+        if (e.state === 'green') {
+          accumulated[e.location] = { state: 'green', since: e.alertDate };
+        } else if ((PRIORITY[e.state] || 0) >= (PRIORITY[existing.state] || 0)) {
+          accumulated[e.location] = { state: e.state, since: e.alertDate };
+        }
+      } else {
+        accumulated[e.location] = { state: e.state, since: e.alertDate };
+      }
+    }
+
+    // Apply accumulated state
+    for (var loc in accumulated) {
+      var s = accumulated[loc].state;
+      var sinceTime = accumulated[loc].since;
+      var polygon = locationPolygons[loc] || null;
+      if (!polygon) continue;
+      if (s === 'green') {
+        var elapsed = targetTime - sinceTime;
+        if (elapsed >= GREEN_FADE_MS) continue; // already faded
+        var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
+        polygon.setStyle({
+          color: COLORS.green,
+          fillColor: COLORS.green,
+          fillOpacity: opacity,
+          opacity: opacity + 0.15,
+          weight: 1
+        });
+      } else {
+        if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
+        polygon.setStyle({
+          color: COLORS[s],
+          fillColor: COLORS[s],
+          fillOpacity: 0.3,
+          opacity: 0.45,
+          weight: s === 'red' ? 0.5 : 1
+        });
+      }
+      locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
+    }
+  }
+
+  function saveLiveState() {
+    if (liveLocationStates) return; // already saved
+    liveLocationStates = {};
+    for (var name in locationStates) {
+      var entry = locationStates[name];
+      liveLocationStates[name] = { state: entry.state, since: entry.since };
+    }
+  }
+
+  function restoreLiveState() {
+    // Clear all polygons
+    var names = Object.keys(locationStates);
+    for (var i = 0; i < names.length; i++) {
+      removeLocation(names[i]);
+    }
+    // Re-apply saved live state
+    if (liveLocationStates) {
+      for (var name in liveLocationStates) {
+        var s = liveLocationStates[name];
+        if (s.state === 'green' && (Date.now() - s.since) >= GREEN_FADE_MS) continue;
+        setLocationState(name, s.state, s.since);
+      }
+    }
+    liveLocationStates = null;
+  }
+
+  function updateShadowState(name, state, since) {
+    if (!liveLocationStates) return;
+    var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    var existing = liveLocationStates[name];
+    if (existing) {
+      if (state === 'green') {
+        liveLocationStates[name] = { state: 'green', since: since || Date.now() };
+      } else if (existing.state === state) {
+        return;
+      } else if ((PRIORITY[existing.state] || 0) > (PRIORITY[state] || 0)) {
+        return;
+      } else {
+        liveLocationStates[name] = { state: state, since: since || Date.now() };
+      }
+    } else {
+      liveLocationStates[name] = { state: state, since: since || Date.now() };
+    }
+  }
+
+  // --- Stats Feature ---
+  function initStats() {
+    var statsBtn = document.getElementById('stats-btn');
+    var btnRow = document.getElementById('stats-btn-row');
+    var fromDateInput = document.getElementById('stats-from-date');
+    var toDateInput = document.getElementById('stats-to-date');
+    var applyBtn = document.getElementById('stats-apply-btn');
+    var categorySelect = document.getElementById('stats-category');
+
+    // Set max dates to today
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    var maxDateStr = yyyy + '-' + mm + '-' + dd;
+    fromDateInput.max = maxDateStr;
+    toDateInput.max = maxDateStr;
+
+    // Default to last 7 days
+    var lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    fromDateInput.value = lastWeek.getFullYear() + '-' + String(lastWeek.getMonth()+1).padStart(2,'0') + '-' + String(lastWeek.getDate()).padStart(2,'0');
+    toDateInput.value = maxDateStr;
+
+    function populateCategories(entries) {
+        var uniqueCategories = new Set();
+        for (var i = 0; i < entries.length; i++) {
+            // ignore green/all-clear events from stats
+            if (entries[i].state !== 'green') {
+                uniqueCategories.add(entries[i].category_desc);
+            }
+        }
+
+        categorySelect.innerHTML = '<option value="all">הכל</option>';
+        var sorted = Array.from(uniqueCategories).sort();
+        for (var j = 0; j < sorted.length; j++) {
+            var opt = document.createElement('option');
+            opt.value = sorted[j];
+            opt.textContent = sorted[j];
+            categorySelect.appendChild(opt);
+        }
+    }
+
+    function closeStats() {
+      statsBtn.classList.remove('open');
+      isStatsMode = false;
+      statsCounts = {};
+      maxStatsCount = 0;
+      document.getElementById('historyTimeLabel').style.display = 'none';
+
+      // Remove tooltips and reset styles
+      for (var name in locationPolygons) {
+        var p = locationPolygons[name];
+        p.setStyle(BASE_STYLE);
+        p.unbindTooltip();
+        p.bindTooltip(name, { direction: 'top', offset: [0, -20] }); // Restore default tooltip
+      }
+
+      enterLiveMode();
+      updateOverlay();
+    }
+
+    btnRow.addEventListener('click', function(e) {
+        if (e.target.classList.contains('tl-close')) {
+            closeStats();
+            popPanelHistory();
+            return;
+        }
+        if (statsBtn.classList.contains('open')) {
+            statsBtn.classList.remove('open');
+            popPanelHistory();
+            updateOverlay();
+        } else {
+            closeTimelinePanel();
+            closeSoundPanel();
+            map.closePopup();
+
+            statsBtn.classList.add('open');
+            pushPanelHistory();
+            updateOverlay();
+
+            // Initial fetch to populate categories if needed
+            if (extendedHistory.length === 0) {
+               fetchExtendedHistory(new Date(fromDateInput.value), new Date(toDateInput.value), function(entries) {
+                   populateCategories(entries);
+               });
+            } else {
+               populateCategories(extendedHistory);
+            }
+        }
+    });
+
+    // When date changes, we might want to refresh the available categories, but that requires a fetch
+    // To prevent spamming, we only do it when they actually click apply, or they can just leave it as 'all'
+    var dateChangeHandler = function() {
+        var fromStr = fromDateInput.value;
+        var toStr = toDateInput.value;
+        if (!fromStr || !toStr) return;
+
+        var fromDate = new Date(fromStr);
+        var toDate = new Date(toStr);
+        if (fromDate > toDate) return;
+
+        categorySelect.innerHTML = '<option value="all">טוען קטגוריות...</option>';
+        fetchExtendedHistory(fromDate, toDate, function(entries) {
+            populateCategories(entries);
+        });
+    };
+    fromDateInput.addEventListener('change', dateChangeHandler);
+    toDateInput.addEventListener('change', dateChangeHandler);
+
+    applyBtn.addEventListener('click', function() {
+        var fromStr = fromDateInput.value;
+        var toStr = toDateInput.value;
+        if (!fromStr || !toStr) return;
+
+        var fromDate = new Date(fromStr);
+        var toDate = new Date(toStr);
+
+        if (fromDate > toDate) {
+           alert("תאריך התחלה לא יכול להיות אחרי תאריך סיום");
+           return;
+        }
+
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'טוען נתונים...';
+
+        if (isLiveMode) {
+          saveLiveState();
+          isLiveMode = false;
+        }
+        isStatsMode = true;
+
+        // clear map
+        for (var name in locationStates) {
+            removeLocation(name);
+        }
+        locationStates = {};
+
+        fetchExtendedHistory(fromDate, toDate, function(fetchedEntries) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = 'הצג נתונים';
+
+            var selectedCategory = categorySelect.value;
+
+            // if we needed to refresh categories, do it and retain selection if possible
+            if (categorySelect.options.length <= 1) {
+                populateCategories(fetchedEntries);
+                if (Array.from(categorySelect.options).some(function(o) { return o.value === selectedCategory; })) {
+                    categorySelect.value = selectedCategory;
+                } else {
+                    selectedCategory = 'all';
+                }
+            }
+
+            statsCounts = {};
+            maxStatsCount = 0;
+
+            var startTs = fromDate.getTime();
+            var endTs = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999).getTime();
+
+            for (var i = 0; i < extendedHistory.length; i++) {
+                var e = extendedHistory[i];
+                if (e.alertDate >= startTs && e.alertDate <= endTs && e.state !== 'green') {
+                    if (selectedCategory === 'all' || e.category_desc === selectedCategory) {
+                        statsCounts[e.location] = (statsCounts[e.location] || 0) + 1;
+                        if (statsCounts[e.location] > maxStatsCount) {
+                            maxStatsCount = statsCounts[e.location];
+                        }
+                    }
+                }
+            }
+
+            // Apply heat map colors and tooltips
+            for (var locName in locationPolygons) {
+                 var p = locationPolygons[locName];
+                 var count = statsCounts[locName] || 0;
+                 p.setStyle(getStatsStyle(locName));
+
+                 p.unbindTooltip();
+                 if (count > 0) {
+                     p.bindTooltip('<b>' + locName + '</b><br>התרעות: ' + count, { direction: 'top', offset: [0, -20] });
+                 } else {
+                     p.bindTooltip(locName, { direction: 'top', offset: [0, -20] });
+                 }
+            }
+
+            document.getElementById('historyTimeLabel').style.display = 'block';
+            document.getElementById('historyTimeLabel').textContent = 'מציג מפת חום לפי מספר התרעות';
+            setStatus('err', 'מצב סטטיסטיקה'); // Use grey dot for stats mode
+        });
+    });
+  }
+
+  function initTimeline() {
+    var container = document.getElementById('timeline-btn');
+    var btnRow = document.getElementById('timeline-btn-row');
+    var slider = document.getElementById('timeline-slider');
+    var label = document.getElementById('timeline-label');
+    var playBtn = document.getElementById('tl-play');
+    var datePicker = document.getElementById('timeline-date-picker');
+
+    var prevBtn = document.getElementById('tl-prev');
+    var nextBtn = document.getElementById('tl-next');
+    var ticksEl = document.getElementById('timeline-ticks');
+
+
+    var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
+    var PLAY_SPEED = 600;
+
+    var viewTimelineMin = 0;
+    var viewTimelineMax = 0;
+
+    // init the input date to today
+    var today = new Date();
+    var yyyy = today.getFullYear();
+    var mm = String(today.getMonth() + 1).padStart(2, '0');
+    var dd = String(today.getDate()).padStart(2, '0');
+    datePicker.max = yyyy + '-' + mm + '-' + dd;
+    datePicker.value = yyyy + '-' + mm + '-' + dd;
+
+    function setTimelineDayBounds(dayStr, isFromUser) {
+      if (!dayStr) return;
+      currentTimelineDay = dayStr;
+
+      var parts = dayStr.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+
+      var startOfDay = new Date(y, m, d, 0, 0, 0, 0).getTime();
+      var endOfDay = new Date(y, m, d, 23, 59, 59, 999).getTime();
+
+      // If it's today, cap at current time
+      var now = Date.now();
+      if (endOfDay > now) endOfDay = now;
+
+      // Find actual event bounds within this day to narrow the slider
+      var firstEvent = null;
+      var lastEvent = null;
+      for (var i = 0; i < extendedHistory.length; i++) {
+        var t = extendedHistory[i].alertDate;
+        if (t >= startOfDay && t <= endOfDay) {
+          if (!firstEvent || t < firstEvent) firstEvent = t;
+          if (!lastEvent || t > lastEvent) lastEvent = t;
+        }
+      }
+
+      // If we don't have events for this day yet and user selected it, fetch it
+      if (!firstEvent && isFromUser) {
+          fetchExtendedHistory(new Date(y, m, d), null, function() {
+            setTimelineDayBounds(dayStr, false); // call again without user flag
+          });
+          return;
+      }
+
+      if (firstEvent && lastEvent) {
+         // add a little buffer
+         viewTimelineMin = Math.max(startOfDay, firstEvent - 5 * 60000);
+         viewTimelineMax = Math.min(endOfDay, lastEvent + 15 * 60000);
+      } else {
+         // default whole day if no events
+         viewTimelineMin = startOfDay;
+         viewTimelineMax = endOfDay;
+      }
+
+      renderTicks();
+
+      // Seek to the end of the newly selected day
+      if (eventPeaks.length > 0) {
+        seekTo(eventPeaks[eventPeaks.length - 1]);
+      } else {
+        slider.value = 999;
+        enterHistoryMode(viewTimelineMax);
+      }
+    }
+
+    datePicker.addEventListener('change', function() {
+      stopPlay();
+      setTimelineDayBounds(datePicker.value, true);
+    });
+
+    // --- Open / Close ---
+    function isOpen() { return container.classList.contains('open'); }
+
+    function openTimeline() {
+      if (extendedHistory.length === 0 && !currentTimelineDay) {
+          fetchExtendedHistory(new Date(), null, function() {
+              openTimeline();
+          });
+          return;
+      }
+
+      container.classList.add('has-data');
+      closeSoundPanel();
+      var statsBtn = document.getElementById('stats-btn');
+      if (statsBtn && statsBtn.classList.contains('open')) {
+          statsBtn.classList.remove('open');
+          isStatsMode = false;
+      }
+      map.closePopup();
+      container.classList.add('open');
+      pushPanelHistory();
+
+      setTimelineDayBounds(datePicker.value, false);
+
+      updateOverlay();
+    }
+
+    function closeTimeline() {
+      container.classList.remove('open');
+      stopPlay();
+
+      enterLiveMode();
+      updateOverlay();
+    }
+    closeTimelinePanel = closeTimeline;
+
+    openTimelineToLastEvent = function() {
+      if (!isOpen()) openTimeline();
+    };
+
+    btnRow.addEventListener('click', function(e) {
+      if (isOpen()) {
+        closeTimeline();
+        popPanelHistory();
+      } else {
+        openTimeline();
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        var statsBtn = document.getElementById('stats-btn');
+        if (statsBtn && statsBtn.classList.contains('open')) {
+             statsBtn.classList.remove('open');
+             isStatsMode = false;
+             enterLiveMode();
+        }
+        if (isOpen()) closeTimeline();
+        popPanelHistory();
+      }
+    });
+
+    // --- Helpers ---
+    function timeFromSlider(val) {
+      return viewTimelineMin + (val / 999) * (viewTimelineMax - viewTimelineMin);
+    }
+
+    function sliderFromTime(time) {
+      return Math.round(((time - viewTimelineMin) / (viewTimelineMax - viewTimelineMin)) * 999);
+    }
+
+    function formatTime(ms) {
+      var d = new Date(ms);
+      return String(d.getHours()).padStart(2, '0') + ':' +
+             String(d.getMinutes()).padStart(2, '0') + ':' +
+             String(d.getSeconds()).padStart(2, '0');
+    }
+
+    function clampTime(t) {
+      return Math.max(viewTimelineMin, Math.min(viewTimelineMax, t));
+    }
+
+    // --- Mode switching ---
+    window.enterLiveMode = function() {
+      if (isLiveMode && !isStatsMode) return;
+      isLiveMode = true;
+      isStatsMode = false;
+      currentViewTime = 0;
+      document.getElementById('historyTimeLabel').style.display = 'none';
+      restoreLiveState();
+      updateLiveStatus();
+    }
+
+    function enterHistoryMode(time) {
+      if (isLiveMode) {
+        saveLiveState();
+        isLiveMode = false;
+      }
+      isStatsMode = false;
+      currentViewTime = time;
+      var timeStr = formatTime(time);
+      label.textContent = timeStr;
+      document.getElementById('historyTimeLabel').style.display = 'block';
+      document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
+      reconstructStateAt(time);
+      }
+
+    function seekTo(time) {
+      time = clampTime(time);
+      slider.value = Math.min(sliderFromTime(time), 999);
+      enterHistoryMode(time);
+      maybeZoomToEvent();
+    }
+
+    // --- Slider input ---
+    slider.addEventListener('input', function() {
+      stopPlay();
+      enterHistoryMode(timeFromSlider(parseInt(slider.value)));
+    });
+
+    // --- Timeline bands (show duration of active alerts) ---
+    var STATE_PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    var computedBands = []; // [{start, end, state}] - visual tick bands
+    var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
+
+    function computeEventPeaks() {
+      eventPeaks = [];
+      var lastNonGreenTime = null;
+      var prevWasGreen = false;
+      for (var i = 0; i < extendedHistory.length; i++) {
+        var e = extendedHistory[i];
+        if (e.alertDate < viewTimelineMin || e.alertDate > viewTimelineMax) continue;
+
+        if (e.state !== 'green') {
+          prevWasGreen = false;
+          lastNonGreenTime = e.alertDate;
+        } else {
+          if (!prevWasGreen && lastNonGreenTime !== null) {
+            eventPeaks.push(lastNonGreenTime);
+          }
+          prevWasGreen = true;
+        }
+      }
+      // Ongoing event: last entry was non-green
+      if (!prevWasGreen && lastNonGreenTime !== null) {
+        eventPeaks.push(lastNonGreenTime);
+      }
+    }
+
+    function renderTicks() {
+      ticksEl.innerHTML = '';
+      computedBands = [];
+      computeEventPeaks();
+      if (extendedHistory.length === 0) return;
+      var range = viewTimelineMax - viewTimelineMin;
+      if (range <= 0) return;
+
+      // Walk events, track per-location active state, emit bands
+      var locStates = {}; // location -> {state, since}
+      var bands = [];     // [{start, end, state}]
+      var curState = null;
+      var curStart = 0;
+
+      function dominantState() {
+        var best = null, bestP = -1;
+        for (var loc in locStates) {
+          var p = STATE_PRIORITY[locStates[loc].state] || 0;
+          if (p > bestP) { bestP = p; best = locStates[loc].state; }
+        }
+        return best;
+      }
+
+      function expireStale(atTime) {
+        for (var loc in locStates) {
+          if (atTime - locStates[loc].since >= ALERT_MAX_AGE_MS) delete locStates[loc];
+        }
+      }
+
+      for (var i = 0; i < extendedHistory.length; i++) {
+        var e = extendedHistory[i];
+
+        // Skip events completely outside the day, but we still need to process them to know ongoing state at day start
+        if (e.alertDate > viewTimelineMax) break;
+
+        expireStale(e.alertDate);
+        if (e.state === 'green') {
+          delete locStates[e.location];
+        } else {
+          locStates[e.location] = { state: e.state, since: e.alertDate };
+        }
+
+        var newDom = dominantState();
+        if (newDom !== curState) {
+          if (curState) {
+            // clip band to view
+            var bandStart = Math.max(curStart, viewTimelineMin);
+            var bandEnd = Math.min(e.alertDate, viewTimelineMax);
+            if (bandEnd > bandStart) {
+                bands.push({ start: bandStart, end: bandEnd, state: curState });
+            }
+          }
+          curState = newDom;
+          curStart = e.alertDate;
+        }
+      }
+      // Close final band, capped at staleness limit
+      if (curState) {
+        // Band ends at the latest location expiry, capped by viewTimelineMax
+        var latestExpiry = 0;
+        for (var loc in locStates) {
+          var exp = locStates[loc].since + ALERT_MAX_AGE_MS;
+          if (exp > latestExpiry) latestExpiry = exp;
+        }
+        var bandStart = Math.max(curStart, viewTimelineMin);
+        var bandEnd = Math.min(latestExpiry, viewTimelineMax);
+        if (bandEnd > bandStart) {
+            bands.push({ start: bandStart, end: bandEnd, state: curState });
+        }
+      }
+
+      computedBands = bands;
+
+      // Render bands as spans
+      for (var j = 0; j < bands.length; j++) {
+        var b = bands[j];
+        var leftPct = ((b.start - viewTimelineMin) / range) * 100;
+        var widthPct = ((b.end - b.start) / range) * 100;
+        if (widthPct < 0.1) widthPct = 0.1; // min visible width
+        var span = document.createElement('span');
+        span.style.left = leftPct + '%';
+        span.style.width = widthPct + '%';
+        span.style.background = TICK_COLORS[b.state] || TICK_COLORS.red;
+        ticksEl.appendChild(span);
+      }
+    }
+
+    // --- Play / Pause ---
+    function stopPlay() {
+      isPlaying = false;
+      playBtn.textContent = '▶';
+      if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+    }
+
+    function startPlay() {
+
+      isPlaying = true;
+      playBtn.textContent = '⏸';
+      var lastFrame = performance.now();
+      if (parseInt(slider.value) >= 999) {
+        slider.value = 0;
+        enterHistoryMode(viewTimelineMin);
+      }
+      function tick(now) {
+        if (!isPlaying) return;
+        var dt = now - lastFrame;
+        lastFrame = now;
+        var newTime = currentViewTime + dt * PLAY_SPEED;
+        if (newTime >= viewTimelineMax) {
+          slider.value = 0;
+          enterHistoryMode(viewTimelineMin);
+          lastFrame = now;
+          playRAF = requestAnimationFrame(tick);
+          return;
+        }
+        slider.value = Math.min(sliderFromTime(newTime), 999);
+        currentViewTime = newTime;
+        var timeStr = formatTime(newTime);
+        label.textContent = timeStr;
+        document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
+        reconstructStateAt(newTime);
+        playRAF = requestAnimationFrame(tick);
+      }
+      playRAF = requestAnimationFrame(tick);
+    }
+
+    playBtn.addEventListener('click', function() {
+      if (isPlaying) stopPlay(); else startPlay();
+    });
+
+    // --- Prev / Next event peak ---
+    prevBtn.addEventListener('click', function() {
+      stopPlay();
+      for (var i = eventPeaks.length - 1; i >= 0; i--) {
+        if (eventPeaks[i] < currentViewTime - 500) {
+          seekTo(eventPeaks[i]);
+          return;
+        }
+      }
+    });
+
+    nextBtn.addEventListener('click', function() {
+      stopPlay();
+      for (var i = 0; i < eventPeaks.length; i++) {
+        if (eventPeaks[i] > currentViewTime + 500) {
+          seekTo(eventPeaks[i]);
+          return;
+        }
+      }
+    });
+
+    // initial fetch of extended history, no longer in main init
+    fetchExtendedHistory(new Date(), null, function() {
+       if (extendedHistory.length > 0) {
+           container.classList.add('has-data');
+       }
+    });
+
+  }
+
+  // --- Init ---
+  function init() {
+    fetch('locations_polygons.json').then(function(r) { return r.json(); })
+    .then(function(data) {
+      buildPolygons(data);
+
+      var historyDone = false;
+      function onHistoryDone() {
+        initialized = true;
+        initTimeline();
+        initStats();
+        setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+        setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+        setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        fetchLiveAlerts();
+        updateLiveStatus();
+        if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+      }
+      fetchHistory(function() { historyDone = true; onHistoryDone(); });
+    }).catch(function(err) {
+      console.error('Failed to load geo data:', err);
+      setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
+    });
+  }
+
+  // --- About control ---
+  function openAbout() {
+    document.getElementById('about-backdrop').classList.add('visible');
+  }
+  function closeAbout() {
+    document.getElementById('about-backdrop').classList.remove('visible');
+  }
+
+  document.getElementById('status').addEventListener('click', function() {
+    var detail = document.getElementById('errorDetail');
+    var dot = document.getElementById('statusDot');
+    if (!dot.classList.contains('indicator-err')) return;
+    if (detail.style.display === 'block') {
+      detail.style.display = 'none';
+    } else {
+      detail.textContent = (lastErrorMsg || 'Unknown error') + (lastCfColo ? ' (CF edge: ' + lastCfColo + ')' : '');
+      detail.style.display = 'block';
+    }
+  });
+  document.addEventListener('click', function(e) {
+    var detail = document.getElementById('errorDetail');
+    var status = document.getElementById('status');
+    if (detail.style.display === 'block' && !status.contains(e.target) && e.target !== detail) {
+      detail.style.display = 'none';
+    }
+  });
+
+  // Show tap hint for mobile users on first visit
+  if ('ontouchstart' in window && !localStorage.getItem('tapHintShown')) {
+    var hint = document.getElementById('tap-hint');
+    hint.style.display = 'block';
+    localStorage.setItem('tapHintShown', '1');
+    hint.addEventListener('animationend', function() { hint.remove(); });
+  }
+
+  document.getElementById('page-title').addEventListener('click', openAbout);
+  document.getElementById('about-close').addEventListener('click', closeAbout);
+  document.getElementById('about-backdrop').addEventListener('click', function(e) {
+    if (e.target === this) closeAbout();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeAbout();
+      if (soundBtn.classList.contains('open')) {
+        closeSoundPanel();
+        popPanelHistory();
+      }
+      map.closePopup();
+      document.getElementById('errorDetail').style.display = 'none';
+    }
+  });
+
+  // --- Sound control & modal ---
+  var soundBtn = document.getElementById('sound-btn');
+  var soundBtnRow = document.getElementById('sound-btn-row');
+  var soundSearch = document.getElementById('sound-search');
+  var soundResults = document.getElementById('sound-results');
+
+  function updateSoundButton() {
+    var icon = soundMuted ? '\uD83D\uDD07' : '\uD83D\uDD0A';
+    var text = soundMuted ? 'ללא התראה קולית' : (soundLocation === 'all' ? 'צליל מופעל' : soundLocation);
+    soundBtnRow.querySelector('.btn-icon').textContent = icon;
+    soundBtnRow.querySelector('.btn-text').textContent = text;
+    soundBtn.title = soundMuted ? 'השמעת צלילים' : 'צלילים: ' + (soundLocation === 'all' ? 'כל הארץ' : soundLocation);
+  }
+  updateSoundButton();
+
+  function isSoundOpen() { return soundBtn.classList.contains('open'); }
+
+  function openSoundPanel() {
+    closeTimelinePanel();
+    map.closePopup();
+    soundBtn.classList.add('open');
+    pushPanelHistory();
+    soundSearch.value = '';
+    soundResults.innerHTML = '';
+    soundSearch.focus();
+    updateOverlay();
+  }
+
+  function closeSoundPanel() {
+    soundBtn.classList.remove('open');
+    updateOverlay();
+  }
+
+  function selectSoundLocation(loc) {
+    soundLocation = loc;
+    soundMuted = false;
+    updateSoundButton();
+    try {
+      localStorage.setItem('oref-sound-muted', 'false');
+      localStorage.setItem('oref-sound-location', loc);
+    } catch(e) {}
+    getAudioContext();
+    closeSoundPanel();
+    popPanelHistory();
+  }
+
+  soundBtnRow.addEventListener('click', function() {
+    if (isSoundOpen()) {
+      closeSoundPanel();
+      popPanelHistory();
+    } else if (soundMuted) {
+      openSoundPanel();
+    } else {
+      soundMuted = true;
+      updateSoundButton();
+      try { localStorage.setItem('oref-sound-muted', 'true'); } catch(e) {}
+    }
+  });
+
+  document.getElementById('sound-all-btn').addEventListener('click', function() {
+    selectSoundLocation('all');
+  });
+
+  document.getElementById('test-danger-btn').addEventListener('click', function() {
+    playDangerSound();
+  });
+  document.getElementById('test-all-clear-btn').addEventListener('click', function() {
+    playAllClearSound();
+  });
+
+  soundSearch.addEventListener('input', function() {
+    var q = soundSearch.value.trim();
+    if (q.length < 2) {
+      soundResults.innerHTML = '';
+      return;
+    }
+    var matches = Object.keys(locationPolygons).filter(function(name) {
+      return name.includes(q);
+    }).slice(0, 20);
+    
+    soundResults.innerHTML = matches.map(function(m) {
+      return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
+    }).join('');
+  });
+
+  soundResults.addEventListener('click', function(e) {
+    var item = e.target.closest('.location-item');
+    if (item) {
+      selectSoundLocation(item.getAttribute('data-name'));
+    }
+  });
+
+  // --- Mobile back button closes panels ---
+  window.addEventListener('popstate', function() {
+    panelHistoryPushed = false;
+    closeSoundPanel();
+    closeTimelinePanel();
+
+    var statsBtn = document.getElementById('stats-btn');
+    if (statsBtn && statsBtn.classList.contains('open')) {
+        statsBtn.classList.remove('open');
+        isStatsMode = false;
+        enterLiveMode();
+    }
+
+    map.closePopup();
+  });
+
+  // --- Click outside to close panels ---
+  document.addEventListener('click', function(e) {
+    var closed = false;
+    if (soundBtn.classList.contains('open') && !soundBtn.contains(e.target)) {
+      closeSoundPanel();
+      closed = true;
+    }
+    if (closed) popPanelHistory();
+    if (openPopupName && !isStatsMode) {
+      var mapContainer = document.getElementById('map');
+      var popupEl = document.querySelector('.leaflet-popup');
+      if (!mapContainer.contains(e.target) && (!popupEl || !popupEl.contains(e.target))) {
+        map.closePopup();
+      }
+    }
+  });
+
+  // --- Mobile resume: reload if data is stale ---
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    try {
+      var lastPoll = Number(sessionStorage.getItem('oref-last-poll')) || 0;
+      if (Date.now() - lastPoll < 30000) return;
+      var lastReload = Number(sessionStorage.getItem('oref-reload-ts')) || 0;
+      if (Date.now() - lastReload < 60000) return; // prevent reload loop
+      sessionStorage.setItem('oref-reload-ts', String(Date.now()));
+    } catch(e) { return; }
+    location.reload();
+  });
+
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    document.title = '';
+  }
+
+  init();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}
+</script>
 </body>
 </html>
