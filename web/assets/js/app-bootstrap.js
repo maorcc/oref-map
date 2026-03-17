@@ -307,8 +307,8 @@
   function initLocationButton() {
     var locationBtn = document.getElementById('location-btn');
     locationBtn.addEventListener('click', function () {
-      if (userMarker) {
-        map.setView(userMarker.getLatLng(), 13);
+      if (userLocationMarker) {
+        map.setView(userLocationMarker.getLatLng(), 13);
       } else {
         map.locate({setView: true, maxZoom: 13});
       }
