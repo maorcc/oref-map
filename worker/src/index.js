@@ -17,8 +17,9 @@ const TZEVA_ADOM_TARGET = 'https://tzevadom.com/api/alerts-history/summary/custo
 const TZEVA_ADOM_TO_OFFICIAL_API = {
   0: 1,
   2: 3,
+  3: 2, // an old alert type used only on2 26/10/2024 04:02 for Drone from Lebanon
   5: 2,
-  11: 14,
+  11: 14
 };
 
 const OFFICIAL_CATEGORY_MAP = {
@@ -31,8 +32,8 @@ const OFFICIAL_CATEGORY_MAP = {
   7: "אירוע רדיולוגי",
   10: "חשש לאירוע ביולוגי",
   13: "האירוע הסתיים",
-  14: "התרעה מוקדמת",
-  99: "ללא שיוך" // Added from functions/api/alarms-history.js
+  14: "בדקות הקרובות צפויות להתקבל התרעות באזורך",
+  99: "ללא שיוך"
 };
 
 const ROUTES = {

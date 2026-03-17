@@ -106,7 +106,7 @@ function initUserLocation() {
   function showToast(msg) {
     var el = document.createElement('div');
     el.textContent = msg;
-    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toastFade 3s forwards;pointer-events:none;';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toast-fade 3s forwards;pointer-events:none;';
     document.body.appendChild(el);
     setTimeout(function() { el.remove(); }, 3000);
   }
