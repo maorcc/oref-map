@@ -961,10 +961,11 @@ function processHistoryEntry(entry) {
   var state = classifyTitle(title);
   // History `data` is a string (single location)
   var location = (typeof entry.data === 'string' ? entry.data : String(entry.data)).trim();
-  if (location && !locationPolygons[location] && !missingPolygonLocations.has(location)) {
-    missingPolygonLocations.add(location);
-    console.warn('History location missing from polygons:', location, entry);
-  }
+  // Check If the location is valid and has a polygon - This is time-consuming...
+  // if (location && !locationPolygons[location] && !missingPolygonLocations.has(location)) {
+  //   missingPolygonLocations.add(location);
+  //   console.warn('History location missing from polygons:', location, entry);
+  // }
   var since = parseAlertDate(entry.alertDate) || Date.now();
   if (state !== 'green' && since > lastDangerTime) lastDangerTime = since;
   recordHistory(location, title, entry.alertDate || '', state);
