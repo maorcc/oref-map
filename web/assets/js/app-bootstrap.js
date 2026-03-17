@@ -1,4 +1,4 @@
-﻿(function() {
+﻿(function () {
   'use strict';
 
   // --- State ---
@@ -11,7 +11,7 @@
   function pushPanelHistory() {
     if (!panelHistoryPushed) {
       try {
-        history.pushState({ panelOpen: true }, '');
+        history.pushState({panelOpen: true}, '');
         panelHistoryPushed = true;
       } catch (e) {
         console.warn('Could not push panel history state', e);
@@ -32,8 +32,10 @@
 
   // --- Init ---
   function init() {
-    fetch('locations_polygons.json').then(function(r) { return r.json(); })
-      .then(function(data) {
+    fetch('locations_polygons.json').then(function (r) {
+      return r.json();
+    })
+      .then(function (data) {
         buildPolygons(data);
 
         function onHistoryDone() {
@@ -53,10 +55,12 @@
 
           // Start data polling and UI updates
           setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-          setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+          setInterval(function () {
+            fetchHistory();
+          }, HISTORY_POLL_MS);
           setInterval(fadeGreenMarkers, FADE_TICK_MS);
           fetchLiveAlerts();
-          fetchExtendedHistory(null, null, null, '1', { context: 'bootstrap', modeKey: '1' });
+          fetchExtendedHistory(null, null, null, '1', {context: 'bootstrap', modeKey: '1'});
           updateLiveStatus();
 
           // Show hint for mobile users
@@ -73,21 +77,21 @@
 
         fetchHistory(onHistoryDone);
 
-      }).catch(function(err) {
-        console.error('Failed to load geo data:', err);
-        setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
-      });
+      }).catch(function (err) {
+      console.error('Failed to load geo data:', err);
+      setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
+    });
   }
 
   // --- Panel initializers ---
   function initAboutPanel() {
-    document.getElementById('page-title').addEventListener('click', function() {
+    document.getElementById('page-title').addEventListener('click', function () {
       document.getElementById('about-backdrop').classList.add('visible');
     });
-    document.getElementById('about-close').addEventListener('click', function() {
+    document.getElementById('about-close').addEventListener('click', function () {
       document.getElementById('about-backdrop').classList.remove('visible');
     });
-    document.getElementById('about-backdrop').addEventListener('click', function(e) {
+    document.getElementById('about-backdrop').addEventListener('click', function (e) {
       if (e.target === this) {
         document.getElementById('about-backdrop').classList.remove('visible');
       }
@@ -97,7 +101,7 @@
   function initErrorDisplay() {
     var statusEl = document.getElementById('status');
     var detailEl = document.getElementById('errorDetail');
-    statusEl.addEventListener('click', function() {
+    statusEl.addEventListener('click', function () {
       var dot = document.getElementById('statusDot');
       if (!dot.classList.contains('indicator-err')) return;
       if (detailEl.style.display === 'block') {
@@ -107,7 +111,7 @@
         detailEl.style.display = 'block';
       }
     });
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
       if (detailEl.style.display === 'block' && !statusEl.contains(e.target) && e.target !== detailEl) {
         detailEl.style.display = 'none';
       }
@@ -143,7 +147,7 @@
       updateOverlay();
     }
 
-    window.closeSoundPanel = function() {
+    window.closeSoundPanel = function () {
       soundBtn.classList.remove('open');
       updateOverlay();
     };
@@ -155,7 +159,8 @@
       try {
         localStorage.setItem('oref-sound-muted', 'false');
         localStorage.setItem('oref-sound-location', loc);
-      } catch(e) {}
+      } catch (e) {
+      }
       getAudioContext();
       closeSoundPanel();
       popPanelHistory();
@@ -163,7 +168,7 @@
 
     updateSoundButton();
 
-    soundBtnRow.addEventListener('click', function() {
+    soundBtnRow.addEventListener('click', function () {
       if (soundBtn.classList.contains('open')) {
         closeSoundPanel();
         popPanelHistory();
@@ -172,29 +177,32 @@
       } else {
         soundMuted = true;
         updateSoundButton();
-        try { localStorage.setItem('oref-sound-muted', 'true'); } catch(e) {}
+        try {
+          localStorage.setItem('oref-sound-muted', 'true');
+        } catch (e) {
+        }
       }
     });
 
-    document.getElementById('sound-all-btn').addEventListener('click', function() {
+    document.getElementById('sound-all-btn').addEventListener('click', function () {
       selectSoundLocation('all');
     });
 
-    soundSearch.addEventListener('input', function() {
+    soundSearch.addEventListener('input', function () {
       var q = soundSearch.value.trim();
       if (q.length < 2) {
         soundResults.innerHTML = '';
         return;
       }
-      var matches = Object.keys(locationPolygons).filter(function(name) {
+      var matches = Object.keys(locationPolygons).filter(function (name) {
         return name.includes(q);
       }).slice(0, 20);
-      soundResults.innerHTML = matches.map(function(m) {
+      soundResults.innerHTML = matches.map(function (m) {
         return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
       }).join('');
     });
 
-    soundResults.addEventListener('click', function(e) {
+    soundResults.addEventListener('click', function (e) {
       var item = e.target.closest('.location-item');
       if (item) {
         selectSoundLocation(item.getAttribute('data-name'));
@@ -212,20 +220,20 @@
       'tzeva-adom': tzevaAdomText
     };
 
-    document.querySelectorAll('.history-provider-control').forEach(function(wrapper) {
+    document.querySelectorAll('.history-provider-control').forEach(function (wrapper) {
       wrapper.title = 'מקור נתוני היסטוריה';
     });
 
     function updateSelects() {
       var provider = getHistoryProvider();
-      document.querySelectorAll('.history-provider-select').forEach(function(select) {
+      document.querySelectorAll('.history-provider-select').forEach(function (select) {
         if (select.value !== provider) {
           select.value = provider;
         }
       });
     }
 
-    document.querySelectorAll('.history-provider-select').forEach(function(select) {
+    document.querySelectorAll('.history-provider-select').forEach(function (select) {
       function getContext() {
         return select.getAttribute('data-history-context') || 'default';
       }
@@ -275,7 +283,7 @@
 
       rebuildOptions();
 
-      select.addEventListener('change', function(e) {
+      select.addEventListener('change', function (e) {
         setHistoryProvider(e.target.value);
       });
 
@@ -288,31 +296,31 @@
   }
 
   function initTestButtons() {
-    document.getElementById('test-danger-btn').addEventListener('click', function() {
+    document.getElementById('test-danger-btn').addEventListener('click', function () {
       playDangerSound();
     });
-    document.getElementById('test-all-clear-btn').addEventListener('click', function() {
+    document.getElementById('test-all-clear-btn').addEventListener('click', function () {
       playAllClearSound();
     });
   }
 
   function initLocationButton() {
     var locationBtn = document.getElementById('location-btn');
-    locationBtn.addEventListener('click', function() {
+    locationBtn.addEventListener('click', function () {
       if (userMarker) {
         map.setView(userMarker.getLatLng(), 13);
       } else {
-        map.locate({ setView: true, maxZoom: 13 });
+        map.locate({setView: true, maxZoom: 13});
       }
     });
   }
 
   function initLocateButton() {
     var locateBtn = document.getElementById('locate-btn');
-    locateBtn.addEventListener('click', function() {
+    locateBtn.addEventListener('click', function () {
       if (isZoomedToEvent) {
         isZoomingProgrammatically = true;
-        map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+        map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, {duration: 0.7});
         isZoomedToEvent = false;
       } else {
         maybeZoomToEvent();
@@ -321,7 +329,7 @@
   }
 
   // --- Global event listeners ---
-  window.addEventListener('popstate', function() {
+  window.addEventListener('popstate', function () {
     panelHistoryPushed = false;
     if (typeof closeSoundPanel === 'function') closeSoundPanel();
     if (typeof closeTimelinePanel === 'function') closeTimelinePanel();
@@ -332,7 +340,7 @@
     map.closePopup();
   });
 
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       document.getElementById('about-backdrop').classList.remove('visible');
       if (typeof closeSoundPanel === 'function' && document.getElementById('sound-btn').classList.contains('open')) {
@@ -344,7 +352,7 @@
     }
   });
 
-  document.addEventListener('click', function(e) {
+  document.addEventListener('click', function (e) {
     var soundBtn = document.getElementById('sound-btn');
     if (soundBtn.classList.contains('open') && !soundBtn.contains(e.target)) {
       if (typeof closeSoundPanel === 'function') {
@@ -362,7 +370,7 @@
   });
 
   // --- Mobile resume handling ---
-  document.addEventListener('visibilitychange', function() {
+  document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') return;
     try {
       var lastPoll = Number(sessionStorage.getItem('oref-last-poll')) || 0;
@@ -371,7 +379,8 @@
       if (Date.now() - lastReload < 60000) return;
       sessionStorage.setItem('oref-reload-ts', String(Date.now()));
       location.reload();
-    } catch(e) { /* ignore */ }
+    } catch (e) { /* ignore */
+    }
   });
 
   // --- PWA adjustments ---
@@ -385,7 +394,9 @@
     if (hint) {
       hint.style.display = 'block';
       localStorage.setItem('tapHintShown', '1');
-      hint.addEventListener('animationend', function() { hint.remove(); });
+      hint.addEventListener('animationend', function () {
+        hint.remove();
+      });
     }
   }
 

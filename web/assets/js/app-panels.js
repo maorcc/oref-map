@@ -1,4 +1,4 @@
-﻿window.initStats = function() {
+﻿window.initStats = function () {
   var statsBtn = document.getElementById('stats-btn');
   var btnRow = document.getElementById('stats-btn-row');
   var customDatesDiv = document.getElementById('stats-custom-dates');
@@ -8,7 +8,7 @@
   var rangeLabelDiv = document.getElementById('stats-range-label');
 
   var currentStatsMode = 1; // 1=24h, 2=7d, 3=30d, 0=custom
-  window.getStatsModeKey = function() {
+  window.getStatsModeKey = function () {
     return String(currentStatsMode || 1);
   };
   var currentStatsEntries = [];
@@ -23,7 +23,7 @@
   toDateInput.max = maxDateStr;
 
   var yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  fromDateInput.value = yesterday.getFullYear() + '-' + String(yesterday.getMonth()+1).padStart(2,'0') + '-' + String(yesterday.getDate()).padStart(2,'0');
+  fromDateInput.value = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
   toDateInput.value = maxDateStr;
 
   function parseIsoDayStart(dayStr) {
@@ -89,7 +89,7 @@
   }
 
   function setModeButtonStyles(mode) {
-    document.querySelectorAll('.stats-mode-btn').forEach(function(btn) {
+    document.querySelectorAll('.stats-mode-btn').forEach(function (btn) {
       if (btn.getAttribute('data-mode') === String(mode)) {
         btn.style.background = '#93c5fd';
         btn.style.borderColor = '#3b82f6';
@@ -124,7 +124,7 @@
   }
 
   function escapeHtml(value) {
-    return String(value || '').replace(/[&<>"']/g, function(ch) {
+    return String(value || '').replace(/[&<>"']/g, function (ch) {
       if (ch === '&') return '&amp;';
       if (ch === '<') return '&lt;';
       if (ch === '>') return '&gt;';
@@ -191,10 +191,10 @@
       rows += '<div style="display:flex;align-items:center;gap:8px;direction:ltr;margin:3px 0;">' +
         '<span style="width:42px;font-size:11px;color:#555;text-align:left;">' + hourLabel + '</span>' +
         '<div style="flex:1;height:10px;background:#f1f5f9;border-radius:999px;overflow:hidden;">' +
-          (count > 0 ? '<span style="display:block;height:100%;width:' + barWidth + '%;background:#f59e0b;"></span>' : '') +
+        (count > 0 ? '<span style="display:block;height:100%;width:' + barWidth + '%;background:#f59e0b;"></span>' : '') +
         '</div>' +
         '<span style="width:24px;font-size:11px;color:#111;text-align:right;">' + count + '</span>' +
-      '</div>';
+        '</div>';
     }
 
     var minuteBars = '';
@@ -213,10 +213,10 @@
     var minuteHistogramHtml =
       '<div style="margin-top:10px;font-size:12px;color:#333;">\u05e4\u05d9\u05dc\u05d5\u05d7 \u05d4\u05ea\u05e8\u05e2\u05d5\u05ea \u05dc\u05e4\u05d9 \u05d3\u05e7\u05d4 \u05d1\u05e9\u05e2\u05d4 (00-59)</div>' +
       '<div style="margin-top:4px;border:1px solid #e5e7eb;border-radius:6px;padding:6px;">' +
-        '<div style="display:grid;grid-template-columns:repeat(60,minmax(0,1fr));column-gap:1px;align-items:end;height:36px;direction:ltr;">' + minuteBars + '</div>' +
-        '<div style="display:flex;justify-content:space-between;font-size:10px;color:#666;direction:ltr;margin-top:4px;">' +
-          '<span>00</span><span>15</span><span>30</span><span>45</span><span>59</span>' +
-        '</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(60,minmax(0,1fr));column-gap:1px;align-items:end;height:36px;direction:ltr;">' + minuteBars + '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10px;color:#666;direction:ltr;margin-top:4px;">' +
+      '<span>00</span><span>15</span><span>30</span><span>45</span><span>59</span>' +
+      '</div>' +
       '</div>';
 
     var emptyText = stats.total === 0
@@ -228,7 +228,7 @@
       '<div style="margin-top:4px;font-size:12px;color:#555;">קטגוריה: ' + safeCategory + '</div>' +
       '<div style="margin-top:4px;font-size:13px;color:#111;font-weight:bold;">סה״כ התרעות: ' + stats.total + '</div>' +
       emptyText +
-    '</div>';
+      '</div>';
   }
 
   function applyStatsHeatMap(entries) {
@@ -261,9 +261,9 @@
       p.setStyle(getStatsStyle(locName));
       p.unbindTooltip();
       if (count > 0) {
-        p.bindTooltip('<b>' + locName + '</b><br>התרעות: ' + count, { direction: 'top', offset: [0, -20] });
+        p.bindTooltip('<b>' + locName + '</b><br>התרעות: ' + count, {direction: 'top', offset: [0, -20]});
       } else {
-        p.bindTooltip(locName, { direction: 'top', offset: [0, -20] });
+        p.bindTooltip(locName, {direction: 'top', offset: [0, -20]});
       }
     }
 
@@ -290,7 +290,7 @@
     categorySelect.disabled = true;
     categorySelect.innerHTML = '<option value="all">טוען...</option>';
 
-    fetchExtendedHistory(req.fromDate, req.toDate, function(entries) {
+    fetchExtendedHistory(req.fromDate, req.toDate, function (entries) {
       if (myToken !== statsLoadToken || !statsBtn.classList.contains('open')) return;
 
       var filtered = [];
@@ -303,7 +303,7 @@
       populateCategories(filtered);
       categorySelect.disabled = false;
       applyStatsHeatMap(filtered);
-    }, req.mode, { replaceHistory: true, context: 'stats', modeKey: req.modeKey });
+    }, req.mode, {replaceHistory: true, context: 'stats', modeKey: req.modeKey});
   }
 
   function setStatsMode(mode) {
@@ -313,7 +313,7 @@
     customDatesDiv.style.display = (currentStatsMode === 0) ? 'block' : 'none';
     updateRangeLabel();
     window.dispatchEvent(new CustomEvent('history-provider-mode-changed', {
-      detail: { context: 'stats', modeKey: String(currentStatsMode) }
+      detail: {context: 'stats', modeKey: String(currentStatsMode)}
     }));
     reloadStatsData();
   }
@@ -332,15 +332,15 @@
       var p = locationPolygons[name];
       p.setStyle(BASE_STYLE);
       p.unbindTooltip();
-      p.bindTooltip(name, { direction: 'top', offset: [0, -20] });
+      p.bindTooltip(name, {direction: 'top', offset: [0, -20]});
     }
 
     enterLiveMode();
     updateOverlay();
   }
 
-  document.querySelectorAll('.stats-mode-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
+  document.querySelectorAll('.stats-mode-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
       e.preventDefault();
       var mode = btn.getAttribute('data-mode');
       if (String(currentStatsMode) === mode) return;
@@ -348,7 +348,7 @@
     });
   });
 
-  var onCustomDateChange = function() {
+  var onCustomDateChange = function () {
     if (currentStatsMode !== 0) return;
     updateRangeLabel();
     reloadStatsData();
@@ -356,12 +356,12 @@
   fromDateInput.addEventListener('change', onCustomDateChange);
   toDateInput.addEventListener('change', onCustomDateChange);
 
-  categorySelect.addEventListener('change', function() {
+  categorySelect.addEventListener('change', function () {
     if (!statsBtn.classList.contains('open') || !isStatsMode) return;
     applyStatsHeatMap(currentStatsEntries);
   });
 
-  btnRow.addEventListener('click', function(e) {
+  btnRow.addEventListener('click', function (e) {
     if (e.target.classList.contains('tl-close')) {
       closeStats();
       popPanelHistory();
@@ -379,7 +379,7 @@
     setStatsMode(1);
   });
 
-  statsBtn.querySelector('.tl-close').addEventListener('click', function(e) {
+  statsBtn.querySelector('.tl-close').addEventListener('click', function (e) {
     e.stopPropagation();
     if (statsBtn.classList.contains('open')) {
       closeStats();
@@ -387,14 +387,14 @@
     }
   });
 
-  window.addEventListener('history-provider-changed', function() {
+  window.addEventListener('history-provider-changed', function () {
     if (statsBtn.classList.contains('open')) {
       reloadStatsData();
     }
   });
 }
 
-window.initTimeline = function() {
+window.initTimeline = function () {
   var container = document.getElementById('timeline-btn');
   var btnRow = document.getElementById('timeline-btn-row');
   var slider = document.getElementById('timeline-slider');
@@ -410,13 +410,13 @@ window.initTimeline = function() {
   var nextBtn = document.getElementById('tl-next');
   var ticksEl = document.getElementById('timeline-ticks');
 
-  var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
+  var TICK_COLORS = {red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71'};
   var PLAY_SPEED = 600;
 
   var viewTimelineMin = 0;
   var viewTimelineMax = 0;
   var timelineMode = '3h'; // '3h', '24h' or 'date'
-  window.getTimelineModeKey = function() {
+  window.getTimelineModeKey = function () {
     return timelineMode || '3h';
   };
 
@@ -458,15 +458,15 @@ window.initTimeline = function() {
     datePicker.style.display = (mode === 'date') ? 'inline-block' : 'none';
 
     window.dispatchEvent(new CustomEvent('history-provider-mode-changed', {
-      detail: { context: 'timeline', modeKey: timelineMode }
+      detail: {context: 'timeline', modeKey: timelineMode}
     }));
   }
 
   function getTodayIsoDate() {
     var now = new Date();
     return now.getFullYear() + '-' +
-           String(now.getMonth() + 1).padStart(2, '0') + '-' +
-           String(now.getDate()).padStart(2, '0');
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
   }
 
   function parseIsoDayStart(dayStr) {
@@ -548,45 +548,48 @@ window.initTimeline = function() {
   }
 
   var timelineLoadToken = 0;
+
   function reloadTimelineData() {
     var req = buildTimelineRequest();
     var myToken = ++timelineLoadToken;
-    fetchExtendedHistory(req.fromDate, req.toDate, function() {
+    fetchExtendedHistory(req.fromDate, req.toDate, function () {
       if (myToken !== timelineLoadToken) return;
       container.classList.add('has-data');
       applyTimelineRange(req.startMs, req.endMs);
-    }, req.mode, { replaceHistory: true, context: 'timeline', modeKey: req.modeKey });
+    }, req.mode, {replaceHistory: true, context: 'timeline', modeKey: req.modeKey});
   }
 
 
   // Mode button handlers
-  mode3hBtn.addEventListener('click', function() {
+  mode3hBtn.addEventListener('click', function () {
     stopPlay();
     datePicker.value = getTodayIsoDate();
     setTimelineMode('3h');
     reloadTimelineData();
   });
-  mode24hBtn.addEventListener('click', function() {
+  mode24hBtn.addEventListener('click', function () {
     stopPlay();
     datePicker.value = getTodayIsoDate();
     setTimelineMode('24h');
     reloadTimelineData();
   });
 
-  modeDateBtn.addEventListener('click', function() {
+  modeDateBtn.addEventListener('click', function () {
     stopPlay();
     setTimelineMode('date');
     reloadTimelineData();
   });
 
-  datePicker.addEventListener('change', function() {
+  datePicker.addEventListener('change', function () {
     if (timelineMode !== 'date') return;
     stopPlay();
     reloadTimelineData();
   });
 
   // --- Open / Close ---
-  function isOpen() { return container.classList.contains('open'); }
+  function isOpen() {
+    return container.classList.contains('open');
+  }
 
   function openTimeline() {
     closeSoundPanel();
@@ -611,14 +614,15 @@ window.initTimeline = function() {
     stopPlay();
 
     isZoomingProgrammatically = true;
-    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, {duration: 0.7});
     isZoomedToEvent = false;
     enterLiveMode();
     updateOverlay();
   }
+
   closeTimelinePanel = closeTimeline;
 
-  openTimelineToLastEvent = function() {
+  openTimelineToLastEvent = function () {
     if (extendedHistory.length === 0) return;
     if (!isOpen()) openTimeline();
     else computeEventPeaks();
@@ -627,11 +631,11 @@ window.initTimeline = function() {
     else seekTo(viewTimelineMax);
   };
 
-  btnRow.addEventListener('click', function(e) {
+  btnRow.addEventListener('click', function (e) {
     if (e.target.classList.contains('tl-close')) {
-       closeTimeline();
-       popPanelHistory();
-       return;
+      closeTimeline();
+      popPanelHistory();
+      return;
     }
 
     if (isOpen()) {
@@ -642,23 +646,23 @@ window.initTimeline = function() {
   });
 
   // Explicit close handler for the X button
-  container.querySelector('.tl-close').addEventListener('click', function(e) {
-      e.stopPropagation();
-      if (isOpen()) {
-          closeTimeline();
-          popPanelHistory();
-      }
+  container.querySelector('.tl-close').addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (isOpen()) {
+      closeTimeline();
+      popPanelHistory();
+    }
   });
 
-  document.addEventListener('keydown', function(e) {
+  document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
       var statsBtn = document.getElementById('stats-btn');
       if (statsBtn && statsBtn.classList.contains('open')) {
-           statsBtn.querySelector('.tl-close').click();
+        statsBtn.querySelector('.tl-close').click();
       }
       if (isOpen()) {
-          closeTimeline();
-          popPanelHistory();
+        closeTimeline();
+        popPanelHistory();
       }
     }
   });
@@ -679,8 +683,8 @@ window.initTimeline = function() {
   function formatTime(ms) {
     var d = new Date(ms);
     return String(d.getHours()).padStart(2, '0') + ':' +
-           String(d.getMinutes()).padStart(2, '0') + ':' +
-           String(d.getSeconds()).padStart(2, '0');
+      String(d.getMinutes()).padStart(2, '0') + ':' +
+      String(d.getSeconds()).padStart(2, '0');
   }
 
   function clampTime(t) {
@@ -688,7 +692,7 @@ window.initTimeline = function() {
   }
 
   // --- Mode switching ---
-  window.enterLiveMode = function() {
+  window.enterLiveMode = function () {
     if (isLiveMode && !isStatsMode) return;
     isLiveMode = true;
     isStatsMode = false;
@@ -710,7 +714,7 @@ window.initTimeline = function() {
     document.getElementById('historyTimeLabel').style.display = 'block';
     document.getElementById('historyTimeLabel').textContent = 'מראה התרעות משעה ' + timeStr;
     reconstructStateAt(time);
-    }
+  }
 
   function seekTo(time) {
     time = clampTime(time);
@@ -720,13 +724,13 @@ window.initTimeline = function() {
   }
 
   // --- Slider input ---
-  slider.addEventListener('input', function() {
+  slider.addEventListener('input', function () {
     stopPlay();
     enterHistoryMode(timeFromSlider(parseInt(slider.value)));
   });
 
   // --- Timeline bands (show duration of active alerts) ---
-  var STATE_PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+  var STATE_PRIORITY = {red: 3, purple: 2, yellow: 1, green: 0};
   var computedBands = []; // [{start, end, state}] - visual tick bands
   var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
   var eventPeakSizes = []; // [number] — unique location count for each peak
@@ -773,7 +777,7 @@ window.initTimeline = function() {
     var locs = eventGroupLocs[idx];
     if (!locs) return null;
     var bounds = null;
-    locs.forEach(function(loc) {
+    locs.forEach(function (loc) {
       var polygon = locationPolygons[loc];
       if (!polygon) return;
       if (!bounds) bounds = L.latLngBounds(polygon.getBounds());
@@ -797,93 +801,95 @@ window.initTimeline = function() {
     // 1. Generate raw bands for each non-green event
     var rawBands = [];
     for (var i = 0; i < extendedHistory.length; i++) {
-        var event = extendedHistory[i];
-        if (event.state === 'green') continue;
+      var event = extendedHistory[i];
+      if (event.state === 'green') continue;
 
-        var endTime;
-        var nextEvent = null;
-        for (var j = i + 1; j < extendedHistory.length; j++) {
-            if (extendedHistory[j].location === event.location) {
-                nextEvent = extendedHistory[j];
-                break;
-            }
+      var endTime;
+      var nextEvent = null;
+      for (var j = i + 1; j < extendedHistory.length; j++) {
+        if (extendedHistory[j].location === event.location) {
+          nextEvent = extendedHistory[j];
+          break;
         }
+      }
 
-        var capTime = event.alertDate + TWENTY_MINS;
-        var endConditionMet = false;
-        if (nextEvent) {
-            if (event.state === 'yellow' && (nextEvent.state === 'green' || nextEvent.state === 'red' || nextEvent.state === 'purple')) {
-                endConditionMet = true;
-            } else if ((event.state === 'red' || event.state === 'purple') && nextEvent.state === 'green') {
-                endConditionMet = true;
-            }
+      var capTime = event.alertDate + TWENTY_MINS;
+      var endConditionMet = false;
+      if (nextEvent) {
+        if (event.state === 'yellow' && (nextEvent.state === 'green' || nextEvent.state === 'red' || nextEvent.state === 'purple')) {
+          endConditionMet = true;
+        } else if ((event.state === 'red' || event.state === 'purple') && nextEvent.state === 'green') {
+          endConditionMet = true;
         }
+      }
 
-        if (endConditionMet) {
-            endTime = Math.min(nextEvent.alertDate, capTime);
-        } else {
-            endTime = capTime;
-        }
+      if (endConditionMet) {
+        endTime = Math.min(nextEvent.alertDate, capTime);
+      } else {
+        endTime = capTime;
+      }
 
-        rawBands.push({
-            start: event.alertDate,
-            end: endTime,
-            state: event.state,
-            priority: STATE_PRIORITY[event.state]
-        });
+      rawBands.push({
+        start: event.alertDate,
+        end: endTime,
+        state: event.state,
+        priority: STATE_PRIORITY[event.state]
+      });
     }
 
     // 2. Merge bands by finding the dominant state over each time interval
     var points = new Set([viewTimelineMin, viewTimelineMax]);
     for (var k = 0; k < rawBands.length; k++) {
-        var band = rawBands[k];
-        if (band.start < viewTimelineMax && band.end > viewTimelineMin) {
-            points.add(Math.max(viewTimelineMin, band.start));
-            points.add(Math.min(viewTimelineMax, band.end));
-        }
+      var band = rawBands[k];
+      if (band.start < viewTimelineMax && band.end > viewTimelineMin) {
+        points.add(Math.max(viewTimelineMin, band.start));
+        points.add(Math.min(viewTimelineMax, band.end));
+      }
     }
 
-    var sortedPoints = Array.from(points).sort(function(a, b) { return a - b; });
+    var sortedPoints = Array.from(points).sort(function (a, b) {
+      return a - b;
+    });
     var mergedBands = [];
     for (var p = 0; p < sortedPoints.length - 1; p++) {
-        var start = sortedPoints[p];
-        var end = sortedPoints[p + 1];
-        if (start >= end) continue;
+      var start = sortedPoints[p];
+      var end = sortedPoints[p + 1];
+      if (start >= end) continue;
 
-        var midPoint = start + (end - start) / 2;
-        var bestState = 'green';
-        var bestPriority = -1;
+      var midPoint = start + (end - start) / 2;
+      var bestState = 'green';
+      var bestPriority = -1;
 
-        for (var b = 0; b < rawBands.length; b++) {
-            var rawBand = rawBands[b];
-            if (midPoint >= rawBand.start && midPoint < rawBand.end) {
-                if (rawBand.priority > bestPriority) {
-                    bestPriority = rawBand.priority;
-                    bestState = rawBand.state;
-                }
-            }
+      for (var b = 0; b < rawBands.length; b++) {
+        var rawBand = rawBands[b];
+        if (midPoint >= rawBand.start && midPoint < rawBand.end) {
+          if (rawBand.priority > bestPriority) {
+            bestPriority = rawBand.priority;
+            bestState = rawBand.state;
+          }
         }
+      }
 
-        if (bestState !== 'green') {
-            mergedBands.push({ start: start, end: end, state: bestState });
-        }
+      if (bestState !== 'green') {
+        mergedBands.push({start: start, end: end, state: bestState});
+      }
     }
 
     // 3. Coalesce adjacent bands of the same state
     if (mergedBands.length === 0) {
-        computedBands = [];
-        return;
+      computedBands = [];
+      return;
     }
     var finalBands = [];
     var currentBand = Object.assign({}, mergedBands[0]);
     for (var m = 1; m < mergedBands.length; m++) {
-        var nextBand = mergedBands[m];
-        if (nextBand.start === currentBand.end && nextBand.state === currentBand.state) {
-            currentBand.end = nextBand.end;
-        } else {
-            finalBands.push(currentBand);
-            currentBand = Object.assign({}, nextBand);
-        }
+      var nextBand = mergedBands[m];
+      if (nextBand.start === currentBand.end && nextBand.state === currentBand.state) {
+        currentBand.end = nextBand.end;
+      } else {
+        finalBands.push(currentBand);
+        currentBand = Object.assign({}, nextBand);
+      }
     }
     finalBands.push(currentBand);
     computedBands = finalBands;
@@ -896,18 +902,18 @@ window.initTimeline = function() {
 
     var frag = document.createDocumentFragment();
     for (var i = 0; i < computedBands.length; i++) {
-        var band = computedBands[i];
-        var startPct = ((band.start - viewTimelineMin) / range) * 100;
-        var endPct = ((band.end - viewTimelineMin) / range) * 100;
-        var widthPct = endPct - startPct;
+      var band = computedBands[i];
+      var startPct = ((band.start - viewTimelineMin) / range) * 100;
+      var endPct = ((band.end - viewTimelineMin) / range) * 100;
+      var widthPct = endPct - startPct;
 
-        if (widthPct <= 0) continue;
+      if (widthPct <= 0) continue;
 
-        var span = document.createElement('span');
-        span.style.left = startPct + '%';
-        span.style.width = widthPct + '%';
-        span.style.background = TICK_COLORS[band.state] || TICK_COLORS.red;
-        frag.appendChild(span);
+      var span = document.createElement('span');
+      span.style.left = startPct + '%';
+      span.style.width = widthPct + '%';
+      span.style.background = TICK_COLORS[band.state] || TICK_COLORS.red;
+      frag.appendChild(span);
     }
     ticksEl.appendChild(frag);
   }
@@ -916,8 +922,14 @@ window.initTimeline = function() {
   function stopPlay() {
     isPlaying = false;
     playBtn.textContent = '\u25B6';
-    if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
-    if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
+    if (playRAF) {
+      cancelAnimationFrame(playRAF);
+      playRAF = null;
+    }
+    if (playFlyHandler) {
+      map.off('moveend', playFlyHandler);
+      playFlyHandler = null;
+    }
   }
 
   var GAP_SKIP_MS = 1000; // real-time ms before skipping a dead gap
@@ -950,6 +962,7 @@ window.initTimeline = function() {
       gapEnterFrame = null;
       playEventIdx = -1;
     }
+
     function findEventIdx(time) {
       for (var i = 0; i < eventStarts.length; i++) {
         var end = (i + 1 < eventStarts.length) ? eventStarts[i + 1] : viewTimelineMax;
@@ -957,6 +970,7 @@ window.initTimeline = function() {
       }
       return -1;
     }
+
     function tick(now) {
       if (!isPlaying) return;
       var dt = now - lastFrame;
@@ -997,9 +1011,12 @@ window.initTimeline = function() {
         if (bounds) {
           isZoomingProgrammatically = true;
           isPlaying = false;
-          if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+          if (playRAF) {
+            cancelAnimationFrame(playRAF);
+            playRAF = null;
+          }
           if (playFlyHandler) map.off('moveend', playFlyHandler);
-          playFlyHandler = function() {
+          playFlyHandler = function () {
             map.off('moveend', playFlyHandler);
             playFlyHandler = null;
             isZoomingProgrammatically = false;
@@ -1008,22 +1025,23 @@ window.initTimeline = function() {
             playRAF = requestAnimationFrame(tick);
           };
           map.on('moveend', playFlyHandler);
-          map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+          map.flyToBounds(bounds, {padding: [80, 80], maxZoom: 10, duration: 0.7});
           return;
         }
       }
 
       playRAF = requestAnimationFrame(tick);
     }
+
     playRAF = requestAnimationFrame(tick);
   }
 
-  playBtn.addEventListener('click', function() {
+  playBtn.addEventListener('click', function () {
     if (isPlaying) stopPlay(); else startPlay();
   });
 
   // --- Prev / Next event peak ---
-  prevBtn.addEventListener('click', function() {
+  prevBtn.addEventListener('click', function () {
     stopPlay();
     for (var i = eventPeaks.length - 1; i >= 0; i--) {
       if (eventPeaks[i] < currentViewTime - 5000) {
@@ -1034,7 +1052,7 @@ window.initTimeline = function() {
     seekTo(viewTimelineMin);
   });
 
-  nextBtn.addEventListener('click', function() {
+  nextBtn.addEventListener('click', function () {
     stopPlay();
     for (var i = 0; i < eventPeaks.length; i++) {
       if (eventPeaks[i] > currentViewTime + 5000) {
@@ -1045,7 +1063,7 @@ window.initTimeline = function() {
     seekTo(viewTimelineMax);
   });
 
-  window.addEventListener('history-provider-changed', function() {
+  window.addEventListener('history-provider-changed', function () {
     if (isOpen()) {
       reloadTimelineData();
     }

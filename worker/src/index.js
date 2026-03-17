@@ -79,19 +79,19 @@ function formatYmd(dateObj) {
 
 // Updated formatIsoSeconds from functions/api/alarms-history.js
 function formatIsoSeconds(dateObj) {
-    const options = {
-        timeZone: 'Asia/Jerusalem',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false,
-    };
-    // The 'sv' locale (Swedish) is commonly used to get an ISO-like format.
-    // It produces 'YYYY-MM-DD HH:mm:ss'. We just need to replace the space with a 'T'.
-    return new Intl.DateTimeFormat('sv', options).format(dateObj).replace(' ', 'T');
+  const options = {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  };
+  // The 'sv' locale (Swedish) is commonly used to get an ISO-like format.
+  // It produces 'YYYY-MM-DD HH:mm:ss'. We just need to replace the space with a 'T'.
+  return new Intl.DateTimeFormat('sv', options).format(dateObj).replace(' ', 'T');
 }
 
 function parseDdMmYyyy(dateStr, endOfDay) {
@@ -138,10 +138,10 @@ function buildRange(modeRaw, fromDateStr, toDateStr) {
     const startDate = parseDdMmYyyy(fromDateStr, false);
     const endDate = parseDdMmYyyy(toDateStr, true);
     if (!startDate || !endDate) {
-      return { ok: false, status: 400, error: 'Invalid date format. Please use DD.MM.YYYY' };
+      return {ok: false, status: 400, error: 'Invalid date format. Please use DD.MM.YYYY'};
     }
     if (startDate.getTime() > endDate.getTime()) {
-      return { ok: false, status: 400, error: 'Invalid date range. fromDate must be earlier than or equal to toDate.' };
+      return {ok: false, status: 400, error: 'Invalid date range. fromDate must be earlier than or equal to toDate.'};
     }
     return {
       ok: true,
@@ -153,7 +153,7 @@ function buildRange(modeRaw, fromDateStr, toDateStr) {
     };
   }
 
-  return { ok: false, status: 400, error: 'Missing or invalid parameters' };
+  return {ok: false, status: 400, error: 'Missing or invalid parameters'};
 }
 
 function mapTzevaTypeToOfficialCategory(typeValue) {
@@ -232,11 +232,11 @@ function transformTzevaPayload(payload, startTs, endTs) {
     }
   }
 
-  transformed.sort(function(a, b) {
+  transformed.sort(function (a, b) {
     return b.__timestamp - a.__timestamp;
   });
 
-  return transformed.map(function(entry) {
+  return transformed.map(function (entry) {
     return {
       data: entry.data,
       alertDate: entry.alertDate,
@@ -290,7 +290,7 @@ export default {
       const providerRaw = url.searchParams.get('provider') || url.searchParams.get('service') || PROVIDERS.OFFICIAL;
       const provider = normalizeProvider(providerRaw);
       if (!provider) {
-        return jsonResponse({ error: 'Invalid provider. Supported values: Official, Tzeva Adom' }, 400);
+        return jsonResponse({error: 'Invalid provider. Supported values: Official, Tzeva Adom'}, 400);
       }
 
       const mode = url.searchParams.get('mode') || '1';
@@ -300,7 +300,7 @@ export default {
       if (provider === PROVIDERS.TZEVA_ADOM) {
         const range = buildRange(mode, fromDate, toDate);
         if (!range.ok) {
-          return jsonResponse({ error: range.error }, range.status || 400);
+          return jsonResponse({error: range.error}, range.status || 400);
         }
 
         try {
@@ -331,7 +331,7 @@ export default {
       const target = targetUrl.toString();
       const colo = request.cf?.colo || '';
       const cache = caches.default;
-      const cacheKey = new Request(url.toString(), { method: 'GET' });
+      const cacheKey = new Request(url.toString(), {method: 'GET'});
 
       const cached = await cache.match(cacheKey);
       if (cached) {
@@ -342,8 +342,22 @@ export default {
         return resp;
       }
 
-      const resp = await fetch(target, { headers: OREF_HEADERS });
-      const body = await resp.arrayBuffer();
+      let resp;
+      let body;
+      try {
+        resp = await fetch(target, {headers: OREF_HEADERS});
+        body = await resp.arrayBuffer();
+      } catch (error) {
+        return jsonResponse(
+          {error: 'Official provider upstream fetch failed'},
+          502,
+          {
+            'Cache-Control': 'no-store',
+            'X-CF-Colo': colo,
+            'X-Served-By': 'worker',
+          }
+        );
+      }
 
       const response = new Response(body, {
         status: resp.status,
@@ -368,12 +382,12 @@ export default {
     let target = ROUTES[url.pathname];
     if (!target) return new Response('Not found', {
       status: 404,
-      headers: { 'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN },
+      headers: {'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN},
     });
 
     const colo = request.cf?.colo || '';
     const cache = caches.default;
-    const cacheKey = new Request(url.toString(), { method: 'GET' });
+    const cacheKey = new Request(url.toString(), {method: 'GET'});
 
     const cached = await cache.match(cacheKey);
     if (cached) {
@@ -384,8 +398,23 @@ export default {
       return resp;
     }
 
-    const resp = await fetch(target, { headers: OREF_HEADERS });
-    const body = await resp.arrayBuffer();
+    let resp;
+    let body;
+    try {
+      resp = await fetch(target, {headers: OREF_HEADERS});
+      body = await resp.arrayBuffer();
+    } catch (error) {
+      return new Response('Upstream fetch failed', {
+        status: 502,
+        headers: {
+          'Access-Control-Allow-Origin': CORS_ALLOW_ORIGIN,
+          'Access-Control-Expose-Headers': CORS_EXPOSE_HEADERS,
+          'Cache-Control': 'no-store',
+          'X-CF-Colo': colo,
+          'X-Served-By': 'worker',
+        },
+      });
+    }
 
     const response = new Response(body, {
       status: resp.status,

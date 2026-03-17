@@ -22,13 +22,17 @@ function apiFetch(endpoint) {
   var url = PROXY_BASE + apiPrefix + '/' + endpoint;
   var wasProxy = apiPrefix === '/api2';
 
-  return fetch(url).then(function(resp) {
-    if (!resp.ok && wasProxy) { resetProxy(); }
+  return fetch(url).then(function (resp) {
+    if (!resp.ok && wasProxy) {
+      resetProxy();
+    }
     return resp;
-  }, function(err) {
-    if (wasProxy) { resetProxy(); }
+  }, function (err) {
+    if (wasProxy) {
+      resetProxy();
+    }
     return Promise.reject(err);
-  }).then(function(resp) {
+  }).then(function (resp) {
     if (apiPrefix === '/api' && resp.url && resp.url.indexOf('/api2/') !== -1) {
       var u = new URL(resp.url);
       PROXY_BASE = u.origin !== location.origin ? u.origin : '';
@@ -49,8 +53,8 @@ var FADE_TICK_MS = 1000;
 
 // --- Map setup ---
 var DEFAULT_CENTER = [31.6, 34.8], DEFAULT_ZOOM = 8;
-var map = L.map('map', { preferCanvas: true, zoomControl: false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-L.control.zoom({ position: 'bottomleft' }).addTo(map);
+var map = L.map('map', {preferCanvas: true, zoomControl: false}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+L.control.zoom({position: 'bottomleft'}).addTo(map);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
@@ -60,7 +64,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 var isZoomedToEvent = false;
 var isZoomingProgrammatically = false;
 
-map.on('moveend', function() {
+map.on('moveend', function () {
   if (!isZoomingProgrammatically) isZoomedToEvent = false;
   isZoomingProgrammatically = false;
 });
@@ -71,7 +75,10 @@ var userLocationMarker = null;
 function initUserLocation() {
   var btn = document.getElementById('location-btn');
   var btnText = btn.querySelector('.btn-text');
-  if (!navigator.geolocation) { btn.style.display = 'none'; return; }
+  if (!navigator.geolocation) {
+    btn.style.display = 'none';
+    return;
+  }
 
   var icon = L.divIcon({
     html: '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>',
@@ -90,17 +97,26 @@ function initUserLocation() {
   }
 
   function setActive() {
-    if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+    if (transientTimeout) {
+      clearTimeout(transientTimeout);
+      transientTimeout = null;
+    }
     btnText.textContent = '';
     btnText.style.display = 'none';
     btn.title = 'הסר מיקום מהמפה';
   }
 
   function setTransient(msg) {
-    if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+    if (transientTimeout) {
+      clearTimeout(transientTimeout);
+      transientTimeout = null;
+    }
     btnText.style.display = '';
     btnText.textContent = msg;
-    transientTimeout = setTimeout(function() { transientTimeout = null; setIdle(); }, 3000);
+    transientTimeout = setTimeout(function () {
+      transientTimeout = null;
+      setIdle();
+    }, 3000);
   }
 
   function showToast(msg) {
@@ -108,17 +124,25 @@ function initUserLocation() {
     el.textContent = msg;
     el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toast-fade 3s forwards;pointer-events:none;';
     document.body.appendChild(el);
-    setTimeout(function() { el.remove(); }, 3000);
+    setTimeout(function () {
+      el.remove();
+    }, 3000);
   }
 
   function stopWatching() {
-    if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-    if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    if (userLocationMarker) {
+      map.removeLayer(userLocationMarker);
+      userLocationMarker = null;
+    }
   }
 
   function startWatching() {
     if (watchId !== null) return;
-    watchId = navigator.geolocation.watchPosition(function(pos) {
+    watchId = navigator.geolocation.watchPosition(function (pos) {
       var latlng = [pos.coords.latitude, pos.coords.longitude];
       if (!isInIsrael(latlng)) {
         stopWatching();
@@ -136,22 +160,26 @@ function initUserLocation() {
         userLocationMarker.setLatLng(latlng);
       }
       setActive();
-    }, function(err) {
+    }, function (err) {
       console.warn('Geolocation error:', err.code, err.message);
-      if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+      }
       setTransient('שגיאה בקבלת מיקום');
-    }, { enableHighAccuracy: false, maximumAge: 30000 });
+    }, {enableHighAccuracy: false, maximumAge: 30000});
   }
 
   if (navigator.permissions) {
-    navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+    navigator.permissions.query({name: 'geolocation'}).then(function (result) {
       if (result.state === 'granted' && localStorage.getItem('oref-location-hidden') !== 'true') {
         startWatching();
       }
-    }).catch(function() {});
+    }).catch(function () {
+    });
   }
 
-  document.getElementById('location-btn-row').addEventListener('click', function() {
+  document.getElementById('location-btn-row').addEventListener('click', function () {
     if (watchId !== null || userLocationMarker) {
       stopWatching();
       showToast('מיקום הוסר מהמפה');
@@ -211,7 +239,8 @@ try {
   soundMuted = localStorage.getItem('oref-sound-muted') !== 'false';
   soundLocation = localStorage.getItem('oref-sound-location') || 'all';
   historyProvider = normalizeHistoryProvider(localStorage.getItem(HISTORY_PROVIDER_STORAGE_KEY));
-} catch(e) {}
+} catch (e) {
+}
 
 function normalizeHistoryProvider(value) {
   var normalized = String(value || HISTORY_PROVIDER_DEFAULT)
@@ -273,10 +302,11 @@ function setHistoryProvider(nextProvider) {
   historyProvider = normalized;
   try {
     localStorage.setItem(HISTORY_PROVIDER_STORAGE_KEY, historyProvider);
-  } catch(e) {}
+  } catch (e) {
+  }
 
   window.dispatchEvent(new CustomEvent('history-provider-changed', {
-    detail: { provider: historyProvider }
+    detail: {provider: historyProvider}
   }));
   return true;
 }
@@ -330,8 +360,10 @@ var currentViewTime = 0;
 var liveLocationStates = null; // shadow copy of live state
 var polygonHintInterval = null; // showPolygonHint animation interval
 var polygonHintTargets = null;  // targets being pulsed by showPolygonHint
-var closeTimelinePanel = function() {}; // set by initTimeline
-var openTimelineToLastEvent = function() {}; // set by initTimeline
+var closeTimelinePanel = function () {
+}; // set by initTimeline
+var openTimelineToLastEvent = function () {
+}; // set by initTimeline
 var currentTimelineDay = null; // track currently selected day in timeline
 
 // --- Stats mode state ---
@@ -342,12 +374,14 @@ var getStatsPopupHtml = null; // set by initStats()
 
 // --- Panel history (mobile back button closes panels) ---
 var panelHistoryPushed = false;
+
 function pushPanelHistory() {
   if (!panelHistoryPushed) {
-    history.pushState({ panel: true }, '');
+    history.pushState({panel: true}, '');
     panelHistoryPushed = true;
   }
 }
+
 function popPanelHistory() {
   if (panelHistoryPushed) {
     panelHistoryPushed = false;
@@ -359,8 +393,8 @@ function popPanelHistory() {
 var locationPolygons = {};  // name → L.polygon
 
 // --- Colors ---
-var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
-var BASE_STYLE = { fillColor: '#888', fillOpacity: 0.01, color: '#888', opacity: 0 };
+var COLORS = {red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00'};
+var BASE_STYLE = {fillColor: '#888', fillOpacity: 0.01, color: '#888', opacity: 0};
 
 // --- Sound ---
 function getAudioContext() {
@@ -421,16 +455,18 @@ function playDangerSound() {
     playSequence(dangerBuffer);
   } else {
     fetch('mixkit-clear-announce-tones-2861.wav')
-      .then(function(r) {
+      .then(function (r) {
         if (!r.ok) throw new Error('Fetch failed');
         return r.arrayBuffer();
       })
-      .then(function(b) { return ctx.decodeAudioData(b); })
-      .then(function(buffer) {
+      .then(function (b) {
+        return ctx.decodeAudioData(b);
+      })
+      .then(function (buffer) {
         dangerBuffer = buffer;
         playSequence(dangerBuffer);
       })
-      .catch(function(err) {
+      .catch(function (err) {
         console.error('Failed to play danger WAV, falling back to sine:', err);
         playFallback();
       });
@@ -496,12 +532,16 @@ function buildPolygons(data) {
     var latlngs;
     if (isNested) {
       // Polygon with holes: [[[outer]], [[hole1]], ...]
-      latlngs = coords.map(function(ring) {
-        return ring.map(function(c) { return [c[1], c[0]]; });
+      latlngs = coords.map(function (ring) {
+        return ring.map(function (c) {
+          return [c[1], c[0]];
+        });
       });
     } else {
       // Simple polygon: [[lng,lat], ...]
-      latlngs = coords.map(function(c) { return [c[1], c[0]]; });
+      latlngs = coords.map(function (c) {
+        return [c[1], c[0]];
+      });
     }
     var polygon = L.polygon(latlngs, {
       fillColor: '#888',
@@ -511,9 +551,9 @@ function buildPolygons(data) {
       weight: 1,
       interactive: true
     }).addTo(map);
-    polygon.bindTooltip(name, { direction: 'top', offset: [0, -20] });
-    (function(n, poly) {
-      poly.on('click', function() {
+    polygon.bindTooltip(name, {direction: 'top', offset: [0, -20]});
+    (function (n, poly) {
+      poly.on('click', function () {
         if (document.body.classList.contains('has-overlay')) return;
         if (isStatsMode) {
           var statsHtml = (typeof getStatsPopupHtml === 'function') ? getStatsPopupHtml(n) : '';
@@ -522,20 +562,20 @@ function buildPolygons(data) {
         }
         showPopup(n, poly);
       });
-      poly.on('mouseover', function() {
+      poly.on('mouseover', function () {
         if (document.body.classList.contains('has-overlay')) return;
         if (isStatsMode) {
-          poly.setStyle({ fillOpacity: 0.9, weight: 3 });
+          poly.setStyle({fillOpacity: 0.9, weight: 3});
         } else {
           poly.setStyle(ACTIVE_STYLE);
         }
       });
-      poly.on('mouseout', function() {
+      poly.on('mouseout', function () {
         if (isStatsMode) {
-           poly.setStyle(getStatsStyle(n));
+          poly.setStyle(getStatsStyle(n));
         } else {
-           if (openPopupName === n) return;
-           poly.setStyle(currentLocationStyle(n));
+          if (openPopupName === n) return;
+          poly.setStyle(currentLocationStyle(n));
         }
       });
     })(name, polygon);
@@ -550,9 +590,9 @@ function buildPolygons(data) {
     debugStyle.textContent = '.leaflet-overlay-pane path { stroke: #555 !important; stroke-opacity: 1 !important; stroke-width: 1 !important; }';
     document.head.appendChild(debugStyle);
     for (var n in locationPolygons) {
-      locationPolygons[n].setStyle({ fillOpacity: 0.05 });
+      locationPolygons[n].setStyle({fillOpacity: 0.05});
     }
-    L.rectangle([[29.4, 34.2], [33.4, 35.9]], { color: '#0000ff', weight: 2, fill: false }).addTo(map);
+    L.rectangle([[29.4, 34.2], [33.4, 35.9]], {color: '#0000ff', weight: 2, fill: false}).addTo(map);
   }
 
   console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
@@ -563,20 +603,20 @@ function classifyTitle(title) {
 
   // Green — all-clear / event over (fades out)
   if (title.includes('האירוע הסתיים') ||
-      (title.includes('ניתן לצאת') && !title.includes('להישאר בקרבתו')) ||
-      title.includes('החשש הוסר') ||
-      title.includes('יכולים לצאת') ||
-      title.includes('אינם צריכים לשהות') ||
-      title.includes('סיום שהייה בסמיכות') ||
-      title === 'עדכון') {
+    (title.includes('ניתן לצאת') && !title.includes('להישאר בקרבתו')) ||
+    title.includes('החשש הוסר') ||
+    title.includes('יכולים לצאת') ||
+    title.includes('אינם צריכים לשהות') ||
+    title.includes('סיום שהייה בסמיכות') ||
+    title === 'עדכון') {
     return 'green';
   }
 
   // Yellow — early warning / preparedness / stay near shelter
   if (title === 'בדקות הקרובות צפויות להתקבל התרעות באזורך' ||
-      title.includes('לשפר את המיקום למיגון המיטבי') ||
-      title === 'יש לשהות בסמיכות למרחב המוגן' ||
-      title.includes('להישאר בקרבתו')) {
+    title.includes('לשפר את המיקום למיגון המיטבי') ||
+    title === 'יש לשהות בסמיכות למרחב המוגן' ||
+    title.includes('להישאר בקרבתו')) {
     return 'yellow';
   }
 
@@ -587,10 +627,10 @@ function classifyTitle(title) {
 
   // Red — active danger (missiles / non-conventional / terrorists / shelter now)
   if (title === 'ירי רקטות וטילים' ||
-      title === 'נשק לא קונבנציונלי' ||
-      title === 'חדירת מחבלים' ||
-      title === 'היכנסו מייד למרחב המוגן' ||
-      title === 'היכנסו למרחב המוגן') {
+    title === 'נשק לא קונבנציונלי' ||
+    title === 'חדירת מחבלים' ||
+    title === 'היכנסו מייד למרחב המוגן' ||
+    title === 'היכנסו למרחב המוגן') {
     return 'red';
   }
 
@@ -603,7 +643,7 @@ function setLocationState(name, state, since) {
   var existing = locationStates[name];
 
   // Priority: red > purple > yellow. Green always overrides (all-clear).
-  var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+  var PRIORITY = {red: 3, purple: 2, yellow: 1, green: 0};
   if (existing) {
     if (state !== 'green') {
       if (existing.state === state) return;
@@ -675,7 +715,7 @@ function recordHistory(name, title, alertDate, state) {
       if (!ts && !existingTs) return;
     }
   }
-  arr.push({ title: title, alertDate: alertDate, state: state });
+  arr.push({title: title, alertDate: alertDate, state: state});
   // Refresh popup if it's open for this location
   if (openPopupName === name && openPopupMarker) {
     if (isStatsMode && typeof getStatsPopupHtml === 'function') {
@@ -716,44 +756,55 @@ function displayLabel(title) {
   return '\u26A0 ' + norm;
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildPopupHtml(name) {
   var entries = (locationHistory[name] || []).slice()
-    .sort(function(a, b) { return (b.alertDate || '').replace('T', ' ').localeCompare((a.alertDate || '').replace('T', ' ')); });
-  var rows = entries.map(function(e, i) {
+    .sort(function (a, b) {
+      return (b.alertDate || '').replace('T', ' ').localeCompare((a.alertDate || '').replace('T', ' '));
+    });
+  var rows = entries.map(function (e, i) {
     var color = COLORS[e.state] || '#888';
-    var label = displayLabel(e.title);
+    var label = escapeHtml(displayLabel(e.title));
     var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
     var border = i < entries.length - 1 ? 'border-bottom:1px solid #eee;' : '';
     return '<div style="padding:4px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
       (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
       '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
-    '</div>';
+      '</div>';
   }).join('');
-  return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' +
+  return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + escapeHtml(name) + '</b>' +
     (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
     '</div>';
 }
 
-var ACTIVE_STYLE = { fillOpacity: 0.5, opacity: 0.8, weight: 3 };
+var ACTIVE_STYLE = {fillOpacity: 0.5, opacity: 0.8, weight: 3};
 
 function getStatsStyle(name) {
-    var count = statsCounts[name] || 0;
-    if (count === 0) return BASE_STYLE;
+  var count = statsCounts[name] || 0;
+  if (count === 0) return BASE_STYLE;
 
-    // heatmap from yellow to red depending on intensity
-    var intensity = maxStatsCount > 0 ? (count / maxStatsCount) : 0;
-    var r = 255;
-    var g = Math.round(255 * (1 - intensity));
-    var b = 0;
-    var color = 'rgb(' + r + ',' + g + ',' + b + ')';
+  // heatmap from yellow to red depending on intensity
+  var intensity = maxStatsCount > 0 ? (count / maxStatsCount) : 0;
+  var r = 255;
+  var g = Math.round(255 * (1 - intensity));
+  var b = 0;
+  var color = 'rgb(' + r + ',' + g + ',' + b + ')';
 
-    return {
-        fillColor: color,
-        color: color,
-        fillOpacity: 0.4 + (intensity * 0.4),
-        opacity: 0.6 + (intensity * 0.4),
-        weight: 1.5
-    };
+  return {
+    fillColor: color,
+    color: color,
+    fillOpacity: 0.4 + (intensity * 0.4),
+    opacity: 0.6 + (intensity * 0.4),
+    weight: 1.5
+  };
 }
 
 function currentLocationStyle(name) {
@@ -763,9 +814,15 @@ function currentLocationStyle(name) {
   if (!entry) return BASE_STYLE;
   if (entry.state === 'green') {
     var opacity = 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS));
-    return { color: COLORS.green, fillColor: COLORS.green, fillOpacity: opacity, opacity: opacity + 0.15, weight: 1 };
+    return {color: COLORS.green, fillColor: COLORS.green, fillOpacity: opacity, opacity: opacity + 0.15, weight: 1};
   }
-  return { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: 0.3, opacity: 0.45, weight: entry.state === 'red' ? 0.5 : 1 };
+  return {
+    color: COLORS[entry.state],
+    fillColor: COLORS[entry.state],
+    fillOpacity: 0.3,
+    opacity: 0.45,
+    weight: entry.state === 'red' ? 0.5 : 1
+  };
 }
 
 function showPopup(name, marker, popupHtml) {
@@ -774,10 +831,11 @@ function showPopup(name, marker, popupHtml) {
   openPopupName = name;
   openPopupMarker = marker;
   marker.setStyle(ACTIVE_STYLE);
-  marker.bindPopup(html, { maxWidth: isStatsMode ? 420 : 350 })
+  marker.bindPopup(html, {maxWidth: isStatsMode ? 420 : 350})
     .openPopup()
-    .on('popupclose', function() {
-      openPopupName = null; openPopupMarker = null;
+    .on('popupclose', function () {
+      openPopupName = null;
+      openPopupMarker = null;
       marker.setStyle(currentLocationStyle(name));
       updateOverlay();
     });
@@ -799,7 +857,13 @@ function showPolygonHint() {
     targets.push({
       polygon: polygon,
       color: COLORS[entry.state],
-      origStyle: { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: op, opacity: op + 0.15, weight: entry.state === 'red' ? 0.5 : 1 }
+      origStyle: {
+        color: COLORS[entry.state],
+        fillColor: COLORS[entry.state],
+        fillOpacity: op,
+        opacity: op + 0.15,
+        weight: entry.state === 'red' ? 0.5 : 1
+      }
     });
   }
 
@@ -809,7 +873,7 @@ function showPolygonHint() {
       if (locationHistory[hName].length > 0 && !locationStates[hName]) {
         var hPoly = locationPolygons[hName];
         if (hPoly) {
-          targets.push({ polygon: hPoly, color: COLORS.green, origStyle: BASE_STYLE });
+          targets.push({polygon: hPoly, color: COLORS.green, origStyle: BASE_STYLE});
         }
       }
     }
@@ -819,7 +883,7 @@ function showPolygonHint() {
 
   var step = 0, totalSteps = 30; // 3 cycles * 10 steps per cycle
   polygonHintTargets = targets;
-  polygonHintInterval = setInterval(function() {
+  polygonHintInterval = setInterval(function () {
     var t = (step % 10) / 10;
     var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
     for (var i = 0; i < targets.length; i++) {
@@ -874,7 +938,7 @@ function processLiveAlert(alert) {
 }
 
 // Expose for debugging/external injection
-window.injectAlert = function(mockAlert) {
+window.injectAlert = function (mockAlert) {
   console.log('Injecting mock alert:', mockAlert);
   processLiveAlert(mockAlert);
 };
@@ -893,7 +957,7 @@ function processHistoryEntry(entry) {
   var key = location + '|' + (entry.alertDate || '');
   if (!extendedRids.has(key) && since) {
     extendedRids.add(key);
-    extendedHistory.push({ location: location, title: title, alertDate: since, state: state, category_desc: title });
+    extendedHistory.push({location: location, title: title, alertDate: since, state: state, category_desc: title});
     // Update global bounds but wait for panel open to re-render timeline day
     timelineMin = timelineMin ? Math.min(timelineMin, since) : since;
     timelineMax = Math.max(timelineMax, since, Date.now());
@@ -932,7 +996,7 @@ function fadeGreenMarkers() {
       toRemove.push(name);
     } else {
       var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-      entry.marker.setStyle({ fillOpacity: opacity, opacity: opacity + 0.15 });
+      entry.marker.setStyle({fillOpacity: opacity, opacity: opacity + 0.15});
     }
   }
   for (var i = 0; i < toRemove.length; i++) {
@@ -972,10 +1036,10 @@ function maybeZoomToEvent() {
   var bounds = getActiveEventBounds();
   isZoomingProgrammatically = true;
   if (bounds) {
-    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+    map.flyToBounds(bounds, {padding: [80, 80], maxZoom: 10, duration: 0.7});
     isZoomedToEvent = true;
   } else {
-    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+    map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, {duration: 0.7});
     isZoomedToEvent = false;
   }
 }
@@ -984,7 +1048,7 @@ function maybeZoomToEvent() {
 function updateLiveStatus() {
   if (!isLiveMode || isStatsMode) return;
   var dominant = null, bestP = -1;
-  var P = { red: 3, purple: 2, yellow: 1 };
+  var P = {red: 3, purple: 2, yellow: 1};
   for (var name in locationStates) {
     var s = locationStates[name].state;
     if (s !== 'green' && (P[s] || 0) > bestP) {
@@ -1028,7 +1092,7 @@ function setStatusHTML(state, html) {
   txt.innerHTML = html;
   var link = document.getElementById('lastAlertLink');
   if (link) {
-    link.addEventListener('click', function(e) {
+    link.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
       openTimelineToLastEvent();
@@ -1036,7 +1100,7 @@ function setStatusHTML(state, html) {
   }
   var zoomLink = document.getElementById('zoomAlertsLink');
   if (zoomLink) {
-    zoomLink.addEventListener('click', function(e) {
+    zoomLink.addEventListener('click', function (e) {
       e.preventDefault();
       e.stopPropagation();
       closeTimelinePanel();
@@ -1055,23 +1119,30 @@ function stripBom(text) {
 
 function fetchLiveAlerts() {
   apiFetch('alerts')
-    .then(function(resp) {
+    .then(function (resp) {
       lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       return resp.text();
     })
-    .then(function(text) {
+    .then(function (text) {
       text = stripBom(text).trim();
       liveErrors = 0;
-      try { sessionStorage.setItem('oref-last-poll', String(Date.now())); } catch(e) {}
+      try {
+        sessionStorage.setItem('oref-last-poll', String(Date.now()));
+      } catch (e) {
+      }
       if (initialized && isLiveMode && !isStatsMode && historyErrors <= 3) updateLiveStatus();
       if (!text) return; // no active alert
       var alert;
-      try { alert = JSON.parse(text); }
-      catch (e) { console.warn('Live JSON parse failed (' + text.length + ' chars), payload:', JSON.stringify(text), e); return; }
+      try {
+        alert = JSON.parse(text);
+      } catch (e) {
+        console.warn('Live JSON parse failed (' + text.length + ' chars), payload:', JSON.stringify(text), e);
+        return;
+      }
       processLiveAlert(alert);
     })
-    .catch(function(err) {
+    .catch(function (err) {
       liveErrors++;
       lastErrorMsg = 'Live alerts: ' + err.message;
       if (liveErrors > 3 && !isStatsMode) {
@@ -1084,7 +1155,7 @@ function fetchLiveAlerts() {
 function processHistoryEntries(entries) {
   if (!Array.isArray(entries)) return;
 
-  entries.sort(function(a, b) {
+  entries.sort(function (a, b) {
     return (a.alertDate || '').localeCompare(b.alertDate || '');
   });
 
@@ -1108,27 +1179,36 @@ function processHistoryEntries(entries) {
 
 function fetchHistory(onDone) {
   apiFetch('history')
-    .then(function(resp) {
+    .then(function (resp) {
       lastCfColo = resp.headers.get('X-CF-Colo') || lastCfColo;
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       return resp.text();
     })
-    .then(function(text) {
+    .then(function (text) {
       text = stripBom(text).trim();
       historyErrors = 0;
       if (initialized && isLiveMode && !isStatsMode && liveErrors <= 3) updateLiveStatus();
-      if (!text) { if (onDone) onDone(); return; }
+      if (!text) {
+        if (onDone) onDone();
+        return;
+      }
       var entries;
       try {
         entries = JSON.parse(text);
       } catch (parseErr) {
         console.warn('History JSON truncated (' + text.length + ' chars), retrying...', parseErr);
-        return fetch(PROXY_BASE + apiPrefix + '/history', { cache: 'no-store' })
-          .then(function(r) { return r.text(); })
-          .then(function(t) {
+        return fetch(PROXY_BASE + apiPrefix + '/history', {cache: 'no-store'})
+          .then(function (r) {
+            return r.text();
+          })
+          .then(function (t) {
             t = stripBom(t).trim();
-            try { entries = JSON.parse(t); }
-            catch (e) { console.error('History retry also failed (' + t.length + ' chars):', e); throw e; }
+            try {
+              entries = JSON.parse(t);
+            } catch (e) {
+              console.error('History retry also failed (' + t.length + ' chars):', e);
+              throw e;
+            }
             processHistoryEntries(entries);
             if (onDone) onDone();
           });
@@ -1136,7 +1216,7 @@ function fetchHistory(onDone) {
       processHistoryEntries(entries);
       if (onDone) onDone();
     })
-    .catch(function(err) {
+    .catch(function (err) {
       historyErrors++;
       lastErrorMsg = 'Alert history: ' + err.message;
       if (historyErrors > 3 && !isStatsMode) {
@@ -1204,44 +1284,46 @@ function fetchExtendedHistory(fromDateObj, toDateObj, onDone, mode, options) {
   }
 
   apiFetch(apiPath)
-    .then(function(resp) {
+    .then(function (resp) {
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       return resp.json();
     })
-    .then(function(entries) {
+    .then(function (entries) {
       var parsedEntries = [];
       if (Array.isArray(entries)) {
-          for (var i = 0; i < entries.length; i++) {
-            var e = entries[i];
-            if (!e.data || !e.category_desc) continue;
-            var rid = String(e.rid || '');
-            var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
-            var state = classifyTitle(title);
-            var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
-            var canonicalKey = location + '|' + (e.alertDate || '') + '|' + title;
-            if ((rid && extendedRids.has('rid:' + rid)) || extendedRids.has(canonicalKey)) continue;
-            var ts = parseAlertDate(e.alertDate);
-            if (!ts) continue;
-            if (rid) extendedRids.add('rid:' + rid);
-            extendedRids.add(canonicalKey);
-            var entryObj = { location: location, title: title, alertDate: ts, state: state, category_desc: title };
-            extendedHistory.push(entryObj);
-            parsedEntries.push(entryObj);
-            recordHistory(location, title, e.alertDate || '', state);
-          }
-          // Sort ascending by time
-          extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-          if (extendedHistory.length > 0) {
-            timelineMin = extendedHistory[0].alertDate;
-            timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
-          }
+        for (var i = 0; i < entries.length; i++) {
+          var e = entries[i];
+          if (!e.data || !e.category_desc) continue;
+          var rid = String(e.rid || '');
+          var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
+          var state = classifyTitle(title);
+          var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
+          var canonicalKey = location + '|' + (e.alertDate || '') + '|' + title;
+          if ((rid && extendedRids.has('rid:' + rid)) || extendedRids.has(canonicalKey)) continue;
+          var ts = parseAlertDate(e.alertDate);
+          if (!ts) continue;
+          if (rid) extendedRids.add('rid:' + rid);
+          extendedRids.add(canonicalKey);
+          var entryObj = {location: location, title: title, alertDate: ts, state: state, category_desc: title};
+          extendedHistory.push(entryObj);
+          parsedEntries.push(entryObj);
+          recordHistory(location, title, e.alertDate || '', state);
+        }
+        // Sort ascending by time
+        extendedHistory.sort(function (a, b) {
+          return a.alertDate - b.alertDate;
+        });
+        if (extendedHistory.length > 0) {
+          timelineMin = extendedHistory[0].alertDate;
+          timelineMax = Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now());
+        }
       }
       console.log('Extended history:', extendedHistory.length, 'entries');
       if (onDone) {
-          onDone(parsedEntries);
+        onDone(parsedEntries);
       }
     })
-    .catch(function(err) {
+    .catch(function (err) {
       console.error('Extended history fetch error:', err);
       if (onDone) onDone([]);
     });
@@ -1261,7 +1343,7 @@ function reconstructStateAt(targetTime) {
 
   var lookbackTime = targetTime - ALERT_MAX_AGE_MS;
   var accumulated = {};
-  var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+  var PRIORITY = {red: 3, purple: 2, yellow: 1, green: 0};
 
   // Replay from lookbackTime to targetTime
   for (var i = 0; i < extendedHistory.length; i++) {
@@ -1272,12 +1354,12 @@ function reconstructStateAt(targetTime) {
     var existing = accumulated[e.location];
     if (existing) {
       if (e.state === 'green') {
-        accumulated[e.location] = { state: 'green', since: e.alertDate };
+        accumulated[e.location] = {state: 'green', since: e.alertDate};
       } else if ((PRIORITY[e.state] || 0) >= (PRIORITY[existing.state] || 0)) {
-        accumulated[e.location] = { state: e.state, since: e.alertDate };
+        accumulated[e.location] = {state: e.state, since: e.alertDate};
       }
     } else {
-      accumulated[e.location] = { state: e.state, since: e.alertDate };
+      accumulated[e.location] = {state: e.state, since: e.alertDate};
     }
   }
 
@@ -1303,7 +1385,7 @@ function reconstructStateAt(targetTime) {
         fillOpacity: 0.3, opacity: 0.45, weight: s === 'red' ? 0.5 : 1
       });
     }
-    locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
+    locationStates[loc] = {state: s, since: sinceTime, marker: polygon};
   }
 }
 
@@ -1312,7 +1394,7 @@ function saveLiveState() {
   liveLocationStates = {};
   for (var name in locationStates) {
     var entry = locationStates[name];
-    liveLocationStates[name] = { state: entry.state, since: entry.since };
+    liveLocationStates[name] = {state: entry.state, since: entry.since};
   }
 }
 
@@ -1335,19 +1417,19 @@ function restoreLiveState() {
 
 function updateShadowState(name, state, since) {
   if (!liveLocationStates) return;
-  var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+  var PRIORITY = {red: 3, purple: 2, yellow: 1, green: 0};
   var existing = liveLocationStates[name];
   if (existing) {
     if (state === 'green') {
-      liveLocationStates[name] = { state: 'green', since: since || Date.now() };
+      liveLocationStates[name] = {state: 'green', since: since || Date.now()};
     } else if (existing.state === state) {
       return;
     } else if ((PRIORITY[existing.state] || 0) > (PRIORITY[state] || 0)) {
       return;
     } else {
-      liveLocationStates[name] = { state: state, since: since || Date.now() };
+      liveLocationStates[name] = {state: state, since: since || Date.now()};
     }
   } else {
-    liveLocationStates[name] = { state: state, since: since || Date.now() };
+    liveLocationStates[name] = {state: state, since: since || Date.now()};
   }
 }

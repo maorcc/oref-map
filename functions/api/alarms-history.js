@@ -1,4 +1,4 @@
-﻿import { orefProxy } from './_proxy.js';
+﻿import {orefProxy} from './_proxy.js';
 
 const OFFICIAL_TARGET = 'https://alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx'
 const TZEVA_ADOM_TARGET = 'https://tzevadom.com/api/alerts-history/summary/custom';
@@ -35,7 +35,7 @@ function jsonResponse(body, status, extraHeaders) {
     'Content-Type': 'application/json; charset=utf-8',
     ...extraHeaders,
   };
-  return new Response(JSON.stringify(body), { status, headers });
+  return new Response(JSON.stringify(body), {status, headers});
 }
 
 function normalizeProvider(rawValue) {
@@ -221,11 +221,11 @@ function transformTzevaPayload(payload, startTs, endTs) {
     }
   }
 
-  transformed.sort(function(a, b) {
+  transformed.sort(function (a, b) {
     return b.__timestamp - a.__timestamp;
   });
 
-  return transformed.map(function(entry) {
+  return transformed.map(function (entry) {
     return {
       data: entry.data,
       alertDate: entry.alertDate,
@@ -264,7 +264,7 @@ export async function onRequestGet(context) {
   const providerRaw = url.searchParams.get('provider') || url.searchParams.get('service') || PROVIDERS.OFFICIAL;
   const provider = normalizeProvider(providerRaw);
   if (!provider) {
-    return jsonResponse({ error: 'Invalid provider. Supported values: Official, Tzeva Adom' }, 400);
+    return jsonResponse({error: 'Invalid provider. Supported values: Official, Tzeva Adom'}, 400);
   }
 
   const fromDate = url.searchParams.get('fromDate');
@@ -290,7 +290,7 @@ export async function onRequestGet(context) {
 
   const range = buildRange(mode, fromDate, toDate);
   if (!range.ok) {
-    return jsonResponse({ error: range.error }, range.status || 400);
+    return jsonResponse({error: range.error}, range.status || 400);
   }
 
   try {
