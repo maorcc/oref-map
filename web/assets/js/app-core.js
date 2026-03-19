@@ -18,11 +18,11 @@ function resetProxy() {
   apiPrefix = '/api';
 }
 
-function apiFetch(endpoint) {
+function apiFetch(endpoint, options) {
   var url = PROXY_BASE + apiPrefix + '/' + endpoint;
   var wasProxy = apiPrefix === '/api2';
 
-  return fetch(url).then(function (resp) {
+  return fetch(url, options).then(function (resp) {
     if (!resp.ok && wasProxy) {
       resetProxy();
     }
@@ -1209,29 +1209,32 @@ function fetchHistory(onDone) {
         if (onDone) onDone();
         return;
       }
+      function handleEntries(entries) {
+        processHistoryEntries(entries);
+        if (onDone) onDone();
+      }
+
       var entries;
       try {
         entries = JSON.parse(text);
       } catch (parseErr) {
         console.warn('History JSON truncated (' + text.length + ' chars), retrying...', parseErr);
-        return fetch(PROXY_BASE + apiPrefix + '/history', {cache: 'no-store'})
+        return apiFetch('history', {cache: 'no-store'})
           .then(function (r) {
             return r.text();
           })
           .then(function (t) {
             t = stripBom(t).trim();
             try {
-              entries = JSON.parse(t);
+              return JSON.parse(t);
             } catch (e) {
               console.error('History retry also failed (' + t.length + ' chars):', e);
               throw e;
             }
-            processHistoryEntries(entries);
-            if (onDone) onDone();
-          });
+          })
+          .then(handleEntries);
       }
-      processHistoryEntries(entries);
-      if (onDone) onDone();
+      handleEntries(entries);
     })
     .catch(function (err) {
       historyErrors++;

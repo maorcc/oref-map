@@ -1,4 +1,12 @@
-﻿window.initStats = function () {
+﻿function getTodayIsoDate() {
+  var today = new Date();
+  var yyyy = today.getFullYear();
+  var mm = String(today.getMonth() + 1).padStart(2, '0');
+  var dd = String(today.getDate()).padStart(2, '0');
+  return yyyy + '-' + mm + '-' + dd;
+}
+
+window.initStats = function () {
   var statsBtn = document.getElementById('stats-btn');
   var btnRow = document.getElementById('stats-btn-row');
   var customDatesDiv = document.getElementById('stats-custom-dates');
@@ -14,13 +22,21 @@
   var currentStatsEntries = [];
   var statsLoadToken = 0;
 
+  function refreshStatsDateBounds() {
+    var maxDateStr = getTodayIsoDate();
+    fromDateInput.max = maxDateStr;
+    toDateInput.max = maxDateStr;
+    if (fromDateInput.value && fromDateInput.value > maxDateStr) {
+      fromDateInput.value = maxDateStr;
+    }
+    if (toDateInput.value && toDateInput.value > maxDateStr) {
+      toDateInput.value = maxDateStr;
+    }
+    return maxDateStr;
+  }
+
   var today = new Date();
-  var yyyy = today.getFullYear();
-  var mm = String(today.getMonth() + 1).padStart(2, '0');
-  var dd = String(today.getDate()).padStart(2, '0');
-  var maxDateStr = yyyy + '-' + mm + '-' + dd;
-  fromDateInput.max = maxDateStr;
-  toDateInput.max = maxDateStr;
+  var maxDateStr = refreshStatsDateBounds();
 
   var yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
   fromDateInput.value = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
@@ -355,6 +371,8 @@
   };
   fromDateInput.addEventListener('change', onCustomDateChange);
   toDateInput.addEventListener('change', onCustomDateChange);
+  fromDateInput.addEventListener('focus', refreshStatsDateBounds);
+  toDateInput.addEventListener('focus', refreshStatsDateBounds);
 
   categorySelect.addEventListener('change', function () {
     if (!statsBtn.classList.contains('open') || !isStatsMode) return;
@@ -376,6 +394,7 @@
     pushPanelHistory();
     updateOverlay();
 
+    refreshStatsDateBounds();
     setStatsMode(1);
   });
 
@@ -421,13 +440,19 @@ window.initTimeline = function () {
   };
 
   // init the input date to today by default
-  var today = new Date();
-  var yyyy = today.getFullYear();
-  var mm = String(today.getMonth() + 1).padStart(2, '0');
-  var dd = String(today.getDate()).padStart(2, '0');
-  datePicker.max = yyyy + '-' + mm + '-' + dd;
-  datePicker.value = yyyy + '-' + mm + '-' + dd;
+  function refreshTimelineDateBounds() {
+    var maxDateStr = getTodayIsoDate();
+    datePicker.max = maxDateStr;
+    if (datePicker.value && datePicker.value > maxDateStr) {
+      datePicker.value = maxDateStr;
+    }
+    return maxDateStr;
+  }
+
+  var maxTimelineDate = refreshTimelineDateBounds();
+  datePicker.value = maxTimelineDate;
   datePicker.style.display = 'none'; // Hidden by default in 24h mode
+  datePicker.addEventListener('focus', refreshTimelineDateBounds);
 
   // Set mode button styling
   function setTimelineMode(mode) {
@@ -592,6 +617,7 @@ window.initTimeline = function () {
   }
 
   function openTimeline() {
+    refreshTimelineDateBounds();
     closeSoundPanel();
     var statsBtn = document.getElementById('stats-btn');
     if (statsBtn && statsBtn.classList.contains('open')) {
@@ -1069,3 +1095,6 @@ window.initTimeline = function () {
     }
   });
 }
+
+
+

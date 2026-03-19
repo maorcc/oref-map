@@ -168,9 +168,14 @@
       var matches = Object.keys(locationPolygons).filter(function (name) {
         return name.includes(q);
       }).slice(0, 20);
-      soundResults.innerHTML = matches.map(function (m) {
-        return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
-      }).join('');
+      soundResults.innerHTML = '';
+      for (var i = 0; i < matches.length; i++) {
+        var item = document.createElement('div');
+        item.className = 'location-item';
+        item.setAttribute('data-name', matches[i]);
+        item.textContent = matches[i];
+        soundResults.appendChild(item);
+      }
     });
 
     soundResults.addEventListener('click', function (e) {
