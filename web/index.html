@@ -72,6 +72,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 .dot-yellow { background: #ffcc00; }
 .dot-green  { background: #00cc00; }
 
+.colorblind-mode .dot-red    { background: #E53935; }
+.colorblind-mode .dot-purple { background: #1E88E5; }
+.colorblind-mode .dot-yellow { background: #FFB300; }
+.colorblind-mode .dot-green  { background: #43A047; }
+
 #status {
   position: fixed;
   top: 80px;
@@ -93,6 +98,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 .indicator-yellow { background: #ffcc00; animation: pulse 3s ease-in-out infinite; }
 .indicator-green  { background: #00cc00; }
 .indicator-err    { background: #999; }
+
+.colorblind-mode .indicator-red    { background: #E53935; }
+.colorblind-mode .indicator-purple { background: #1E88E5; }
+.colorblind-mode .indicator-yellow { background: #FFB300; }
+.colorblind-mode .indicator-green  { background: #43A047; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 #lastAlertLink, #zoomAlertsLink { color: inherit; text-decoration: underline; cursor: pointer; }
 
@@ -232,6 +242,18 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   -webkit-user-select: none;
   padding: 2px 4px;
 }
+#cb-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  direction: rtl;
+  font-size: 13px;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 2px 4px;
+}
 .pins-hidden .alert-pin-marker { display: none; }
 #locate-btn.auto-follow-active {
   background: rgba(255, 80, 80, 0.15);
@@ -274,6 +296,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   direction: rtl;
 }
+.colorblind-mode .alert-pin-icon  { background: #E53935; }
+.colorblind-mode .alert-pin-label { background: rgba(229, 57, 53, 0.85); }
 #locate-btn-row {
   display: flex;
   align-items: center;
@@ -616,6 +640,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   <label id="pin-labels-toggle" title="הצג שמות יישובים על המפה">
     <input type="checkbox" id="pin-labels-cb"> שמות יישובים
   </label>
+  <label id="cb-mode-toggle" title="החלף לצבעים ידידותיים לעיוורי צבעים">
+    <input type="checkbox" id="cb-mode-cb"> עיוורי צבעים
+  </label>
   <div id="gps-row">
     <button id="locate-btn" type="button" title="הצג התרעות במפה">
       <div id="locate-btn-row">
@@ -842,6 +869,23 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     document.getElementById('map').classList.toggle('pins-hidden', !this.checked);
   });
 
+  document.getElementById('cb-mode-cb').addEventListener('change', function() {
+    var cb = this.checked;
+    document.body.classList.toggle('colorblind-mode', cb);
+    COLORS.red    = cb ? COLORS_CB.red    : '#ff0000';
+    COLORS.purple = cb ? COLORS_CB.purple : '#9922cc';
+    COLORS.yellow = cb ? COLORS_CB.yellow : '#ffcc00';
+    COLORS.green  = cb ? COLORS_CB.green  : '#00cc00';
+    reApplyColors();
+    try { localStorage.setItem('oref-cb-mode', cb ? '1' : ''); } catch(e) {}
+  });
+  try {
+    if (localStorage.getItem('oref-cb-mode') === '1') {
+      document.getElementById('cb-mode-cb').checked = true;
+      document.getElementById('cb-mode-cb').dispatchEvent(new Event('change'));
+    }
+  } catch(e) {}
+
   document.getElementById('locate-btn').addEventListener('click', function() {
     autoFollowZoom = !autoFollowZoom;
     document.getElementById('locate-btn').classList.toggle('auto-follow-active', autoFollowZoom);
@@ -908,7 +952,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   // --- Colors ---
   var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
+  var COLORS_CB = { red: '#E53935', purple: '#1E88E5', yellow: '#FFB300', green: '#43A047' };
   var BASE_STYLE = { fillColor: '#888', fillOpacity: 0.01, color: '#888', opacity: 0 };
+
+  function reApplyColors() {
+    for (var name in locationStates) {
+      var entry = locationStates[name];
+      var s = entry.state;
+      var polygon = locationPolygons[name];
+      if (!polygon) continue;
+      if (s === 'green') {
+        var elapsed = Date.now() - entry.since;
+        var opacity = 0.5 * Math.max(0, 1 - elapsed / GREEN_FADE_MS);
+        if (!isHullMode) polygon.setStyle({ color: COLORS.green, fillColor: COLORS.green, fillOpacity: opacity, opacity: opacity + 0.15 });
+      } else {
+        if (!isHullMode) polygon.setStyle({ color: COLORS[s], fillColor: COLORS[s] });
+      }
+    }
+    if (isHullMode) updateHullLayers();
+  }
 
   // --- Sound ---
   function getAudioContext() {
