@@ -220,6 +220,60 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   -webkit-appearance: none;
   appearance: none;
 }
+#pin-labels-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  direction: rtl;
+  font-size: 13px;
+  color: #444;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding: 2px 4px;
+}
+.pins-hidden .alert-pin-marker { display: none; }
+#locate-btn.auto-follow-active {
+  background: rgba(255, 80, 80, 0.15);
+  border-color: #e74c3c;
+  color: #c0392b;
+}
+@keyframes pinDrop {
+  0%   { transform: translateY(-30px) scaleY(0.8); opacity: 0; }
+  60%  { transform: translateY(4px) scaleY(1.05); opacity: 1; }
+  80%  { transform: translateY(-6px) scaleY(0.95); }
+  100% { transform: translateY(0) scaleY(1); opacity: 1; }
+}
+.alert-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: pinDrop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  pointer-events: none;
+}
+.alert-pin.alert-pin-static {
+  animation: none;
+}
+.alert-pin-icon {
+  width: 12px; height: 12px;
+  background: #ff0000;
+  border: 2px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+.alert-pin-label {
+  background: rgba(220,0,0,0.85);
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  margin-top: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  direction: rtl;
+}
 #locate-btn-row {
   display: flex;
   align-items: center;
@@ -386,6 +440,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #timeline-transport button:hover { background: #eee; }
 #timeline-transport button:active { background: #ddd; }
 #timeline-transport #tl-prev, #timeline-transport #tl-next { font-size: 19px; background: rgba(219, 234, 254, 0.92); border-color: #93c5fd; }
+#timeline-transport #tl-speed { font-size: 13px; padding: 4px 8px; min-width: 36px; }
 #timeline-slider-wrap {
   position: relative;
   width: 100%;
@@ -558,6 +613,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
     <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
   </div>
+  <label id="pin-labels-toggle" title="הצג שמות יישובים על המפה">
+    <input type="checkbox" id="pin-labels-cb"> שמות יישובים
+  </label>
   <div id="gps-row">
     <button id="locate-btn" type="button" title="הצג התרעות במפה">
       <div id="locate-btn-row">
@@ -598,6 +656,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         <button id="tl-prev" title="אירוע קודם">⏮</button>
         <button id="tl-play" title="נגן/עצור">▶</button>
         <button id="tl-next" title="אירוע הבא">⏭</button>
+        <button id="tl-speed" title="מהירות נגינה">×1</button>
       </div>
     </div>
   </div>
@@ -762,18 +821,31 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   // --- State ---
   var isZoomedToEvent = false;
   var isZoomingProgrammatically = false;
+  var autoFollowZoom = false;
+  var lastAutoZoomTime = 0;
 
   map.on('moveend', function() {
     if (!isZoomingProgrammatically) isZoomedToEvent = false;
     isZoomingProgrammatically = false;
   });
 
+  map.on('dragstart', function() {
+    if (autoFollowZoom) {
+      autoFollowZoom = false;
+      document.getElementById('locate-btn').classList.remove('auto-follow-active');
+    }
+  });
+
+  var pinLabelsCb = document.getElementById('pin-labels-cb');
+  pinLabelsCb.checked = true;
+  pinLabelsCb.addEventListener('change', function() {
+    document.getElementById('map').classList.toggle('pins-hidden', !this.checked);
+  });
+
   document.getElementById('locate-btn').addEventListener('click', function() {
-    if (isZoomedToEvent) {
-      isZoomingProgrammatically = true;
-      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
-      isZoomedToEvent = false;
-    } else {
+    autoFollowZoom = !autoFollowZoom;
+    document.getElementById('locate-btn').classList.toggle('auto-follow-active', autoFollowZoom);
+    if (autoFollowZoom) {
       maybeZoomToEvent();
     }
   });
@@ -831,6 +903,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   // --- Polygon state ---
   var locationPolygons = {};  // name → L.polygon
+  var locationCentroids = {}; // name → L.latLng (vertex-average centroid)
+  var alertPins = {};         // name → L.marker (red alert pins)
 
   // --- Colors ---
   var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
@@ -977,6 +1051,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         // Simple polygon: [[lng,lat], ...]
         latlngs = coords.map(function(c) { return [c[1], c[0]]; });
       }
+      // Vertex-average centroid (much better than bbox center for large Voronoi cells)
+      var outerRing = isNested ? latlngs[0] : latlngs;
+      var sumLat = 0, sumLng = 0;
+      for (var k = 0; k < outerRing.length; k++) { sumLat += outerRing[k][0]; sumLng += outerRing[k][1]; }
+      locationCentroids[name] = L.latLng(sumLat / outerRing.length, sumLng / outerRing.length);
+
       var polygon = L.polygon(latlngs, {
         fillColor: '#888',
         fillOpacity: 0.01,
@@ -1060,6 +1140,38 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     return 'red'; // default to danger for unknown
   }
 
+  // --- Alert pin helpers ---
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function addAlertPin(name, animate) {
+    if (alertPins[name]) return;
+    var poly = locationPolygons[name];
+    if (!poly) return;
+    var center = locationCentroids[name] || poly.getBounds().getCenter();
+    var cls = animate ? 'alert-pin' : 'alert-pin alert-pin-static';
+    var icon = L.divIcon({
+      className: 'alert-pin-marker',
+      html: '<div class="' + cls + '"><div class="alert-pin-icon"></div><div class="alert-pin-label">' +
+            escapeHtml(name) + '</div></div>',
+      iconAnchor: [6, 24],
+      iconSize: null,
+    });
+    alertPins[name] = L.marker(center, { icon: icon, interactive: false, zIndexOffset: 500 }).addTo(map);
+  }
+
+  function removeAlertPin(name) {
+    if (alertPins[name]) {
+      map.removeLayer(alertPins[name]);
+      delete alertPins[name];
+    }
+  }
+
+  function removeAllAlertPins() {
+    for (var n in alertPins) removeAlertPin(n);
+  }
+
   // --- Marker management ---
   function setLocationState(name, state, since) {
     var existing = locationStates[name];
@@ -1097,11 +1209,20 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       marker: polygon
     };
 
+    // Manage alert pins: add on red, remove when leaving red
+    var prevState = existing ? existing.state : null;
+    if (state === 'red') {
+      addAlertPin(name, isLiveMode);
+    } else if (prevState === 'red') {
+      removeAlertPin(name);
+    }
+
     playSoundForState(state, name);
     if (isHullMode) updateHullLayers();
   }
 
   function removeLocation(name) {
+    removeAlertPin(name);
     var entry = locationStates[name];
     if (!isHullMode && entry && entry.marker) {
       entry.marker.setStyle(BASE_STYLE);
@@ -1431,6 +1552,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         updateShadowState(loc, state);
       }
     }
+    if (autoFollowZoom && isLiveMode) {
+      var now2 = Date.now();
+      if (now2 - lastAutoZoomTime > 1500) {
+        lastAutoZoomTime = now2;
+        maybeZoomToEvent();
+      }
+    }
   }
 
   // Expose for debugging/external injection
@@ -1513,18 +1641,16 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   function getActiveEventBounds() {
-    var allBounds = null;
+    var bounds = null;
     for (var name in locationStates) {
-      if (locationStates[name].state === 'green') continue;
+      var s = locationStates[name].state;
+      if (s !== 'red' && s !== 'purple') continue;
       var polygon = locationPolygons[name];
       if (!polygon) continue;
-      if (!allBounds) {
-        allBounds = L.latLngBounds(polygon.getBounds());
-      } else {
-        allBounds.extend(polygon.getBounds());
-      }
+      var b = polygon.getBounds();
+      if (!bounds) bounds = L.latLngBounds(b); else bounds.extend(b);
     }
-    return allBounds;
+    return bounds;
   }
 
   function maybeZoomToEvent() {
@@ -1753,7 +1879,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   function reconstructStateAt(targetTime) {
     cancelPolygonHint();
-    // Clear all polygons
+    // Clear all polygons and pins
     for (var name in locationStates) {
       var entry = locationStates[name];
       if (entry && entry.marker) {
@@ -1762,6 +1888,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       }
     }
     locationStates = {};
+    removeAllAlertPins();
     if (isHullMode) clearHullPolygons();
 
     // Replay history up to targetTime
@@ -1814,6 +1941,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         }
       }
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
+      if (s === 'red') addAlertPin(loc, false);
     }
     if (isHullMode) updateHullLayers();
   }
@@ -2242,6 +2370,18 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     playBtn.addEventListener('click', function() {
       if (isPlaying) stopPlay(); else startPlay();
+    });
+
+    // --- Speed control ---
+    var SPEED_STEPS = [1, 0.5, 3, 2, 1.5];
+    var speedIdx = 0;
+    var BASE_PLAY_SPEED = PLAY_SPEED;
+    var speedBtn = document.getElementById('tl-speed');
+    function speedLabel(v) { return v === 0.5 ? '×½' : v === 1.5 ? '×1.5' : '×' + v; }
+    speedBtn.addEventListener('click', function() {
+      speedIdx = (speedIdx + 1) % SPEED_STEPS.length;
+      PLAY_SPEED = BASE_PLAY_SPEED * SPEED_STEPS[speedIdx];
+      speedBtn.textContent = speedLabel(SPEED_STEPS[speedIdx]);
     });
 
     // --- Prev / Next event peak ---
