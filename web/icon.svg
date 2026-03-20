@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#1a3a5c"/>
+
+  <!-- Location pin body -->
+  <path d="M256 100
+    C196 100 148 148 148 208
+    C148 280 256 412 256 412
+    C256 412 364 280 364 208
+    C364 148 316 100 256 100Z"
+    fill="white" opacity="0.95"/>
+
+  <!-- Location pin inner circle (alert color) -->
+  <circle cx="256" cy="210" r="52" fill="#E53935"/>
+
+  <!-- Small white dot in center -->
+  <circle cx="256" cy="210" r="18" fill="white"/>
+</svg>
