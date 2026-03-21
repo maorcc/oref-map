@@ -867,6 +867,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   // --- Timeline state ---
   var extendedHistory = [];     // sorted ascending by alertDate ms
   var extendedRids = new Set(); // dedup by rid
+  var prefetchedDayHistory = {};  // { 'YYYY-MM-DD': entries[] }
   var timelineMin = 0;
   var timelineMax = 0;
   var isLiveMode = true;
@@ -1810,8 +1811,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
 
   // --- Extended history (timeline) ---
+  function prefetchDayHistory(dateStr) {
+    if (prefetchedDayHistory[dateStr]) return;
+    fetch('/api/day-history?date=' + dateStr)
+      .then(function(resp) {
+        if (!resp.ok) return;
+        return resp.json();
+      })
+      .then(function(entries) {
+        if (Array.isArray(entries)) {
+          prefetchedDayHistory[dateStr] = entries;
+          console.log('Prefetched day history for', dateStr, ':', entries.length, 'entries');
+        }
+      })
+      .catch(function() {}); // silent
+  }
+
   function fetchExtendedHistory(onDone) {
     var dateParam = timelineDate || todayDateStr();
+    var finalized = false;
 
     function processEntries(entries) {
       var added = 0;
@@ -1837,7 +1855,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
 
     function finalize() {
-      if (dayHistoryReady) return; // already handled (404 or non-array)
+      if (finalized) return; // already handled (404 or non-array)
+      finalized = true;
       extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
       if (extendedHistory.length > 0) {
         timelineMin = extendedHistory[0].alertDate;
@@ -1850,17 +1869,24 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (onDone) onDone();
     }
 
-    fetch('/api/day-history?date=' + dateParam)
-      .then(function(resp) {
-        if (resp.status === 404) {
-          console.log('No day-history data for', dateParam);
-          dayHistoryReady = true;
-          if (onDone) onDone();
-          return;
-        }
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        return resp.json();
-      })
+    // Use prefetched data if available
+    var cached = prefetchedDayHistory[dateParam];
+    if (cached) delete prefetchedDayHistory[dateParam];
+
+    (cached
+      ? Promise.resolve(cached)
+      : fetch('/api/day-history?date=' + dateParam)
+          .then(function(resp) {
+            if (resp.status === 404) {
+              console.log('No day-history data for', dateParam);
+              dayHistoryReady = true;
+              if (onDone) onDone();
+              return;
+            }
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            return resp.json();
+          })
+    )
       .then(function(entries) {
         if (!entries) return; // 404 case already handled
         if (!Array.isArray(entries)) { dayHistoryReady = true; if (onDone) onDone(); return; }
@@ -1876,7 +1902,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
             })
             .then(function(recentEntries) {
               if (Array.isArray(recentEntries)) {
-                var added = processEntries(recentEntries);
+                // Filter to current date (around midnight, API may include yesterday's entries)
+                var sameDayEntries = recentEntries.filter(function(entry) {
+                  return (entry.alertDate || '').slice(0, 10) === dateParam;
+                });
+                var added = processEntries(sameDayEntries);
                 if (added > 0) console.log('Gap-fill: added', added, 'entries from extended history API');
               }
             })
@@ -2094,6 +2124,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         fetchHistory();
         fetchExtendedHistory(function() {
           rebuildTimeline('first');
+          prefetchPrevDay();
         });
       } else {
         // Stop history polling for past dates
@@ -2103,8 +2134,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         }
         fetchExtendedHistory(function() {
           rebuildTimeline('first');
+          prefetchPrevDay();
         });
       }
+    }
+
+    function prefetchPrevDay() {
+      var prevDay = addDays(timelineDate || todayDateStr(), -1);
+      if (prevDay >= DAY_HISTORY_MIN_DATE) prefetchDayHistory(prevDay);
     }
 
     // --- Open / Close ---
@@ -2122,9 +2159,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         onDayHistoryReady = function() {
           onDayHistoryReady = null;
           rebuildTimeline();
+          prefetchPrevDay();
         };
       } else {
         rebuildTimeline();
+        prefetchPrevDay();
         // Refresh day-history for today in background
         if (isViewingToday()) {
           fetchExtendedHistory(function() {
