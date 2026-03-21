@@ -1879,8 +1879,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           .then(function(resp) {
             if (resp.status === 404) {
               console.log('No day-history data for', dateParam);
-              dayHistoryReady = true;
-              if (onDone) onDone();
               return;
             }
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -1889,7 +1887,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     )
       .then(function(entries) {
         if (!entries) return; // 404 case already handled
-        if (!Array.isArray(entries)) { dayHistoryReady = true; if (onDone) onDone(); return; }
+        if (!Array.isArray(entries)) return;
         processEntries(entries);
 
         // Gap-fill: when viewing today, fetch extended history API
