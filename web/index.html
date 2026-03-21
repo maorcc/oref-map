@@ -1812,6 +1812,44 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   // --- Extended history (timeline) ---
   function fetchExtendedHistory(onDone) {
     var dateParam = timelineDate || todayDateStr();
+
+    function processEntries(entries) {
+      var added = 0;
+      for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e.data || !e.category_desc) continue;
+        var rid = String(e.rid || '');
+        var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
+        var state = classifyTitle(title);
+        var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
+        var ts = parseAlertDate(e.alertDate);
+        if (!ts) continue;
+        var compositeKey = location + '|' + (e.alertDate || '').replace('T', ' ');
+        if (rid && extendedRids.has(rid)) continue;
+        if (extendedRids.has(compositeKey)) continue;
+        if (rid) extendedRids.add(rid);
+        extendedRids.add(compositeKey);
+        extendedHistory.push({ location: location, title: title, alertDate: ts, state: state });
+        recordHistory(location, title, e.alertDate || '', state);
+        added++;
+      }
+      return added;
+    }
+
+    function finalize() {
+      if (dayHistoryReady) return; // already handled (404 or non-array)
+      extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
+      if (extendedHistory.length > 0) {
+        timelineMin = extendedHistory[0].alertDate;
+        timelineMax = isViewingToday()
+          ? Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now())
+          : extendedHistory[extendedHistory.length - 1].alertDate;
+      }
+      console.log('Day history (' + dateParam + '):', extendedHistory.length, 'entries');
+      dayHistoryReady = true;
+      if (onDone) onDone();
+    }
+
     fetch('/api/day-history?date=' + dateParam)
       .then(function(resp) {
         if (resp.status === 404) {
@@ -1826,36 +1864,28 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       .then(function(entries) {
         if (!entries) return; // 404 case already handled
         if (!Array.isArray(entries)) { dayHistoryReady = true; if (onDone) onDone(); return; }
-        for (var i = 0; i < entries.length; i++) {
-          var e = entries[i];
-          if (!e.data || !e.category_desc) continue;
-          var rid = String(e.rid || '');
-          var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
-          var state = classifyTitle(title);
-          var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
-          var ts = parseAlertDate(e.alertDate);
-          if (!ts) continue;
-          // Dedup by rid AND composite key
-          var compositeKey = location + '|' + (e.alertDate || '').replace('T', ' ');
-          if (rid && extendedRids.has(rid)) continue;
-          if (extendedRids.has(compositeKey)) continue;
-          if (rid) extendedRids.add(rid);
-          extendedRids.add(compositeKey);
-          extendedHistory.push({ location: location, title: title, alertDate: ts, state: state });
-          recordHistory(location, title, e.alertDate || '', state);
+        processEntries(entries);
+
+        // Gap-fill: when viewing today, fetch extended history API
+        // to cover the ~15-30 min lag between R2 and real-time
+        if (isViewingToday()) {
+          return fetch('/api/alarms-history')
+            .then(function(resp) {
+              if (!resp.ok) throw new Error('HTTP ' + resp.status);
+              return resp.json();
+            })
+            .then(function(recentEntries) {
+              if (Array.isArray(recentEntries)) {
+                var added = processEntries(recentEntries);
+                if (added > 0) console.log('Gap-fill: added', added, 'entries from extended history API');
+              }
+            })
+            .catch(function(err) {
+              console.warn('Gap-fill fetch failed (non-fatal):', err);
+            });
         }
-        // Sort ascending by time
-        extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-        if (extendedHistory.length > 0) {
-          timelineMin = extendedHistory[0].alertDate;
-          timelineMax = isViewingToday()
-            ? Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now())
-            : extendedHistory[extendedHistory.length - 1].alertDate;
-        }
-        console.log('Day history (' + dateParam + '):', extendedHistory.length, 'entries');
-        dayHistoryReady = true;
-        if (onDone) onDone();
       })
+      .then(finalize)
       .catch(function(err) {
         console.error('Day history fetch error:', err);
         dayHistoryReady = true;
@@ -2570,12 +2600,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         fetchLiveAlerts();
         updateLiveStatus();
 
-        // Fetch live history first, then day-history in background
         fetchHistory(function() {
           initialized = true;
-          fetchExtendedHistory(function() {
-            rebuildTimelineFn();
-          });
+        });
+        // Day-history + gap-fill load in background (independent of live history)
+        fetchExtendedHistory(function() {
+          rebuildTimelineFn();
         });
       }
 
