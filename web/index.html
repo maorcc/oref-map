@@ -2110,13 +2110,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       container.classList.remove('open');
       stopPlay();
 
-      if (autoZoomActive) {
-        maybeZoomToEvent();
-      } else {
-        isZoomingProgrammatically = true;
-        map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
-      }
-
       // If viewing a past date, reset to today
       if (!isViewingToday()) {
         timelineDate = null;
@@ -2137,8 +2130,16 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         });
       }
 
+      // Restore live state before zoom decision so getActiveEventBounds reflects reality
       enterLiveMode();
       updateOverlay();
+
+      if (autoZoomActive && getActiveEventBounds()) {
+        maybeZoomToEvent();
+      } else {
+        isZoomingProgrammatically = true;
+        map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+      }
     }
     closeTimelinePanel = closeTimeline;
 

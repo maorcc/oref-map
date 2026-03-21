@@ -8,6 +8,9 @@ HISTORY_PROXY_URL = "https://proxy1.oref-proxy1.workers.dev"
 [triggers]
 crons = ["3/15 * * * *"]
 
+[observability]
+enabled = true
+
 [[r2_buckets]]
 binding = "HISTORY_BUCKET"
 bucket_name = "oref-history"

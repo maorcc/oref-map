@@ -210,6 +210,8 @@ window = [scheduledTime - 30min,  scheduledTime - 15min)
 
 Windows are contiguous — the next run's window starts exactly where the previous ended. Using `event.scheduledTime` means retries or delayed execution don't corrupt window boundaries.
 
+**`scheduledTime` has non-zero seconds**: Despite being a cron trigger, `event.scheduledTime` can include seconds (e.g., `:03:39` instead of `:03:00`). Since oref `alertDate` values always have `:00` seconds, the string comparison `>=`/`<` would misalign window boundaries. The code snaps `scheduledTime` to the nearest cron schedule point (minutes 3, 18, 33, 48) to ensure clean `:00` second boundaries.
+
 **Israel time conversion**: `alertDate` values from the API are in Israel time. Window bounds (UTC timestamps) are converted using `Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' })` for string comparison.
 
 **Processing**:
@@ -221,7 +223,9 @@ Windows are contiguous — the next run's window starts exactly where the previo
 6. For each date: read existing `.jsonl` from R2, append new entries, write back
 7. At midnight crossing (`startDate < endDate`): write `.complete` marker for the completed day
 
-**Error handling**: On fetch failure after 3 retries (delays: 5s, 15s, 45s), sends a Pushover notification and aborts. R2 write failures and CPU limit crashes are **not** notified.
+**Observability**: `[observability] enabled = true` in wrangler.toml persists logs to the Cloudflare dashboard. Console logs include window boundaries, entry counts, and R2 write details for each cron run.
+
+**Error handling**: On fetch failure after 3 retries (delays: 5s, 15s, 45s), sends a Pushover notification and aborts. R2 write failures and CPU limit crashes are **not** notified — check dashboard logs.
 
 ### Day-history API (`functions/api/day-history.js`)
 

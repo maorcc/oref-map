@@ -46,13 +46,17 @@ async function sendPushover(env, title, message) {
 
 export default {
   async scheduled(event, env, ctx) {
-    const scheduledTime = event.scheduledTime; // ms UTC
+    // Snap to nearest cron point (minutes 3, 18, 33, 48) — scheduledTime can drift by seconds
+    const rawMinutes = Math.floor(event.scheduledTime / 60000);
+    const scheduledTime = (Math.floor((rawMinutes - 3) / 15) * 15 + 3) * 60000;
 
     const windowEndMs = scheduledTime - 15 * 60 * 1000;
     const windowStartMs = scheduledTime - 30 * 60 * 1000;
 
     const windowStartStr = toIsraelTimeStr(windowStartMs);
     const windowEndStr = toIsraelTimeStr(windowEndMs);
+
+    console.log(`Window: [${windowStartStr}, ${windowEndStr})`);
 
     let entries;
     try {
@@ -62,7 +66,9 @@ export default {
       );
       const text = (await resp.text()).replace(/^\ufeff/, '');
       entries = JSON.parse(text);
+      console.log(`Fetched ${entries.length} entries from API`);
     } catch (e) {
+      console.error(`Fetch failed: ${e.message}`);
       ctx.waitUntil(sendPushover(
         env,
         'oref-map ingestion failure',
@@ -85,6 +91,8 @@ export default {
       byDate[d].push(e);
     }
 
+    console.log(`Filtered: ${filtered.length} entries, dates: ${Object.keys(byDate).join(', ') || 'none'}`);
+
     // Append to each date's JSONL file
     for (const [d, dateEntries] of Object.entries(byDate)) {
       const existing = await env.HISTORY_BUCKET.get(`${d}.jsonl`);
@@ -93,6 +101,7 @@ export default {
       await env.HISTORY_BUCKET.put(`${d}.jsonl`, existingText + newLines, {
         httpMetadata: { contentType: 'application/jsonl' },
       });
+      console.log(`Wrote ${d}.jsonl: ${dateEntries.length} new + ${existingText.length} bytes existing`);
     }
 
     // Midnight: write .complete marker for previous day when window crosses midnight
@@ -105,6 +114,7 @@ export default {
         await env.HISTORY_BUCKET.put(completeKey, '', {
           httpMetadata: { contentType: 'text/plain' },
         });
+        console.log(`Wrote ${completeKey}`);
       }
     }
   },
