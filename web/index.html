@@ -1514,7 +1514,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     if (!Array.isArray(locations)) return;
     var isNewAlert = alert.id !== lastLiveAlertId;
     lastLiveAlertId = alert.id;
-    var now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    var now = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
     for (var i = 0; i < locations.length; i++) {
       var loc = locations[i];
       recordHistory(loc, title, now, state);
@@ -1548,7 +1548,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     // Also feed into extendedHistory for timeline, but only if date matches the viewed day
     var entryDate = (entry.alertDate || '').slice(0, 10);
     var viewingDate = timelineDate || todayDateStr();
-    var key = location + '|' + (entry.alertDate || '');
+    var key = location + '|' + (entry.alertDate || '').replace('T', ' ');
     if (entryDate === viewingDate && !extendedRids.has(key) && since) {
       extendedRids.add(key);
       extendedHistory.push({ location: location, title: title, alertDate: since, state: state });
@@ -1836,7 +1836,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           var ts = parseAlertDate(e.alertDate);
           if (!ts) continue;
           // Dedup by rid AND composite key
-          var compositeKey = location + '|' + (e.alertDate || '');
+          var compositeKey = location + '|' + (e.alertDate || '').replace('T', ' ');
           if (rid && extendedRids.has(rid)) continue;
           if (extendedRids.has(compositeKey)) continue;
           if (rid) extendedRids.add(rid);
