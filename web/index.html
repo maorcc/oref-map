@@ -608,7 +608,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   'use strict';
 
   // --- Debug overlay (append console.warn/error to on-screen log when ?debug) ---
-  var isDebugMode = location.search.indexOf('debug') !== -1;
+  var isDebugMode = new URLSearchParams(location.search).has('debug');
   if (isDebugMode) {
     var debugOverlay = document.createElement('div');
     debugOverlay.id = 'debug-overlay';
@@ -2034,6 +2034,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       locationHistory = {};
       timelineMin = 0;
       timelineMax = 0;
+      lastHistoryDate = null;
       stopPlay();
       timelineDate = (newDate === todayDateStr()) ? null : newDate;
       updateDateNav();
@@ -2112,6 +2113,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         locationHistory = {};
         timelineMin = 0;
         timelineMax = 0;
+        lastHistoryDate = null;
         dayHistoryReady = false;
         updateDateNav();
         // Restart history polling

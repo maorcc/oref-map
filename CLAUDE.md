@@ -42,7 +42,7 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 ### History API
 - **URL**: `https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json`
 - Returns ~1 hour of recent alerts (entries expire by age, not by count).
-- Shape: `{"alertDate", "title", "data": "location", "category"}`
+- Shape: `[{"alertDate", "title", "data": "location", "category"}, ...]`
 - `data` is a **string** (single location), unlike the live API.
 - `alertDate` format: `"YYYY-MM-DD HH:MM:SS"`
 - Reliable record of all alerts including all-clears. Use this to reconstruct current state on page load.
