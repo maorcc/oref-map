@@ -29,7 +29,8 @@ A static single-page web app showing live Pikud HaOref (Home Front Command) aler
 - **Poll interval**: 10 seconds
 - **Shape**: `[{"alertDate": "YYYY-MM-DD HH:MM:SS", "title", "data": "location", "category"}, ...]`
 - `data` is a **string** (single location), unlike the live API.
-- Reliable record of all alerts including all-clears. Used on page load to reconstruct initial state, and polled to catch all-clear events that would be missed in the live API.
+- Returns ~1 hour of recent alerts (entries expire by age, not by count).
+- Reliable record of all alerts including all-clears. Used on page load to reconstruct initial state, and polled to catch all-clear events that would be missed in the live API. Also feeds into the timeline's `extendedHistory` to fill the R2 day-history lag.
 
 ### Extended History API
 - **URL**: `https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1`
@@ -37,7 +38,7 @@ A static single-page web app showing live Pikud HaOref (Home Front Command) aler
 - **Shape**: `{"data": "location", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category_desc": "title", "rid": number, ...}`
 - `rid` is a unique ID per entry — used for deduplication.
 - **Modes**: `mode=0` (all), `mode=1` (24h), `mode=2` (7d), `mode=3` (month). City filter: `city_0=<name>`. Date filtering params are broken — always returns latest entries regardless.
-- Previously proxied at `/api/alarms-history` and used directly by the timeline slider. Now superseded by the day-history API backed by R2 (see [History Storage](#history-storage) below). The proxy endpoint still exists and is used by the ingestion worker.
+- Not used by the client UI. The regular history API covers ~50-60 min, which fills the R2 lag for the timeline. The proxy endpoint (`/api/alarms-history`) is only used by the ingestion worker to populate R2.
 
 ### Why Dual Polling?
 
@@ -154,7 +155,7 @@ The timeline fetches from `/api/day-history?date=YYYY-MM-DD` (backed by R2 stora
 
 ### Previous design
 
-The original timeline fetched the extended history API (`/api/alarms-history`) on each panel open. This limited the timeline to ~1–2 hours of recent data. The R2-backed approach gives access to the full history of the war.
+The original timeline fetched the extended history API (`/api/alarms-history`) on each panel open. This limited the timeline to ~1–2 hours of recent data. The R2-backed approach gives access to the full history of the war. The regular history API (~1 hour coverage, polled every 10s) fills the R2 lag for the most recent events.
 
 ## History Storage
 

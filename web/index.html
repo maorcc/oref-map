@@ -328,46 +328,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 .tl-close:hover { color: #333; }
 #timeline-btn.open .tl-close { display: inline; }
 
-#test-danger-btn {
-  display: none;
-  position: fixed;
-  bottom: 24px;
-  left: 120px;
-  width: 40px;
-  height: 40px;
-  background: rgba(255,255,255,0.92);
-  border: none;
-  border-radius: 8px;
-  font-size: 22px;
-  line-height: 40px;
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 1000;
-  padding: 0;
-}
-#test-danger-btn:hover { background: #f0f0f0; }
-
-#test-all-clear-btn {
-  display: none;
-  position: fixed;
-  bottom: 24px;
-  left: 168px;
-  width: 40px;
-  height: 40px;
-  background: rgba(255,255,255,0.92);
-  border: none;
-  border-radius: 8px;
-  font-size: 22px;
-  line-height: 40px;
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  z-index: 1000;
-  padding: 0;
-}
-#test-all-clear-btn:hover { background: #f0f0f0; }
-
 #timeline-controls {
   display: none;
   padding: 10px 12px;
@@ -552,22 +512,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   #tl-date-label { font-size: 12px; }
   .btn-icon { font-size: 16px; }
   .btn-text { font-size: 12px; }
-  #test-danger-btn {
-    bottom: 12px;
-    left: 100px;
-    width: 36px;
-    height: 36px;
-    font-size: 20px;
-    line-height: 36px;
-  }
-  #test-all-clear-btn {
-    bottom: 12px;
-    left: 144px;
-    width: 36px;
-    height: 36px;
-    font-size: 20px;
-    line-height: 36px;
-  }
 }
 </style>
 </head>
@@ -659,12 +603,30 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     </div>
   </div>
 </div>
-<button id="test-danger-btn" title="בדיקת צליל סכנה">🚨</button>
-<button id="test-all-clear-btn" title="בדיקת צליל רגיעה">✅</button>
-
 <script>
 (function() {
   'use strict';
+
+  // --- Debug overlay (append console.warn/error to on-screen log when ?debug) ---
+  var isDebugMode = location.search.indexOf('debug') !== -1;
+  if (isDebugMode) {
+    var debugOverlay = document.createElement('div');
+    debugOverlay.id = 'debug-overlay';
+    debugOverlay.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:30vh;overflow-y:auto;' +
+      'background:rgba(0,0,0,0.85);color:#eee;font:11px/1.4 monospace;padding:6px 10px;z-index:9999;' +
+      'pointer-events:auto;direction:ltr;text-align:left;';
+    document.body.appendChild(debugOverlay);
+    var origWarn = console.warn, origError = console.error;
+    function debugLog(level, args) {
+      var line = document.createElement('div');
+      line.style.color = level === 'error' ? '#f66' : '#fd0';
+      line.textContent = '[' + level + '] ' + Array.prototype.join.call(args, ' ');
+      debugOverlay.appendChild(line);
+      debugOverlay.scrollTop = debugOverlay.scrollHeight;
+    }
+    console.warn = function() { origWarn.apply(console, arguments); debugLog('warn', arguments); };
+    console.error = function() { origError.apply(console, arguments); debugLog('error', arguments); };
+  }
 
   // --- Config ---
   // Set PROXY_BASE to the Cloudflare Worker URL for production, e.g.:
@@ -1091,19 +1053,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         });
       })(name, polygon);
       locationPolygons[name] = polygon;
-    }
-
-    // ?debug: show all polygon outlines
-    if (location.search.indexOf('debug') !== -1) {
-      document.getElementById('test-danger-btn').style.display = 'block';
-      document.getElementById('test-all-clear-btn').style.display = 'block';
-      var debugStyle = document.createElement('style');
-      debugStyle.textContent = '.leaflet-overlay-pane path { stroke: #555 !important; stroke-opacity: 1 !important; stroke-width: 1 !important; }';
-      document.head.appendChild(debugStyle);
-      for (var n in locationPolygons) {
-        locationPolygons[n].setStyle({ fillOpacity: 0.05 });
-      }
-      L.rectangle([[29.4, 34.2], [33.4, 35.9]], { color: '#0000ff', weight: 2, fill: false }).addTo(map);
     }
 
     console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
@@ -1890,29 +1839,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         if (!entries) return; // 404 case already handled
         if (!Array.isArray(entries)) return;
         processEntries(entries);
-
-        // Gap-fill: when viewing today, fetch extended history API
-        // to cover the ~15-30 min lag between R2 and real-time
-        if (isViewingToday()) {
-          return fetch('/api/alarms-history')
-            .then(function(resp) {
-              if (!resp.ok) throw new Error('HTTP ' + resp.status);
-              return resp.json();
-            })
-            .then(function(recentEntries) {
-              if (Array.isArray(recentEntries)) {
-                // Filter to current date (around midnight, API may include yesterday's entries)
-                var sameDayEntries = recentEntries.filter(function(entry) {
-                  return (entry.alertDate || '').slice(0, 10) === dateParam;
-                });
-                var added = processEntries(sameDayEntries);
-                if (added > 0) console.log('Gap-fill: added', added, 'entries from extended history API');
-              }
-            })
-            .catch(function(err) {
-              console.warn('Gap-fill fetch failed (non-fatal):', err);
-            });
-        }
       })
       .then(finalize)
       .catch(function(err) {
@@ -2589,62 +2515,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
       buildPolygons(data);
 
-      var isDebug2 = location.search.indexOf('debug2') !== -1;
-
       // Init timeline immediately (button always visible)
       initTimeline();
 
-      if (isDebug2) {
-        isLiveMode = false;
-        fetch('interesting-map.json')
-          .then(function(r) { return r.json(); })
-          .then(function(entries) {
-            if (Array.isArray(entries)) {
-              for (var i = 0; i < entries.length; i++) {
-                var e = entries[i];
-                if (!e.data || !e.category_desc) continue;
-                var rid = String(e.rid || '');
-                if (rid && extendedRids.has(rid)) continue;
-                var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
-                var state = classifyTitle(title);
-                var loc = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
-                var ts = parseAlertDate(e.alertDate);
-                if (!ts) continue;
-                if (rid) extendedRids.add(rid);
-                extendedHistory.push({ location: loc, title: title, alertDate: ts, state: state });
-                recordHistory(loc, title, e.alertDate || '', state);
-              }
-              extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-              if (extendedHistory.length > 0) {
-                timelineMin = extendedHistory[0].alertDate;
-                timelineMax = extendedHistory[extendedHistory.length - 1].alertDate;
-              }
-            }
-            initialized = true;
-            dayHistoryReady = true;
-            rebuildTimelineFn();
-            if (extendedHistory.length > 0) reconstructStateAt(timelineMax);
-          })
-          .catch(function(err) {
-            console.error('debug2: failed to load interesting-map.json:', err);
-            initialized = true;
-            dayHistoryReady = true;
-          });
-      } else {
-        // Start live + history polling immediately
-        setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-        historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-        setInterval(fadeGreenMarkers, FADE_TICK_MS);
-        fetchLiveAlerts();
+      // Start live + history polling immediately
+      setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+      historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+      setInterval(fadeGreenMarkers, FADE_TICK_MS);
+      fetchLiveAlerts();
 
-        fetchHistory(function() {
-          initialized = true;
-        });
-        // Day-history + gap-fill load in background (independent of live history)
-        fetchExtendedHistory(function() {
-          rebuildTimelineFn();
-        });
-      }
+      fetchHistory(function() {
+        initialized = true;
+      });
+      // Day-history + gap-fill load in background (independent of live history)
+      fetchExtendedHistory(function() {
+        rebuildTimelineFn();
+      });
 
       if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
     }).catch(function(err) {
@@ -2767,13 +2653,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   document.getElementById('sound-all-btn').addEventListener('click', function() {
     selectSoundLocation('all');
-  });
-
-  document.getElementById('test-danger-btn').addEventListener('click', function() {
-    playDangerSound();
-  });
-  document.getElementById('test-all-clear-btn').addEventListener('click', function() {
-    playAllClearSound();
   });
 
   soundSearch.addEventListener('input', function() {

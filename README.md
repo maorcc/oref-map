@@ -87,4 +87,3 @@ Polls the Oref APIs:
 
 - **Live alerts** (`/api/alerts`) — every 1 second
 - **History** (`/api/history`) — every 10 seconds
-- **Extended history** (`/api/alarms-history`) — on demand (timeline slider)

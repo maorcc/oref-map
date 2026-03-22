@@ -8,6 +8,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 **Public URL**: https://oref-map.org
 
+## Product principles
+
+- **Complete history is non-negotiable.** Users rely on this system during active rocket attacks. If a missile hit 10 minutes ago and that event doesn't appear on the map or timeline, users lose trust in the system. Never accept gaps or missing events in displayed history — always ensure recent events are visible even if it requires redundant data sources.
+
 ## Commands
 
 ```bash
@@ -37,10 +41,12 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 
 ### History API
 - **URL**: `https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json`
-- Returns array of recent alerts: `{"alertDate", "title", "data": "location", "category"}`
+- Returns ~1 hour of recent alerts (entries expire by age, not by count).
+- Shape: `{"alertDate", "title", "data": "location", "category"}`
 - `data` is a **string** (single location), unlike the live API.
 - `alertDate` format: `"YYYY-MM-DD HH:MM:SS"`
 - Reliable record of all alerts including all-clears. Use this to reconstruct current state on page load.
+- Also feeds into the timeline's `extendedHistory` to fill the R2 day-history lag (~15-30 min).
 
 ### Category numbers are unreliable
 Do **not** use `cat`/`category` for classification — the same number is reused for different alert types across the two APIs. Always classify by **title text**.
@@ -79,10 +85,19 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 - `category_desc` is the alert title. Classify the same way.
 - `rid` is a unique ID per entry — used for deduplication.
 - Date filtering params are ignored — always returns latest entries.
-- Used by the timeline slider to reconstruct map state at any point in the past ~1-2 hours.
+- **Not used by the client UI** — only consumed by the ingestion worker to populate R2 day-history. The regular history API (~50-60 min coverage) fills the R2 lag for the timeline.
 
 ### Dual polling rationale
 The live API is polled every 1s for immediate danger display. The history API is polled every 10s because all-clear events are short-lived in the live API and would be missed — the history API is the reliable source for state transitions to green.
+
+### Other available endpoints (not currently used)
+- `https://www.oref.org.il/alerts/alertCategories.json` — alert category definitions
+- `https://www.oref.org.il/alerts/alertsTranslation.json` — localized alert text
+- `https://www.oref.org.il/alerts/RemainderConfig_heb.json` — shelter duration per area
+- `https://www.oref.org.il/alerts/alertHistoryCount.json` — summary alert count
+- `https://www.oref.org.il/districts/districts_heb.json` — districts/areas list
+- `https://www.oref.org.il/districts/cities_heb.json` — cities list with metadata
+- `https://www.oref.org.il/districts/citiesNotes_heb.json` — per-city notes
 
 ### Geo-blocking
 The Oref APIs geo-block non-Israeli IPs with **HTTP 403**. Pages Functions at `/api/*` check the colo — TLV users are proxied directly, non-TLV users get a 303 redirect to `/api2/*` which is handled by the placement-pinned Worker. See `docs/architecture.md` for details.
