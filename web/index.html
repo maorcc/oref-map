@@ -1800,7 +1800,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           setStatus('err', 'תקלה בטעינת התרעות קודמות. מנסה שוב...');
         }
         console.error('History fetch error:', err);
-        if (onDone) onDone();
+        if (onDone) setTimeout(function() { fetchHistory(onDone); }, 1000);
       });
   }
 
