@@ -1636,6 +1636,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
   function updateLiveStatus() {
     if (!isLiveMode) return;
+    if (!initialized) return;
     var dominant = null, bestP = -1;
     var P = { red: 3, purple: 2, yellow: 1 };
     for (var name in locationStates) {
@@ -2635,7 +2636,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
         setInterval(fadeGreenMarkers, FADE_TICK_MS);
         fetchLiveAlerts();
-        updateLiveStatus();
 
         fetchHistory(function() {
           initialized = true;
