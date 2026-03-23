@@ -5,7 +5,7 @@ const OREF_HEADERS = {
 
 const PROXY_HOSTS = [
   'https://orefproxy5.oref-map.org',
-  'https://orefproxy6.oref-map.org',
+  'https://orefproxy7.oref-map.org',
   'https://proxy1.oref-proxy1.workers.dev',
 ];
 
