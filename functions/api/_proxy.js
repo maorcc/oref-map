@@ -9,9 +9,9 @@ const PROXY_HOSTS = [
   'https://proxy1.oref-proxy1.workers.dev',
 ];
 
-const PROXY_HOSTS_WHITELIST = [
-  ...PROXY_HOSTS,
-  'https://orefproxy8.oref-map.org',
+const PROXY_HOST_PATTERNS = [
+  /^orefproxy\d+\.oref-map\.org$/,
+  /^proxy\d+\.oref-proxy\d+\.workers\.dev$/,
 ];
 
 function randomProxy() {
@@ -155,7 +155,7 @@ export async function orefProxy(context, { target, redirectSuffix, kind }) {
 
   // ?debugapi=<hostname> forces redirect to that proxy (if whitelisted), even from TLV
   if (debugApi) {
-    const proxyHost = PROXY_HOSTS_WHITELIST.find(h => h === 'https://' + debugApi);
+    const proxyHost = PROXY_HOST_PATTERNS.some(p => p.test(debugApi)) ? 'https://' + debugApi : null;
     if (proxyHost) {
       return new Response(null, {
         status: 303,
