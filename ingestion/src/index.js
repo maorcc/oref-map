@@ -44,14 +44,51 @@ async function sendPushover(env, title, message) {
   });
 }
 
+// Map alertDate to R2 file date key. Events from 23:xx belong to next day's file.
+// Each day file covers (D-1)T23:00 to DT22:59.
+function r2DateKey(alertDateStr) {
+  const d = new Date(alertDateStr.slice(0, 10) + 'T12:00:00Z');
+  if (parseInt(alertDateStr.slice(11, 13)) >= 23)
+    d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// Determine the 15-minute ingestion window from wall time.
+// Returns { windowStartMs, windowEndMs } or null if in a dead zone.
+// Cron runs at :03, :18, :33, :48 but actual execution may drift.
+//   :01–:13 → [XX:45, XX+1:00)    :17–:28 → [XX:00, XX:15)
+//   :32–:43 → [XX:15, XX:30)      :47–:58 → [XX:30, XX:45)
+//   Dead zones: :14–:16, :29–:31, :44–:46, :59–:00
+function computeWindow(nowMs) {
+  const israelStr = toIsraelTimeStr(nowMs);
+  const minute = parseInt(israelStr.slice(14, 16));
+
+  // Map minute to window-end offset (minutes after the hour, Israel time)
+  let windowEndMinute;
+  if (minute >= 1 && minute <= 13) windowEndMinute = 0;       // [XX:45, XX+1:00)
+  else if (minute >= 17 && minute <= 28) windowEndMinute = 15; // [XX:00, XX:15)
+  else if (minute >= 32 && minute <= 43) windowEndMinute = 30; // [XX:15, XX:30)
+  else if (minute >= 47 && minute <= 58) windowEndMinute = 45; // [XX:30, XX:45)
+  else return null; // dead zone
+
+  // Compute window end by subtracting the offset from nowMs to reach :00/:15/:30/:45
+  // For windowEndMinute=0, subtract the full minute+seconds to reach the top of the hour
+  const seconds = parseInt(israelStr.slice(17, 19));
+  const offsetMinutes = windowEndMinute === 0 ? minute : minute - windowEndMinute;
+  const windowEndMs = nowMs - offsetMinutes * 60000 - seconds * 1000;
+  const windowStartMs = windowEndMs - 15 * 60000;
+
+  return { windowStartMs, windowEndMs };
+}
+
 export default {
   async scheduled(event, env, ctx) {
-    // Snap to nearest cron point (minutes 3, 18, 33, 48) — scheduledTime can drift by seconds
-    const rawMinutes = Math.floor(event.scheduledTime / 60000);
-    const scheduledTime = (Math.floor((rawMinutes - 3) / 15) * 15 + 3) * 60000;
-
-    const windowEndMs = scheduledTime - 15 * 60 * 1000;
-    const windowStartMs = scheduledTime - 30 * 60 * 1000;
+    const window = computeWindow(Date.now());
+    if (!window) {
+      console.log('Dead zone — skipping execution');
+      return;
+    }
+    const { windowStartMs, windowEndMs } = window;
 
     const windowStartStr = toIsraelTimeStr(windowStartMs);
     const windowEndStr = toIsraelTimeStr(windowEndMs);
@@ -83,10 +120,10 @@ export default {
 
     filtered.sort((a, b) => a.alertDate < b.alertDate ? -1 : a.alertDate > b.alertDate ? 1 : 0);
 
-    // Group by date
+    // Group by R2 date key (events 23:xx go to next day's file)
     const byDate = {};
     for (const e of filtered) {
-      const d = e.alertDate.slice(0, 10);
+      const d = r2DateKey(e.alertDate);
       if (!byDate[d]) byDate[d] = [];
       byDate[d].push(e);
     }
@@ -102,20 +139,6 @@ export default {
         httpMetadata: { contentType: 'application/jsonl' },
       });
       console.log(`Wrote ${d}.jsonl: ${dateEntries.length} new + ${existingText.length} bytes existing`);
-    }
-
-    // Midnight: write .complete marker for previous day when window crosses midnight
-    const startDate = windowStartStr.slice(0, 10);
-    const endDate = windowEndStr.slice(0, 10);
-    if (startDate < endDate) {
-      const completeKey = `${startDate}.complete`;
-      const existing = await env.HISTORY_BUCKET.head(completeKey);
-      if (!existing) {
-        await env.HISTORY_BUCKET.put(completeKey, '', {
-          httpMetadata: { contentType: 'text/plain' },
-        });
-        console.log(`Wrote ${completeKey}`);
-      }
     }
   },
 };

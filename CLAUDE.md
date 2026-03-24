@@ -27,6 +27,9 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 - `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
 - `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
 - `worker/wrangler.toml` — Worker configuration with placement and `/api2/*` route
+- `ingestion/src/index.js` — Cloudflare Worker cron: ingests extended history API into R2 day-history files
+- `tools/backfill_history.py` — One-off script to rebuild R2 day-history files from the oref API (mode=3, city by city)
+- `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
 - `docs/map-requirements.md` — Feature requirements doc
 
 ## Oref API details
@@ -46,7 +49,7 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 - `data` is a **string** (single location), unlike the live API.
 - `alertDate` format: `"YYYY-MM-DD HH:MM:SS"`
 - Reliable record of all alerts including all-clears. Use this to reconstruct current state on page load.
-- Also feeds into the timeline's `extendedHistory` to fill the R2 day-history lag (~15-30 min).
+- Also feeds into the timeline's `extendedHistory` to fill the R2 day-history lag (~3-18 min).
 
 ### Category numbers are unreliable
 Do **not** use `cat`/`category` for classification — the same number is reused for different alert types across the two APIs. Always classify by **title text**.

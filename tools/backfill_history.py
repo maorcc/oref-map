@@ -17,7 +17,9 @@ Identical dates are skipped silently.
 
 Usage:
     uv run tools/backfill_history.py            # WAR_START..yesterday, interactive
-    uv run tools/backfill_history.py --today     # merge today first (no prompt), then interactive
+    uv run tools/backfill_history.py --today      # merge today first, then interactive
+    uv run tools/backfill_history.py --yes        # overwrite all without prompting
+    uv run tools/backfill_history.py --today --yes # merge today + overwrite all
 """
 
 import asyncio
@@ -39,6 +41,16 @@ HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
 }
 CONCURRENCY = 10
+
+
+def r2_date_key(alert_date: str) -> str:
+    """Map alertDate to R2 file date key. 23:xx → next day."""
+    d = date.fromisoformat(alert_date[:10])
+    if int(alert_date[11:13]) >= 23:
+        d += timedelta(days=1)
+    return d.isoformat()
+
+
 RETRIES = 3
 RETRY_DELAYS = [2, 5, 15]
 WAR_START = "2026-02-28"
@@ -46,12 +58,17 @@ BUCKET = "oref-history"
 COMPARE_DIR = Path("tmp/backfill-compare")
 
 
-async def fetch_city(session: aiohttp.ClientSession, semaphore: asyncio.Semaphore, city: str) -> list:
+async def fetch_city(
+    session: aiohttp.ClientSession,
+    semaphore: asyncio.Semaphore,
+    city: str,
+) -> list:
     url = f"{BASE_URL}?lang=he&mode=3&city_0={quote(city)}"
     async with semaphore:
         for attempt in range(RETRIES):
             try:
-                async with session.get(url, headers=HEADERS, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                timeout = aiohttp.ClientTimeout(total=20)
+                async with session.get(url, headers=HEADERS, timeout=timeout) as resp:
                     resp.raise_for_status()
                     text = await resp.text(encoding="utf-8-sig")
                     data = json.loads(text) if text.strip() else []
@@ -92,7 +109,7 @@ def to_jsonl(entries: list[dict]) -> str:
 def download_remote(day: str, dest: Path) -> list[dict]:
     """Download YYYY-MM-DD.jsonl from R2. Returns parsed entries, or [] if not found."""
     result = subprocess.run(
-        ["npx", "wrangler", "r2", "object", "get", f"{BUCKET}/{day}.jsonl",
+        ["npx", "--yes", "wrangler", "r2", "object", "get", f"{BUCKET}/{day}.jsonl",
          "--file", str(dest), "--remote"],
         capture_output=True,
         text=True,
@@ -108,7 +125,7 @@ def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
         tmp_path = f.name
     try:
         result = subprocess.run(
-            ["npx", "wrangler", "r2", "object", "put", f"{BUCKET}/{key}",
+            ["npx", "--yes", "wrangler", "r2", "object", "put", f"{BUCKET}/{key}",
              "--file", tmp_path, "--content-type", content_type, "--remote"],
             capture_output=True,
             text=True,
@@ -121,18 +138,6 @@ def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
         Path(tmp_path).unlink(missing_ok=True)
 
 
-def wrangler_put_empty(key: str) -> bool:
-    result = subprocess.run(
-        ["npx", "wrangler", "r2", "object", "put", f"{BUCKET}/{key}",
-         "--pipe", "--content-type", "text/plain", "--remote"],
-        input=b"",
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        print(f"  UPLOAD FAIL {key}:\n{result.stderr.decode()}", file=sys.stderr)
-        return False
-    return True
-
 
 def merge_entries(backfill: list[dict], remote: list[dict]) -> list[dict]:
     """Union of both entry sets by rid, sorted by alertDate."""
@@ -143,8 +148,10 @@ def merge_entries(backfill: list[dict], remote: list[dict]) -> list[dict]:
 
 
 async def main() -> None:
+    start_time = datetime.now()
     t0 = time.monotonic()
     update_today = "--today" in sys.argv
+    auto_yes = "--yes" in sys.argv
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     today_str = date.today().isoformat()
 
@@ -188,21 +195,36 @@ async def main() -> None:
                 "category_desc": e["category_desc"],
                 "rid": rid,
             }
-            by_date.setdefault(alert_date[:10], []).append(entry)
+            by_date.setdefault(r2_date_key(alert_date), []).append(entry)
 
     total = sum(len(v) for v in by_date.values())
     print(f"  {total} unique entries across {len(by_date)} dates")
 
+    # Stats tracking
+    today_result = None  # "uploaded", "skipped", "failed", or None (not requested)
+    today_added = 0
+    skipped_identical = 0
+    skipped_declined = 0
+
     # --today: merge today's data immediately (no prompt)
     if update_today:
-        # Cutoff = last completed cron window end. Cron window ends at :03, :18, :33, :48.
+        # Cutoff = last completed cron window end. Cron ingests quarter-hour blocks
+        # [XX:00, XX:15), [XX:15, XX:30), etc. — the quarter ending at :00/:15/:30/:45.
+        # Cron fires 3 min after each quarter ends,
+        # so if now >= :03, the :00 quarter is done.
         now = datetime.now()
-        cutoff_minutes = [3, 18, 33, 48]
-        candidates = [m for m in cutoff_minutes if m <= now.minute]
+        cutoff_minutes = [0, 15, 30, 45]
+        candidates = [
+            m for m in cutoff_minutes if m + 3 <= now.minute
+        ]
         if candidates:
-            cutoff_time = now.replace(minute=max(candidates), second=0, microsecond=0)
+            cutoff_time = now.replace(
+                minute=max(candidates), second=0, microsecond=0,
+            )
         else:
-            cutoff_time = (now - timedelta(hours=1)).replace(minute=48, second=0, microsecond=0)
+            cutoff_time = (now - timedelta(hours=1)).replace(
+                minute=45, second=0, microsecond=0,
+            )
         cutoff_str = cutoff_time.strftime("%Y-%m-%dT%H:%M:%S")
         print(f"\nCutoff: {cutoff_str} (entries after this left to cron)")
 
@@ -210,7 +232,10 @@ async def main() -> None:
         backfill_entries = [e for e in all_today if e["alertDate"] < cutoff_str]
         skipped = len(all_today) - len(backfill_entries)
         if skipped:
-            print(f"  filtered: {len(backfill_entries)} entries before cutoff, {skipped} skipped")
+            print(
+                f"  filtered: {len(backfill_entries)} before cutoff,"
+                f" {skipped} skipped",
+            )
 
         remote_path = COMPARE_DIR / f"{today_str}.remote.jsonl"
         print(f"{today_str} (today): downloading remote...", end=" ", flush=True)
@@ -222,33 +247,48 @@ async def main() -> None:
         backfill_rids = {e["rid"] for e in backfill_entries}
         added = len(backfill_rids - remote_rids)
         kept = len(remote_rids - backfill_rids)
-        print(f"  merged={len(merged)} (added {added} from backfill, kept {kept} remote-only)")
+        print(
+            f"  merged={len(merged)}"
+            f" (added {added} from backfill,"
+            f" kept {kept} remote-only)",
+        )
 
         if added > 0:
             elapsed = time.monotonic() - t0
             print(f"  Uploading {today_str}.jsonl... (elapsed: {elapsed:.0f}s)")
-            if wrangler_put(f"{today_str}.jsonl", to_jsonl(merged).encode("utf-8"), "application/jsonl"):
+            data = to_jsonl(merged).encode("utf-8")
+            if wrangler_put(f"{today_str}.jsonl", data, "application/jsonl"):
                 upload_time = datetime.now()
                 upload_str = upload_time.strftime("%H:%M:%S")
                 # Next cron fires at the next :03/:18/:33/:48
                 cron_minutes = [3, 18, 33, 48]
                 next_crons = [m for m in cron_minutes if m > upload_time.minute]
                 if next_crons:
-                    next_cron = upload_time.replace(minute=next_crons[0], second=0, microsecond=0)
+                    next_cron = upload_time.replace(
+                        minute=next_crons[0], second=0, microsecond=0,
+                    )
                 else:
-                    next_cron = (upload_time + timedelta(hours=1)).replace(minute=3, second=0, microsecond=0)
+                    next_cron = (
+                        upload_time + timedelta(hours=1)
+                    ).replace(minute=3, second=0, microsecond=0)
                 margin = (next_cron - upload_time).total_seconds() / 60
 
-                print(f"\n  --- Today summary ---")
+                print("\n  --- Today summary ---")
                 print(f"  Cutoff:          {cutoff_str}")
                 print(f"  Upload completed: {upload_str}")
                 print(f"  Total duration:  {elapsed:.0f}s")
-                print(f"  Next cron:       {next_cron.strftime('%H:%M')}")
-                print(f"  Margin:          {margin:.1f} min {'OK' if margin >= 2 else 'TIGHT!'}")
+                next_cron_str = next_cron.strftime('%H:%M')
+                print(f"  Next cron:       {next_cron_str}")
+                ok = "OK" if margin >= 2 else "TIGHT!"
+                print(f"  Margin:          {margin:.1f} min {ok}")
+                today_result = "uploaded"
+                today_added = added
             else:
-                print(f"  FAILED", file=sys.stderr)
+                print("  FAILED", file=sys.stderr)
+                today_result = "failed"
         else:
             print("  no new entries to add, skipping upload")
+            today_result = "skipped"
 
     # Compare each past date against remote
     to_upload: list[tuple[str, list]] = []
@@ -265,6 +305,7 @@ async def main() -> None:
 
         if not remote_entries and not new_entries:
             print("  both empty, skipping")
+            skipped_identical += 1
             continue
 
         only_in_remote = remote_rids - new_rids
@@ -272,6 +313,7 @@ async def main() -> None:
 
         if not only_in_remote and not only_in_new:
             print("  identical, skipping")
+            skipped_identical += 1
             continue
 
         # Save new version locally for manual inspection
@@ -280,36 +322,61 @@ async def main() -> None:
 
         print(f"  only_in_remote={len(only_in_remote)}, only_in_new={len(only_in_new)}")
         if only_in_remote:
-            print(f"  WARNING: {len(only_in_remote)} entries will be lost if overwritten")
+            print(
+                f"  WARNING: {len(only_in_remote)} entries"
+                " will be lost if overwritten",
+            )
         print(f"  Saved: {remote_path.name}, {new_path.name}")
 
-        answer = input(f"  Overwrite {day}? [y/N] ").strip().lower()
-        if answer == "y":
+        if auto_yes:
+            print(f"  --yes: overwriting {day}")
             to_upload.append((day, new_entries))
+        else:
+            answer = input(f"  Overwrite {day}? [y/N] ").strip().lower()
+            if answer == "y":
+                to_upload.append((day, new_entries))
+            else:
+                skipped_declined += 1
 
-    if not to_upload:
-        print("\nNothing to upload.")
-        return
-
-    print(f"\nUploading {len(to_upload)} dates...")
     success = 0
     failures = []
-    for day, entries in to_upload:
-        print(f"  Uploading {day}.jsonl ({len(entries)} entries)...")
-        if not wrangler_put(f"{day}.jsonl", to_jsonl(entries).encode("utf-8"), "application/jsonl"):
-            failures.append(day)
-            continue
+    if to_upload:
+        print(f"\nUploading {len(to_upload)} dates...")
+        for day, entries in to_upload:
+            print(f"  Uploading {day}.jsonl ({len(entries)} entries)...")
+            data = to_jsonl(entries).encode("utf-8")
+            if not wrangler_put(f"{day}.jsonl", data, "application/jsonl"):
+                failures.append(day)
+                continue
+            success += 1
 
-        print(f"  Uploading {day}.complete...")
-        if not wrangler_put_empty(f"{day}.complete"):
-            failures.append(day)
-            continue
-
-        success += 1
-
-    print(f"\nDone. {success}/{len(to_upload)} dates uploaded successfully.")
+    # --- Final summary ---
+    end_time = datetime.now()
+    elapsed = time.monotonic() - t0
+    print(f"\n{'=' * 50}")
+    print("  Backfill summary")
+    print(f"{'=' * 50}")
+    print(f"  Started:          {start_time.strftime('%H:%M:%S')}")
+    print(f"  Finished:         {end_time.strftime('%H:%M:%S')}")
+    print(f"  Duration:         {elapsed:.0f}s ({elapsed / 60:.1f} min)")
+    print(f"  API entries:      {total} across {len(by_date)} dates")
+    print(f"  Date range:       {all_dates[0]} .. {all_dates[-1]}")
+    if update_today:
+        if today_result == "uploaded":
+            print(f"  Today ({today_str}): {today_result}"
+                  f" ({today_added} entries added)")
+        else:
+            print(f"  Today ({today_str}): {today_result}")
+    print(f"  Past dates:       {len(all_dates)} total")
+    print(f"    Identical:      {skipped_identical}")
+    print(f"    Uploaded:       {success}")
+    if skipped_declined:
+        print(f"    Declined:       {skipped_declined}")
     if failures:
-        print(f"Failures: {failures}", file=sys.stderr)
+        print(f"    Failed:         {len(failures)} — {failures}")
+    print(f"{'=' * 50}")
+
+    if failures:
         sys.exit(1)
 
 
