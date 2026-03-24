@@ -179,10 +179,11 @@ The Oref extended history API only exposes the latest ~3,000 entries (~1–2 hou
 
 ### Storage format
 
-Each day is stored as two R2 objects:
+Each day is stored as a single R2 object:
 
-- **`YYYY-MM-DD.jsonl`** — the data file, comma-per-line JSONL
-- **`YYYY-MM-DD.complete`** — empty marker; presence means the day is fully ingested
+- **`YYYY-MM-DD.jsonl`** — comma-per-line JSONL
+
+Each day file covers events from `(D-1)T23:00` to `DT22:59` (Israel time). Events with `alertDate` hour ≥ 23 are stored in the **next** day's file. This ensures that just after midnight, today's R2 file already contains yesterday's late-night events.
 
 Each entry occupies one line ending with `,\n`:
 
@@ -203,26 +204,29 @@ For an empty file this produces `'[]'` — valid JSON.
 
 A Cloudflare Worker with a cron trigger every 15 minutes (at `:03`, `:18`, `:33`, `:48`).
 
-**Time window logic**: Each run is responsible for a fixed, non-overlapping 15-minute window derived from `event.scheduledTime` (not wall clock):
+**Time window logic**: Each run ingests a fixed 15-minute quarter-hour block, determined by wall clock time (Israel time). The cron fires 3 minutes after each quarter ends, giving the API time to populate entries:
 
-```
-window = [scheduledTime - 30min,  scheduledTime - 15min)
-```
+| Actual minute (Israel) | Window ingested |
+|---|---|
+| :01–:13 | [XX:45, XX+1:00) |
+| :17–:28 | [XX:00, XX:15) |
+| :32–:43 | [XX:15, XX:30) |
+| :47–:58 | [XX:30, XX:45) |
+| :14–:16, :29–:31, :44–:46, :59–:00 | **Dead zone** — skip |
 
-Windows are contiguous — the next run's window starts exactly where the previous ended. Using `event.scheduledTime` means retries or delayed execution don't corrupt window boundaries.
-
-**`scheduledTime` has non-zero seconds**: Despite being a cron trigger, `event.scheduledTime` can include seconds (e.g., `:03:39` instead of `:03:00`). Since oref `alertDate` values always have `:00` seconds, the string comparison `>=`/`<` would misalign window boundaries. The code snaps `scheduledTime` to the nearest cron schedule point (minutes 3, 18, 33, 48) to ensure clean `:00` second boundaries.
+If the worker runs in a dead zone (ambiguous timing between two cron points), it logs and exits without processing. This handles cron drift safely.
 
 **Israel time conversion**: `alertDate` values from the API are in Israel time. Window bounds (UTC timestamps) are converted using `Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' })` for string comparison.
+
+**R2 date key**: Events are grouped by `r2DateKey(alertDate)` — events with hour ≥ 23 go to the next day's file (see [Storage format](#storage-format)).
 
 **Processing**:
 1. Fetch from proxy1 Worker (`/api2/alarms-history`) — see [why proxy1](#why-proxy1-not-history-proxy) below
 2. Strip BOM, parse JSON (~3,000 entries, ~50KB)
 3. Filter to entries within the time window
 4. Map to 4 fields: `{ data, alertDate, category_desc, rid }`
-5. Sort by `alertDate`, group by date
+5. Sort by `alertDate`, group by R2 date key (events 23:xx → next day's file)
 6. For each date: read existing `.jsonl` from R2, append new entries, write back
-7. At midnight crossing (`startDate < endDate`): write `.complete` marker for the completed day
 
 **Observability**: `[observability] enabled = true` in wrangler.toml persists logs to the Cloudflare dashboard. Console logs include window boundaries, entry counts, and R2 write details for each cron run.
 
@@ -236,7 +240,7 @@ Pages Function serving R2 data as JSON.
 - Validates date format, returns 400 if invalid
 - Reads `YYYY-MM-DD.jsonl` from R2, returns 404 if not found
 - Converts comma-per-line JSONL to JSON array
-- **Caching**: completed days (`.complete` exists) → `max-age=3600` (1 hour); ongoing days → `max-age=60` (1 minute)
+- **Caching**: past days (`date < today`) → `max-age=3600` (1 hour); today → `max-age=60` (1 minute)
 - **Local dev**: If `HISTORY_BUCKET` binding is absent, proxies to production
 
 ### Backfill script (`tools/backfill_history.py`)
@@ -251,7 +255,9 @@ uv run tools/backfill_history.py --today    # merge today first (no prompt), the
 
 **Interactive mode** (past dates): Downloads the existing R2 file for each date, compares `rid` sets, shows a diff summary, saves both versions to `tmp/backfill-compare/`, and prompts per date.
 
-**`--today` mode**: Merges backfill data with the existing R2 file for today (union by `rid`). Uses a **cron-aware cutoff** — only includes backfill entries before the last completed cron window boundary (`:03`, `:18`, `:33`, `:48`) to avoid creating duplicates when the next cron run appends. Prints a timing summary with margin to next cron. Does not write `.complete` (day is ongoing).
+**`--today` mode**: Merges backfill data with the existing R2 file for today (union by `rid`). Uses a **cron-aware cutoff** — only includes backfill entries before the last completed quarter-hour boundary (`:00`, `:15`, `:30`, `:45`, available 3 min after each) to avoid creating duplicates when the next cron run appends. Prints a timing summary with margin to next cron.
+
+Both modes use `r2_date_key()` to group events — entries with `alertDate` hour ≥ 23 go to the next day's file, matching the ingestion worker's partitioning.
 
 ### Why proxy1, not history-proxy
 

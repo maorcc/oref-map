@@ -39,6 +39,16 @@ HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
 }
 CONCURRENCY = 10
+
+
+def r2_date_key(alert_date: str) -> str:
+    """Map alertDate to R2 file date key. Events from 23:xx belong to next day's file."""
+    d = date.fromisoformat(alert_date[:10])
+    if int(alert_date[11:13]) >= 23:
+        d += timedelta(days=1)
+    return d.isoformat()
+
+
 RETRIES = 3
 RETRY_DELAYS = [2, 5, 15]
 WAR_START = "2026-02-28"
@@ -121,18 +131,6 @@ def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
         Path(tmp_path).unlink(missing_ok=True)
 
 
-def wrangler_put_empty(key: str) -> bool:
-    result = subprocess.run(
-        ["npx", "wrangler", "r2", "object", "put", f"{BUCKET}/{key}",
-         "--pipe", "--content-type", "text/plain", "--remote"],
-        input=b"",
-        capture_output=True,
-    )
-    if result.returncode != 0:
-        print(f"  UPLOAD FAIL {key}:\n{result.stderr.decode()}", file=sys.stderr)
-        return False
-    return True
-
 
 def merge_entries(backfill: list[dict], remote: list[dict]) -> list[dict]:
     """Union of both entry sets by rid, sorted by alertDate."""
@@ -188,21 +186,23 @@ async def main() -> None:
                 "category_desc": e["category_desc"],
                 "rid": rid,
             }
-            by_date.setdefault(alert_date[:10], []).append(entry)
+            by_date.setdefault(r2_date_key(alert_date), []).append(entry)
 
     total = sum(len(v) for v in by_date.values())
     print(f"  {total} unique entries across {len(by_date)} dates")
 
     # --today: merge today's data immediately (no prompt)
     if update_today:
-        # Cutoff = last completed cron window end. Cron window ends at :03, :18, :33, :48.
+        # Cutoff = last completed cron window end. Cron ingests quarter-hour blocks
+        # [XX:00, XX:15), [XX:15, XX:30), etc. — the quarter ending at :00/:15/:30/:45.
+        # Cron fires 3 min after each quarter ends, so if now >= :03, the :00 quarter is done.
         now = datetime.now()
-        cutoff_minutes = [3, 18, 33, 48]
-        candidates = [m for m in cutoff_minutes if m <= now.minute]
+        cutoff_minutes = [0, 15, 30, 45]
+        candidates = [m for m in cutoff_minutes if m + 3 <= now.minute]
         if candidates:
             cutoff_time = now.replace(minute=max(candidates), second=0, microsecond=0)
         else:
-            cutoff_time = (now - timedelta(hours=1)).replace(minute=48, second=0, microsecond=0)
+            cutoff_time = (now - timedelta(hours=1)).replace(minute=45, second=0, microsecond=0)
         cutoff_str = cutoff_time.strftime("%Y-%m-%dT%H:%M:%S")
         print(f"\nCutoff: {cutoff_str} (entries after this left to cron)")
 
@@ -297,11 +297,6 @@ async def main() -> None:
     for day, entries in to_upload:
         print(f"  Uploading {day}.jsonl ({len(entries)} entries)...")
         if not wrangler_put(f"{day}.jsonl", to_jsonl(entries).encode("utf-8"), "application/jsonl"):
-            failures.append(day)
-            continue
-
-        print(f"  Uploading {day}.complete...")
-        if not wrangler_put_empty(f"{day}.complete"):
             failures.append(day)
             continue
 

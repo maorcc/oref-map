@@ -1499,10 +1499,17 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     recordHistory(location, title, entry.alertDate || '', state);
 
     // Also feed into extendedHistory for timeline, but only if date matches the viewed day
+    // When viewing today, also accept yesterday's entries (cross-midnight: R2 day files
+    // cover 23:00 prev day to 22:59 current day, so history API entries from yesterday
+    // 23:xx belong on today's timeline)
     var entryDate = (entry.alertDate || '').slice(0, 10);
     var viewingDate = timelineDate || todayDateStr();
+    var yesterdayDate = new Date(viewingDate + 'T12:00:00Z');
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    var yesterdayStr = yesterdayDate.toISOString().slice(0, 10);
+    var dateMatch = entryDate === viewingDate || (!timelineDate && entryDate === yesterdayStr);
     var key = location + '|' + (entry.alertDate || '').replace('T', ' ');
-    if (entryDate === viewingDate && !extendedRids.has(key) && since) {
+    if (dateMatch && !extendedRids.has(key) && since) {
       extendedRids.add(key);
       extendedHistory.push({ location: location, title: title, alertDate: since, state: state });
       if (!timelineMin || since < timelineMin) timelineMin = since;
@@ -2031,6 +2038,18 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     };
 
     function switchDate(newDate) {
+      // Carry forward: when navigating backward, save entries from target day's
+      // 23:00-23:59 window (they came from the current day's R2 file and would be
+      // lost when we clear extendedHistory)
+      var carryover = [];
+      if (newDate < (timelineDate || todayDateStr())) {
+        var carryStart = new Date(newDate + 'T23:00:00').getTime();
+        var carryEnd = new Date(newDate + 'T23:59:59.999').getTime();
+        carryover = extendedHistory.filter(function(e) {
+          return e.alertDate >= carryStart && e.alertDate <= carryEnd;
+        });
+      }
+
       dayHistoryReady = false;
       extendedHistory = [];
       extendedRids = new Set();
@@ -2045,6 +2064,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       label.style.opacity = '0.5';
       ticksEl.innerHTML = '';
 
+      function mergeCarryover() {
+        // Carryover entries are from newDate 23:00-23:59. The R2 file for newDate
+        // covers (newDate-1) 23:00 to newDate 22:59 — no overlap, so no dedup needed.
+        for (var i = 0; i < carryover.length; i++) {
+          extendedHistory.push(carryover[i]);
+        }
+        if (carryover.length > 0) {
+          extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
+          if (extendedHistory.length > 0) {
+            timelineMin = extendedHistory[0].alertDate;
+            timelineMax = extendedHistory[extendedHistory.length - 1].alertDate;
+          }
+        }
+      }
+
       if (isViewingToday()) {
         // Restart history polling
         if (!historyPollId) {
@@ -2052,6 +2086,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         }
         fetchHistory();
         fetchExtendedHistory(function() {
+          mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
         });
@@ -2062,6 +2097,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           historyPollId = null;
         }
         fetchExtendedHistory(function() {
+          mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
         });
