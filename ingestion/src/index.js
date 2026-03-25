@@ -109,7 +109,7 @@ export default {
       ctx.waitUntil(sendPushover(
         env,
         'oref-map ingestion failure',
-        `Failed to fetch oref history after ${RETRY_DELAYS_MS.length + 1} retries (~8 min). Window: ${windowStartStr} – ${windowEndStr}\nError: ${e.message}`
+        `Failed to fetch oref history after ${RETRY_DELAYS_MS.length} retries (~${Math.round(RETRY_DELAYS_MS.reduce((a, b) => a + b, 0) / 60000)} min). Window: ${windowStartStr} – ${windowEndStr}\nError: ${e.message}`
       ));
       return;
     }

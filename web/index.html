@@ -1418,9 +1418,10 @@ body.idle #right-panel {
     }
   }
 
-  // Expose for popup onclick
-  window._toggleFav = function(name) {
-    // Use stored click latlng, or fall back to existing favorite position
+  // Expose for popup onclick — uses openPopupName so no name is embedded in HTML
+  window._toggleFav = function() {
+    var name = openPopupName;
+    if (!name) return;
     var latlng = openPopupLatlng || favorites[name];
     if (!latlng) return;
     toggleFavorite(name, latlng);
@@ -1442,7 +1443,7 @@ body.idle #right-panel {
     var isFav = !!favorites[name];
     var starColor = isFav ? '#f5a623' : '#ccc';
     var starChar = isFav ? '\u2605' : '\u2606';
-    var starBtn = '<span class="fav-star" onclick="window._toggleFav(\'' + name.replace(/'/g, "\\'") + '\')" ' +
+    var starBtn = '<span class="fav-star" onclick="window._toggleFav()" ' +
       'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
       'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
     return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
