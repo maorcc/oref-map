@@ -832,6 +832,9 @@ body.idle #right-panel {
   });
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
+  var favorites = {};            // {name: {lat, lng}}
+  var favoriteMarkers = {};      // {name: L.marker}
+  var openPopupLatlng = null;    // latlng of the click that opened the current popup
   var lastHistoryDate = null;    // track newest history entry
   var liveErrors = 0;
   var historyErrors = 0;
@@ -848,6 +851,8 @@ body.idle #right-panel {
   try {
     soundMuted = localStorage.getItem('oref-sound-muted') !== 'false';
     soundLocation = localStorage.getItem('oref-sound-location') || 'all';
+    var savedFavorites = localStorage.getItem('oref-favorites');
+    if (savedFavorites) favorites = JSON.parse(savedFavorites);
   } catch(e) {}
 
   // --- Timeline state ---
@@ -1070,9 +1075,9 @@ body.idle #right-panel {
       }).addTo(map);
       polygon.bindTooltip(name, { direction: 'top', offset: [0, -20] });
       (function(n, poly) {
-        poly.on('click', function() {
+        poly.on('click', function(e) {
           if (document.body.classList.contains('has-overlay')) return;
-          showPopup(n, poly);
+          showPopup(n, poly, e.latlng);
         });
         poly.on('mouseover', function() {
           if (document.body.classList.contains('has-overlay')) return;
@@ -1370,6 +1375,57 @@ body.idle #right-panel {
     return '\u26A0 ' + norm;
   }
 
+  // --- Favorites ---
+  var favoriteIcon = L.divIcon({
+    html: '<span style="display:flex;width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 0 6px rgba(0,0,0,0.3);align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="#f5a623" stroke="#c88a1a" stroke-width="1"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>',
+    className: '',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7]
+  });
+
+  function saveFavorites() {
+    try { localStorage.setItem('oref-favorites', JSON.stringify(favorites)); } catch(e) {}
+  }
+
+  function addFavoriteMarker(name, latlng) {
+    if (favoriteMarkers[name]) favoriteMarkers[name].remove();
+    favoriteMarkers[name] = L.marker([latlng.lat, latlng.lng], {
+      icon: favoriteIcon,
+      interactive: false,
+      zIndexOffset: 900
+    }).addTo(map);
+  }
+
+  function removeFavoriteMarker(name) {
+    if (favoriteMarkers[name]) {
+      favoriteMarkers[name].remove();
+      delete favoriteMarkers[name];
+    }
+  }
+
+  function toggleFavorite(name, latlng) {
+    if (favorites[name]) {
+      delete favorites[name];
+      removeFavoriteMarker(name);
+    } else {
+      favorites[name] = { lat: latlng.lat, lng: latlng.lng };
+      addFavoriteMarker(name, latlng);
+    }
+    saveFavorites();
+    // Refresh popup if open
+    if (openPopupName === name && openPopupMarker) {
+      openPopupMarker.getPopup().setContent(buildPopupHtml(name));
+    }
+  }
+
+  // Expose for popup onclick
+  window._toggleFav = function(name) {
+    // Use stored click latlng, or fall back to existing favorite position
+    var latlng = openPopupLatlng || favorites[name];
+    if (!latlng) return;
+    toggleFavorite(name, latlng);
+  };
+
   function buildPopupHtml(name) {
     var entries = (locationHistory[name] || []).slice()
       .sort(function(a, b) { return (b.alertDate || '').replace('T', ' ').localeCompare((a.alertDate || '').replace('T', ' ')); });
@@ -1383,7 +1439,13 @@ body.idle #right-panel {
         '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
       '</div>';
     }).join('');
-    return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' +
+    var isFav = !!favorites[name];
+    var starColor = isFav ? '#f5a623' : '#ccc';
+    var starChar = isFav ? '\u2605' : '\u2606';
+    var starBtn = '<span class="fav-star" onclick="window._toggleFav(\'' + name.replace(/'/g, "\\'") + '\')" ' +
+      'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
+      'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
+    return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
       (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
       '</div>';
   }
@@ -1400,14 +1462,16 @@ body.idle #right-panel {
     return { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: 0.3, opacity: 0.45, weight: entry.state === 'red' ? 0.5 : 1 };
   }
 
-  function showPopup(name, marker) {
+  function showPopup(name, marker, latlng) {
     openPopupName = name;
     openPopupMarker = marker;
+    openPopupLatlng = latlng || null;
     marker.setStyle(ACTIVE_STYLE);
     marker.bindPopup(buildPopupHtml(name), { maxWidth: 350 })
       .openPopup()
       .on('popupclose', function() {
         openPopupName = null; openPopupMarker = null;
+        openPopupLatlng = null;
         marker.setStyle(currentLocationStyle(name));
         updateOverlay();
       });
@@ -2593,6 +2657,11 @@ body.idle #right-panel {
     .then(function(data) {
 
       buildPolygons(data);
+
+      // Load favorite markers
+      Object.keys(favorites).forEach(function(name) {
+        addFavoriteMarker(name, favorites[name]);
+      });
 
       // Init timeline immediately (button always visible)
       initTimeline();

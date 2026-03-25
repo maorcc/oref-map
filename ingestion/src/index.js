@@ -1,4 +1,4 @@
-const RETRY_DELAYS_MS = [5000, 15000, 45000];
+const RETRY_DELAYS_MS = [5000, 15000, 30000, 60000, 120000, 180000, 240000];
 
 function toIsraelTimeStr(timestampMs) {
   return new Intl.DateTimeFormat('sv-SE', {
@@ -14,7 +14,7 @@ function toIsraelTimeStr(timestampMs) {
 
 async function fetchWithRetry(url, headers) {
   let lastError;
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i <= RETRY_DELAYS_MS.length; i++) {
     if (i > 0) {
       await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[i - 1]));
     }
@@ -109,7 +109,7 @@ export default {
       ctx.waitUntil(sendPushover(
         env,
         'oref-map ingestion failure',
-        `Failed to fetch oref history after 3 retries. Window: ${windowStartStr} – ${windowEndStr}\nError: ${e.message}`
+        `Failed to fetch oref history after ${RETRY_DELAYS_MS.length + 1} retries (~8 min). Window: ${windowStartStr} – ${windowEndStr}\nError: ${e.message}`
       ));
       return;
     }
