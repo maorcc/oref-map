@@ -222,6 +222,27 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     border-color: #f59e0b;
   }
 }
+#share-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1000;
+  background: rgba(255,255,255,0.55);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.25);
+  color: #444;
+  padding: 0;
+}
+@media (hover: none) {
+  #share-btn { display: flex; }
+}
 #locate-btn {
   display: flex;
   align-items: center;
@@ -540,6 +561,12 @@ body.idle #right-panel {
 <div id="map"></div>
 
 <h1 id="page-title">מפת העורף</h1>
+<button id="share-btn" type="button" title="שתף" aria-label="שתף">
+  <!-- iOS share icon: tray with upward arrow -->
+  <svg id="share-icon-ios" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="15"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5"/></svg>
+  <!-- Android share icon: connected nodes -->
+  <svg id="share-icon-android" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+</button>
 
 
 <div id="status">
@@ -2886,6 +2913,22 @@ body.idle #right-panel {
   ['mousemove','mousedown','keydown','wheel','scroll','touchstart','touchmove']
     .forEach(function(e) { document.addEventListener(e, _resetIdle, {passive:true}); });
   _resetIdle();
+
+  // --- Share button ---
+  var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  document.getElementById(isIos ? 'share-icon-ios' : 'share-icon-android').style.display = 'block';
+
+  document.getElementById('share-btn').addEventListener('click', async function() {
+    try { await navigator.share({
+        title: 'מפת העורף',
+        text: 'מפת התרעות בזמן אמת',
+        url: 'https://oref-map.org'
+      });
+    } catch (e) {
+      if (e.name !== 'AbortError') console.error('Share failed:', e);
+    }
+  });
 
   init();
 })();
