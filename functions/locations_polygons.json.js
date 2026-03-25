@@ -2,9 +2,10 @@
 // Uses Cache API for 24h edge caching (polygons change only when pipeline re-runs).
 // In local dev, falls back to the static file via ASSETS binding.
 export async function onRequestGet(context) {
-  if (new URL(context.request.url).hostname === 'localhost') {
-    // Local dev: serve static web/locations_polygons.json via ASSETS binding.
-    return context.env.ASSETS.fetch(context.request);
+  const hostname = new URL(context.request.url).hostname;
+  if (hostname === 'localhost' || hostname === '0.0.0.0' || hostname === '127.0.0.1') {
+    // Local dev: serve static web/locations_polygons.json directly.
+    return context.next();
   }
   const cache = caches.default;
   const upstream = 'https://oref-polygons.pages.dev/locations_polygons.json';

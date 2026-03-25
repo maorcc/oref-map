@@ -52,7 +52,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   align-items: flex-start;
   gap: 8px;
   z-index: 1000;
+  pointer-events: none;
+  transition: bottom 0.4s ease, gap 0.4s ease;
 }
+#right-panel > * { pointer-events: auto; }
 #legend-section { display: contents; }
 #legend-toggle {
   display: none;
@@ -228,13 +231,15 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   overflow: hidden;
-  transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out;
+  transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
 #gps-row {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  max-height: 40px;
+  transition: opacity 0.4s ease, max-height 0.4s ease, margin 0.4s ease;
 }
 @media (hover: hover) {
   #sound-btn:not(.open):not(.active):hover, #location-btn:not(.active):hover, #locate-btn:not(.active):hover {
@@ -619,6 +624,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   #tl-date-label { font-size: 12px; }
   .btn-icon { font-size: 16px; }
   .btn-text { font-size: 12px; }
+  body.idle #right-panel { bottom: 8px; }
+}
+/* Idle mode: hide buttons after inactivity */
+body.idle #gps-row,
+body.idle #sound-btn,
+body.idle #timeline-btn {
+  opacity: 0;
+  max-height: 0 !important;
+  overflow: hidden;
+  pointer-events: none;
+  margin: 0;
+  padding: 0;
+}
+body.idle #right-panel {
+  bottom: 12px;
+  gap: 0;
 }
 </style>
 </head>
@@ -641,7 +662,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     <h2>אודות מפת העורף</h2>
     <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
     <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
-    <p>מפה זו אינה רשמית ואינה מופעלת על ידי פיקוד העורף. אין להסתמך עליה כמקור יחיד למידע ביטחוני. לקבלת הנחיות רשמיות, יש לפנות לאתר <a href="https://www.oref.org.il/" target="_blank" rel="noopener">פיקוד העורף</a>.</p>
+    <p>אין להסתמך על המידע והתכנים המוצגים באתר זה, ובכל מקרה יש לנהוג בהתאם להנחיות פיקוד העורף.</p>
     <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.</p>
     <p>נתקלתם בבעיה או יש לכם הצעה? <a href="https://github.com/maorcc/oref-map/issues/new" target="_blank" rel="noopener">פתחו קריאה ב-GitHub</a>.</p>
   </div>
@@ -1030,6 +1051,13 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     var d = new Date(dateStr + 'T12:00:00');
     d.setDate(d.getDate() + n);
     return d.toISOString().slice(0, 10);
+  }
+  function viewingDayBounds() {
+    var d = timelineDate || todayDateStr();
+    return {
+      start: new Date(d + 'T00:00:00').getTime(),
+      end: new Date(d + 'T23:59:59').getTime()
+    };
   }
 
   // --- Panel history (mobile back button closes panels) ---
@@ -1742,8 +1770,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     if (dateMatch && !extendedRids.has(key) && since) {
       extendedRids.add(key);
       extendedHistory.push({ location: location, title: title, alertDate: since, state: state });
-      if (!timelineMin || since < timelineMin) timelineMin = since;
-      timelineMax = Math.max(timelineMax, since, Date.now());
     }
 
     // Skip expired green markers — don't briefly flash old all-clears on page load
@@ -2046,12 +2072,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       if (finalized) return; // already handled (404 or non-array)
       finalized = true;
       extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-      if (extendedHistory.length > 0) {
-        timelineMin = extendedHistory[0].alertDate;
-        timelineMax = isViewingToday()
-          ? Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now())
-          : extendedHistory[extendedHistory.length - 1].alertDate;
-      }
+      var bounds = viewingDayBounds();
+      timelineMin = bounds.start;
+      timelineMax = bounds.end;
       console.log('Day history (' + dateParam + '):', extendedHistory.length, 'entries');
       dayHistoryReady = true;
       if (onDone) onDone();
@@ -2232,12 +2255,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 
     function rebuildTimeline(seekMode) {
       // seekMode: 'last' (default) = last event, 'first' = first event
+      var bounds = viewingDayBounds();
+      timelineMin = bounds.start;
+      timelineMax = bounds.end;
       if (extendedHistory.length > 0) {
         extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-        timelineMin = extendedHistory[0].alertDate;
-        timelineMax = isViewingToday()
-          ? Math.max(extendedHistory[extendedHistory.length - 1].alertDate, Date.now())
-          : extendedHistory[extendedHistory.length - 1].alertDate;
         renderTicks();
         if (eventPeaks.length > 0) {
           if (seekMode === 'first') {
@@ -2284,11 +2306,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       extendedHistory = [];
       extendedRids = new Set();
       locationHistory = {};
-      timelineMin = 0;
-      timelineMax = 0;
       lastHistoryDate = null;
       stopPlay();
       timelineDate = (newDate === todayDateStr()) ? null : newDate;
+      var bounds = viewingDayBounds();
+      timelineMin = bounds.start;
+      timelineMax = bounds.end;
       updateDateNav();
       label.textContent = '\u05D8\u05D5\u05E2\u05DF...';
       label.style.opacity = '0.5';
@@ -2302,10 +2325,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         }
         if (carryover.length > 0) {
           extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
-          if (extendedHistory.length > 0) {
-            timelineMin = extendedHistory[0].alertDate;
-            timelineMax = extendedHistory[extendedHistory.length - 1].alertDate;
-          }
         }
       }
 
@@ -2380,8 +2399,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         extendedHistory = [];
         extendedRids = new Set();
         locationHistory = {};
-        timelineMin = 0;
-        timelineMax = 0;
+        var bounds = viewingDayBounds();
+        timelineMin = bounds.start;
+        timelineMax = bounds.end;
         lastHistoryDate = null;
         dayHistoryReady = false;
         updateDateNav();
@@ -2472,7 +2492,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     }
 
     function clampTime(t) {
-      return Math.max(timelineMin, Math.min(timelineMax, t));
+      var max = isViewingToday() ? Math.min(timelineMax, Date.now()) : timelineMax;
+      return Math.max(timelineMin, Math.min(max, t));
     }
 
     // --- Mode switching ---
@@ -2510,7 +2531,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     // --- Slider input ---
     slider.addEventListener('input', function() {
       stopPlay();
-      enterHistoryMode(timeFromSlider(parseInt(slider.value)));
+      var time = clampTime(timeFromSlider(parseInt(slider.value)));
+      slider.value = sliderFromTime(time);
+      enterHistoryMode(time);
       maybeZoomToEvent();
     });
 
@@ -2626,7 +2649,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
           var exp = locStates[loc].since + ALERT_MAX_AGE_MS;
           if (exp > latestExpiry) latestExpiry = exp;
         }
-        bands.push({ start: curStart, end: Math.min(latestExpiry, timelineMax), state: curState });
+        var bandCap = isViewingToday() ? Math.min(timelineMax, Date.now()) : timelineMax;
+        bands.push({ start: curStart, end: Math.min(latestExpiry, bandCap), state: curState });
       }
 
       computedBands = bands;
@@ -2642,6 +2666,20 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         span.style.width = widthPct + '%';
         span.style.background = TICK_COLORS[b.state] || TICK_COLORS.red;
         ticksEl.appendChild(span);
+      }
+
+      // Gray out future portion when viewing today
+      if (isViewingToday()) {
+        var now = Date.now();
+        if (now < timelineMax) {
+          var futureLeft = ((now - timelineMin) / range) * 100;
+          var futureSpan = document.createElement('span');
+          futureSpan.style.left = futureLeft + '%';
+          futureSpan.style.width = (100 - futureLeft) + '%';
+          futureSpan.style.background = 'repeating-linear-gradient(-45deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px)';
+          futureSpan.style.opacity = '1';
+          ticksEl.appendChild(futureSpan);
+        }
       }
     }
 
@@ -2676,9 +2714,10 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
       var lastFrame = performance.now();
       var gapEnterFrame = null;
       var playEventIdx = -1;
-      if (parseInt(slider.value) >= 999) {
-        slider.value = 0;
-        enterHistoryMode(timelineMin);
+      if (parseInt(slider.value) >= sliderFromTime(isViewingToday() ? Math.min(timelineMax, Date.now()) : timelineMax)) {
+        var startTime = eventPeaks.length > 0 ? eventStarts[0] : timelineMin;
+        slider.value = sliderFromTime(startTime);
+        enterHistoryMode(startTime);
       }
 
       function findEventIdx(time) {
@@ -2694,13 +2733,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
         var dt = now - lastFrame;
         lastFrame = now;
         var newTime = currentViewTime + dt * PLAY_SPEED;
-        if (newTime >= timelineMax) {
-          slider.value = 0;
-          enterHistoryMode(timelineMin);
-          lastFrame = now;
-          gapEnterFrame = null;
-          playEventIdx = -1;
-          playRAF = requestAnimationFrame(tick);
+        var playEnd = isViewingToday() ? Math.min(timelineMax, Date.now()) : timelineMax;
+        if (newTime >= playEnd) {
+          if (eventPeaks.length > 0) {
+            seekTo(eventPeaks[0]);
+          }
+          stopPlay();
           return;
         }
         if (!isInBand(newTime)) {
@@ -3002,6 +3040,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   if (window.matchMedia('(display-mode: standalone)').matches) {
     document.title = '';
   }
+
+  // --- Idle mode: hide buttons after inactivity ---
+  var IDLE_MS = 45000;
+  var _idleTimer = null;
+  function _enterIdle() {
+    if (document.getElementById('sound-btn').classList.contains('open') ||
+        document.getElementById('timeline-btn').classList.contains('open')) {
+      _resetIdle(); return;
+    }
+    document.body.classList.add('idle');
+  }
+  function _resetIdle() {
+    document.body.classList.remove('idle');
+    clearTimeout(_idleTimer);
+    _idleTimer = setTimeout(_enterIdle, IDLE_MS);
+  }
+  ['mousemove','mousedown','keydown','wheel','scroll','touchstart','touchmove']
+    .forEach(function(e) { document.addEventListener(e, _resetIdle, {passive:true}); });
+  _resetIdle();
 
   init();
 })();
