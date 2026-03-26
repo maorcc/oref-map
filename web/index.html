@@ -924,7 +924,6 @@ body.idle #right-panel {
   var timelineMin = 0;
   var timelineMax = 0;
   var isLiveMode = true;
-  var isHullMode = location.search.indexOf('hull') !== -1;
   var isPlaying = false;
   var playRAF = null;
   var playFlyHandler = null;
@@ -1216,18 +1215,16 @@ body.idle #right-panel {
     if (!polygon) return;
 
     var now = Date.now();
-    if (!isHullMode) {
-      var opacity = state === 'green'
-        ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
-        : 0.3;
-      polygon.setStyle({
-        color: COLORS[state],
-        fillColor: COLORS[state],
-        fillOpacity: opacity,
-        opacity: opacity + 0.15,
-        weight: state === 'red' ? 0.5 : 1
-      });
-    }
+    var opacity = state === 'green'
+      ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
+      : 0.3;
+    polygon.setStyle({
+      color: COLORS[state],
+      fillColor: COLORS[state],
+      fillOpacity: opacity,
+      opacity: opacity + 0.15,
+      weight: state === 'red' ? 0.5 : 1
+    });
     locationStates[name] = {
       state: state,
       since: since || Date.now(),
@@ -1235,143 +1232,15 @@ body.idle #right-panel {
     };
 
     playSoundForState(state, name);
-    if (isHullMode) updateHullLayers();
   }
 
   function removeLocation(name) {
     var entry = locationStates[name];
-    if (!isHullMode && entry && entry.marker) {
+    if (entry && entry.marker) {
       entry.marker.setStyle(BASE_STYLE);
       entry.marker.closePopup();
     }
     delete locationStates[name];
-    if (isHullMode) updateHullLayers();
-  }
-
-  // --- Convex hull rendering ---
-  var HULL_CLUSTER_THRESHOLD = 0.027; // degrees (~3 km) — max gap within one cluster
-  var hullPolygons = []; // flat list of all active hull L.polygon instances
-
-  function clearHullPolygons() {
-    for (var i = 0; i < hullPolygons.length; i++) map.removeLayer(hullPolygons[i]);
-    hullPolygons = [];
-  }
-
-  // Cluster locations by minimum vertex-to-vertex proximity. Returns array of index-arrays.
-  function clusterByIndex(vertexSets) {
-    var n = vertexSets.length;
-    var parent = [];
-    for (var i = 0; i < n; i++) parent[i] = i;
-    function find(i) {
-      while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
-      return i;
-    }
-    var t2 = HULL_CLUSTER_THRESHOLD * HULL_CLUSTER_THRESHOLD;
-    for (var i = 0; i < n; i++) {
-      for (var j = i + 1; j < n; j++) {
-        if (find(i) === find(j)) continue; // already merged
-        var vi = vertexSets[i], vj = vertexSets[j];
-        outer: for (var a = 0; a < vi.length; a++) {
-          for (var b = 0; b < vj.length; b++) {
-            var dl = vi[a][0] - vj[b][0], dg = vi[a][1] - vj[b][1];
-            if (dl*dl + dg*dg <= t2) { parent[find(i)] = find(j); break outer; }
-          }
-        }
-      }
-    }
-    var groups = {};
-    for (var i = 0; i < n; i++) {
-      var root = find(i);
-      if (!groups[root]) groups[root] = [];
-      groups[root].push(i);
-    }
-    return Object.keys(groups).map(function(k) { return groups[k]; });
-  }
-
-  // Collect all outer-ring vertices of a Leaflet polygon as [lat, lng] pairs.
-  function polyVertices(poly) {
-    var rings = poly.getLatLngs();
-    var outer = rings[0];
-    var pts = [];
-    for (var i = 0; i < outer.length; i++) pts.push([outer[i].lat, outer[i].lng]);
-    return pts;
-  }
-
-  function convexHull(points) {
-    if (points.length < 3) return points.slice();
-    var pivot = points.reduce(function(p, c) {
-      return c[0] < p[0] || (c[0] === p[0] && c[1] < p[1]) ? c : p;
-    });
-    var rest = points.filter(function(p) { return p !== pivot; });
-    rest.sort(function(a, b) {
-      var angA = Math.atan2(a[0] - pivot[0], a[1] - pivot[1]);
-      var angB = Math.atan2(b[0] - pivot[0], b[1] - pivot[1]);
-      if (Math.abs(angA - angB) > 1e-10) return angA - angB;
-      var dA = (a[0]-pivot[0])*(a[0]-pivot[0]) + (a[1]-pivot[1])*(a[1]-pivot[1]);
-      var dB = (b[0]-pivot[0])*(b[0]-pivot[0]) + (b[1]-pivot[1])*(b[1]-pivot[1]);
-      return dA - dB;
-    });
-    var hull = [pivot];
-    for (var i = 0; i < rest.length; i++) {
-      while (hull.length >= 2) {
-        var a = hull[hull.length - 2], b = hull[hull.length - 1], c = rest[i];
-        if ((b[1]-a[1])*(c[0]-a[0]) - (b[0]-a[0])*(c[1]-a[1]) <= 0) hull.pop();
-        else break;
-      }
-      hull.push(rest[i]);
-    }
-    return hull;
-  }
-
-  function updateHullLayers(stateMap) {
-    clearHullPolygons();
-    var sm = stateMap || locationStates;
-    var order = ['yellow', 'purple', 'red'];
-    var namesByState = { yellow: [], purple: [], red: [] };
-    for (var name in sm) {
-      var entry = sm[name];
-      if (!entry || entry.state === 'green') continue;
-      if (!locationPolygons[name]) continue;
-      if (namesByState[entry.state]) namesByState[entry.state].push(name);
-    }
-
-    // Phase 1: compute hull rings and fallback circles per state
-    var hullRings = { yellow: [], purple: [], red: [] };
-    var circles   = { yellow: [], purple: [], red: [] };
-    for (var si = 0; si < order.length; si++) {
-      var state = order[si];
-      var names = namesByState[state];
-      if (names.length === 0) continue;
-      var vertexSets = names.map(function(n) { return polyVertices(locationPolygons[n]); });
-      var clusters = clusterByIndex(vertexSets);
-      for (var ci = 0; ci < clusters.length; ci++) {
-        var indices = clusters[ci];
-        var allPts = [];
-        for (var ii = 0; ii < indices.length; ii++) {
-          var verts = vertexSets[indices[ii]];
-          for (var vi = 0; vi < verts.length; vi++) allPts.push(verts[vi]);
-        }
-        if (allPts.length >= 3) {
-          hullRings[state].push(convexHull(allPts));
-        } else {
-          var c = locationPolygons[names[indices[0]]].getBounds().getCenter();
-          circles[state].push([c.lat, c.lng]);
-        }
-      }
-    }
-
-    // Phase 2: draw — yellow first (underneath), then purple, then red (on top)
-    var style0 = { interactive: false, fillOpacity: 0.35, opacity: 0.5, weight: 2 };
-    for (var si = 0; si < order.length; si++) {
-      var state = order[si];
-      var style = Object.assign({}, style0, { color: COLORS[state], fillColor: COLORS[state] });
-      for (var ri = 0; ri < hullRings[state].length; ri++) {
-        hullPolygons.push(L.polygon(hullRings[state][ri], style).addTo(map));
-      }
-      for (var ci = 0; ci < circles[state].length; ci++) {
-        hullPolygons.push(L.circle(circles[state][ci], Object.assign({ radius: HULL_CLUSTER_THRESHOLD * 111000 }, style)).addTo(map));
-      }
-    }
   }
 
   // --- Alert history per location ---
@@ -2020,12 +1889,11 @@ body.idle #right-panel {
     for (var name in locationStates) {
       var entry = locationStates[name];
       if (entry && entry.marker) {
-        if (!isHullMode) entry.marker.setStyle(BASE_STYLE);
+        entry.marker.setStyle(BASE_STYLE);
         entry.marker.closePopup();
       }
     }
     locationStates = {};
-    if (isHullMode) clearHullPolygons();
 
     // Replay history up to targetTime
     var accumulated = {}; // {location: {state, since}}
@@ -2054,31 +1922,26 @@ body.idle #right-panel {
       if (s === 'green') {
         var elapsed = targetTime - sinceTime;
         if (elapsed >= GREEN_FADE_MS) continue; // already faded
-        if (!isHullMode) {
-          var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-          polygon.setStyle({
-            color: COLORS.green,
-            fillColor: COLORS.green,
-            fillOpacity: opacity,
-            opacity: opacity + 0.15,
-            weight: 1
-          });
-        }
+        var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
+        polygon.setStyle({
+          color: COLORS.green,
+          fillColor: COLORS.green,
+          fillOpacity: opacity,
+          opacity: opacity + 0.15,
+          weight: 1
+        });
       } else {
         if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
-        if (!isHullMode) {
-          polygon.setStyle({
-            color: COLORS[s],
-            fillColor: COLORS[s],
-            fillOpacity: 0.3,
-            opacity: 0.45,
-            weight: s === 'red' ? 0.5 : 1
-          });
-        }
+        polygon.setStyle({
+          color: COLORS[s],
+          fillColor: COLORS[s],
+          fillOpacity: 0.3,
+          opacity: 0.45,
+          weight: s === 'red' ? 0.5 : 1
+        });
       }
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
     }
-    if (isHullMode) updateHullLayers();
     syncEllipseMode();
   }
 
