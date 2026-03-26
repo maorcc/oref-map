@@ -1826,7 +1826,7 @@ body.idle #right-panel {
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
       var alertDate = entry.alertDate || '';
-      if (lastHistoryDate && alertDate <= lastHistoryDate) continue;
+      if (lastHistoryDate && alertDate < lastHistoryDate) continue;
       processHistoryEntry(entry);
       newEntries++;
     }
