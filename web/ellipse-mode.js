@@ -226,11 +226,11 @@
       ellipseOverlays.push(overlay);
     }
 
-    function flattenPolygonLatLngs(polygon) {
+    function polygonRings(polygon) {
       var latlngs = polygon.getLatLngs();
       if (!latlngs || !latlngs.length) return [];
-      if (Array.isArray(latlngs[0])) return latlngs[0];
-      return latlngs;
+      if (Array.isArray(latlngs[0])) return latlngs;
+      return [latlngs];
     }
 
     function latLngsAlmostEqual(a, b) {
@@ -246,6 +246,28 @@
     function onSegment(a, b, p) {
       return Math.min(a.lng, b.lng) - 1e-12 <= p.lng && p.lng <= Math.max(a.lng, b.lng) + 1e-12 &&
         Math.min(a.lat, b.lat) - 1e-12 <= p.lat && p.lat <= Math.max(a.lat, b.lat) + 1e-12;
+    }
+
+    function ringContainsPoint(ring, point) {
+      var inside = false;
+      for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        var a = ring[i];
+        var b = ring[j];
+        if (orientation(a, b, point) === 0 && onSegment(a, b, point)) return true;
+        var intersects = ((a.lat > point.lat) !== (b.lat > point.lat)) &&
+          (point.lng < ((b.lng - a.lng) * (point.lat - a.lat)) / (b.lat - a.lat) + a.lng);
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function polygonContainsPoint(rings, point) {
+      if (!rings.length || rings[0].length < 3) return false;
+      if (!ringContainsPoint(rings[0], point)) return false;
+      for (var i = 1; i < rings.length; i++) {
+        if (rings[i].length >= 3 && ringContainsPoint(rings[i], point)) return false;
+      }
+      return true;
     }
 
     function segmentsTouch(a1, a2, b1, b2) {
@@ -269,24 +291,45 @@
       if (!polyA || !polyB) return false;
       if (!polyA.getBounds().intersects(polyB.getBounds())) return false;
 
-      var ptsA = flattenPolygonLatLngs(polyA);
-      var ptsB = flattenPolygonLatLngs(polyB);
-      if (ptsA.length < 2 || ptsB.length < 2) return false;
+      var ringsA = polygonRings(polyA);
+      var ringsB = polygonRings(polyB);
+      if (!ringsA.length || !ringsB.length) return false;
 
-      for (var i = 0; i < ptsA.length; i++) {
-        for (var j = 0; j < ptsB.length; j++) {
-          if (latLngsAlmostEqual(ptsA[i], ptsB[j])) return true;
+      for (var ra = 0; ra < ringsA.length; ra++) {
+        for (var rb = 0; rb < ringsB.length; rb++) {
+          var ptsA = ringsA[ra];
+          var ptsB = ringsB[rb];
+          for (var i = 0; i < ptsA.length; i++) {
+            for (var j = 0; j < ptsB.length; j++) {
+              if (latLngsAlmostEqual(ptsA[i], ptsB[j])) return true;
+            }
+          }
         }
       }
 
-      for (var a = 0; a < ptsA.length; a++) {
-        var a1 = ptsA[a];
-        var a2 = ptsA[(a + 1) % ptsA.length];
-        for (var b = 0; b < ptsB.length; b++) {
-          var b1 = ptsB[b];
-          var b2 = ptsB[(b + 1) % ptsB.length];
-          if (segmentsTouch(a1, a2, b1, b2)) return true;
+      for (var ra = 0; ra < ringsA.length; ra++) {
+        for (var rb = 0; rb < ringsB.length; rb++) {
+          var ptsA = ringsA[ra];
+          var ptsB = ringsB[rb];
+          for (var a = 0; a < ptsA.length; a++) {
+            var a1 = ptsA[a];
+            var a2 = ptsA[(a + 1) % ptsA.length];
+            for (var b = 0; b < ptsB.length; b++) {
+              var b1 = ptsB[b];
+              var b2 = ptsB[(b + 1) % ptsB.length];
+              if (segmentsTouch(a1, a2, b1, b2)) return true;
+            }
+          }
         }
+      }
+
+      var outerA = ringsA[0];
+      var outerB = ringsB[0];
+      for (var i = 0; i < outerA.length; i++) {
+        if (polygonContainsPoint(ringsB, outerA[i])) return true;
+      }
+      for (var j = 0; j < outerB.length; j++) {
+        if (polygonContainsPoint(ringsA, outerB[j])) return true;
       }
 
       return false;
