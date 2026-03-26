@@ -1506,7 +1506,7 @@ body.idle #right-panel {
   function updatePredictionLines() {
     clearPredictionLines();
     if (!predictionActive) return;
-    // Collect area-weighted centroids of active red locations only (exclude purple/drones)
+    // Collect area-weighted centroids of active red locations only (exclude purple/drones/yellow)
     var points = [];
     for (var name in locationStates) {
       var entry = locationStates[name];
