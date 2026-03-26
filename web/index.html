@@ -1461,7 +1461,8 @@ body.idle #right-panel {
       var color = COLORS[e.state] || '#888';
       var label = displayLabel(e.title);
       var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
-      var border = i < entries.length - 1 ? 'border-bottom:1px solid #eee;' : '';
+      var nextEntry = entries[i + 1];
+      var border = (nextEntry && nextEntry.state === 'green') ? 'border-bottom:1px solid #ccc;' : '';
       return '<div style="padding:4px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
         (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
         '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
