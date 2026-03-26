@@ -2941,9 +2941,14 @@ if ('serviceWorker' in navigator) {
 <script>
 (function() {
   var STORAGE_KEY = 'pwa_install';
-  var stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  var stored;
+  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { stored = {}; }
   // Don't prompt if already installed or permanently dismissed
   if (stored.installed || stored.dismissed) return;
+
+  function saveStored() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch (e) {}
+  }
 
   var deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', function(e) {
@@ -2956,7 +2961,7 @@ if ('serviceWorker' in navigator) {
       stored.todayCount = 0;
     }
     stored.todayCount = (stored.todayCount || 0) + 1;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    saveStored();
 
     if (stored.todayCount >= 3) {
       deferredPrompt.prompt();
@@ -2966,7 +2971,7 @@ if ('serviceWorker' in navigator) {
         } else {
           stored.dismissed = true;
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+        saveStored();
         deferredPrompt = null;
       });
     }
@@ -2974,7 +2979,7 @@ if ('serviceWorker' in navigator) {
 
   window.addEventListener('appinstalled', function() {
     stored.installed = true;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    saveStored();
   });
 })();
 </script>
