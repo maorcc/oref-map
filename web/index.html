@@ -233,6 +233,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   max-height: calc(100vh - 80px);
   overflow-y: auto;
 }
+/* Feature-flag-gated elements: hidden by default, shown when flag is active */
+.f-gated { display: none !important; }
+body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-row {
@@ -594,7 +597,7 @@ body.idle #right-panel {
       </div>
     </div>
   </div>
-  <div id="menu-ellipse" class="menu-item" style="display:none;">
+  <div id="menu-ellipse" class="menu-item f-gated">
     <div class="menu-select-wrap">
       <select id="menu-ellipse-select" class="menu-select" aria-label="מצב אליפסה">
         <option value="0">אליפסה כבויה</option>
@@ -682,12 +685,20 @@ body.idle #right-panel {
   'use strict';
 
   var pageParams = new URLSearchParams(location.search);
-  var isEllipseMode = pageParams.get('mode') === 'ellipse';
-  if (isEllipseMode) document.body.classList.add('ellipse-mode');
 
-  // --- Debug overlay (append console.warn/error to on-screen log when ?debug) ---
-  var isDebugMode = pageParams.has('debug');
-  if (isDebugMode) {
+  // --- Feature flags (URL params with f- prefix, e.g. ?f-log&f-ellipse) ---
+  var FF = {};
+  pageParams.forEach(function(v, k) {
+    if (k.lastIndexOf('f-', 0) === 0) {
+      var name = k.substring(2);
+      FF[name] = v || true;
+      document.body.classList.add('f-' + name);
+    }
+  });
+  window.FF = FF;
+
+  // --- Debug overlay (append console.warn/error to on-screen log when ?f-log) ---
+  if (FF.log) {
     var debugOverlay = document.createElement('div');
     debugOverlay.id = 'debug-overlay';
     debugOverlay.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:30vh;overflow-y:auto;' +
@@ -717,11 +728,9 @@ body.idle #right-panel {
     apiPrefix = '/api';
   }
 
-  var debugApi = pageParams.get('debugapi');
-
   function apiFetch(endpoint) {
     var url = PROXY_BASE + apiPrefix + '/' + endpoint;
-    if (debugApi) url += '?debugapi=' + encodeURIComponent(debugApi);
+    if (FF.debugapi) url += '?debugapi=' + encodeURIComponent(FF.debugapi);
     var wasProxy = apiPrefix === '/api2';
 
     return fetch(url).then(function(resp) {
@@ -1010,15 +1019,11 @@ body.idle #right-panel {
   var menuOpen = false;
   var menuSoundItem = document.getElementById('menu-sound');
   var menuSoundRow = document.getElementById('menu-sound-row');
-  var menuEllipseItem = document.getElementById('menu-ellipse');
   var menuEllipseSelect = document.getElementById('menu-ellipse-select');
   var soundSubPanelOpen = false;
   var searchInput = document.getElementById('search-input');
   var searchResults = document.getElementById('search-results');
 
-  if (isEllipseMode) {
-    menuEllipseItem.style.display = '';
-  }
 
   function openMenu() {
     menuPanel.style.display = 'block';
@@ -2768,7 +2773,7 @@ body.idle #right-panel {
     ellipseModeController.sync(!!force);
     ellipseModeController.refreshExtendedVisual();
   }
-  if (isEllipseMode && window.initEllipseMode) {
+  if (FF.ellipse && window.initEllipseMode) {
     ellipseModeController = window.initEllipseMode({
       map: map,
       getLocationStates: function() { return locationStates; },
