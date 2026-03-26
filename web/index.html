@@ -1344,10 +1344,12 @@ body.idle #right-panel {
   }
 
   // --- Launch source prediction ---
-  var predictionLines = [];  // L.polyline instances on the map
+  var predictionLines = [];  // L.polyline/L.polygon instances on the map
   var predictionActive = localStorage.getItem('oref-predict') === 'true';
-  var PREDICTION_LINE_EXTEND = 1.5; // degrees (~167 km) to extend the line beyond the centroid
   var PREDICTION_CLUSTER_THRESHOLD = 0.15; // degrees (~17 km) for grouping alerts into salvos
+  var PREDICTION_ELONGATION_MIN = 2.5; // minimum eigenvalue ratio (lambda1/lambda2) to draw
+  // Israel's approximate geographic center — used to determine "outward" direction
+  var ISRAEL_CENTER = [31.5, 34.8];
 
   if (predictionActive) {
     document.getElementById('predict-btn').classList.add('active');
@@ -1373,10 +1375,12 @@ body.idle #right-panel {
     predictionLines = [];
   }
 
-  // Compute centroid of a Leaflet polygon (outer ring)
+  // Compute centroid of a Leaflet polygon (outer ring). Returns [lat, lng] or null.
   function polygonCentroid(poly) {
     var rings = poly.getLatLngs();
+    if (!rings || rings.length === 0) return null;
     var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+    if (outer.length === 0 || typeof outer[0].lat !== 'number') return null;
     var sumLat = 0, sumLng = 0;
     for (var i = 0; i < outer.length; i++) {
       sumLat += outer[i].lat;
@@ -1411,61 +1415,107 @@ body.idle #right-panel {
     return Object.keys(groups).map(function(k) { return groups[k]; });
   }
 
-  // Fit a line through points using PCA (principal component). Returns {center, direction}.
+  // Fit a line through points using PCA. Returns {center, direction, lambda1, lambda2} or null.
+  // lambda1 >= lambda2 are the eigenvalues (variance along principal / minor axes).
   function fitLine(points) {
     var n = points.length;
     if (n < 2) return null;
 
-    // Compute centroid
     var cx = 0, cy = 0;
     for (var i = 0; i < n; i++) { cx += points[i][0]; cy += points[i][1]; }
     cx /= n; cy /= n;
 
-    // Covariance matrix entries
     var cxx = 0, cxy = 0, cyy = 0;
     for (var i = 0; i < n; i++) {
       var dx = points[i][0] - cx, dy = points[i][1] - cy;
-      cxx += dx * dx;
-      cxy += dx * dy;
-      cyy += dy * dy;
+      cxx += dx * dx; cxy += dx * dy; cyy += dy * dy;
     }
 
-    // Principal eigenvector of 2x2 covariance matrix
-    // Eigenvalues of [[cxx,cxy],[cxy,cyy]]:
-    // lambda = ((cxx+cyy) ± sqrt((cxx-cyy)^2 + 4*cxy^2)) / 2
     var diff = cxx - cyy;
     var disc = Math.sqrt(diff * diff + 4 * cxy * cxy);
     var lambda1 = (cxx + cyy + disc) / 2;
+    var lambda2 = (cxx + cyy - disc) / 2;
 
-    // Eigenvector for lambda1
     var vx, vy;
     if (Math.abs(cxy) > 1e-12) {
-      vx = lambda1 - cyy;
-      vy = cxy;
+      vx = lambda1 - cyy; vy = cxy;
     } else if (cxx >= cyy) {
       vx = 1; vy = 0;
     } else {
       vx = 0; vy = 1;
     }
-    // Normalize
     var len = Math.sqrt(vx * vx + vy * vy);
     if (len > 0) { vx /= len; vy /= len; }
 
-    return { center: [cx, cy], direction: [vx, vy] };
+    return { center: [cx, cy], direction: [vx, vy], lambda1: lambda1, lambda2: lambda2 };
+  }
+
+  // Estimate extension distance (in degrees) toward the source based on bearing.
+  // Bearing is in degrees, 0 = north, 90 = east, etc.
+  // Returns distance in degrees (~111 km per degree).
+  function sourceExtensionDeg(bearingDeg) {
+    // Normalize to [0, 360)
+    var b = ((bearingDeg % 360) + 360) % 360;
+    // North (330-30): Lebanon/Syria ~200 km → ~1.8 deg
+    if (b >= 330 || b < 30) return 2.0;
+    // Northeast (30-70): Syria/Iraq ~600 km → ~5.4 deg
+    if (b >= 30 && b < 70) return 5.5;
+    // East (70-120): Iraq/Iran ~1500 km → ~13.5 deg
+    if (b >= 70 && b < 120) return 14.0;
+    // Southeast (120-170): Iran/Yemen ~1800 km → ~16 deg
+    if (b >= 120 && b < 170) return 16.0;
+    // South (170-210): Yemen ~2000 km → ~18 deg
+    if (b >= 170 && b < 210) return 18.0;
+    // Southwest (210-260): Gaza/Egypt ~100 km → ~0.9 deg
+    if (b >= 210 && b < 260) return 1.0;
+    // West (260-290): Mediterranean — unlikely, minimal extension
+    if (b >= 260 && b < 290) return 1.0;
+    // Northwest (290-330): Lebanon coast ~150 km → ~1.4 deg
+    return 1.5;
+  }
+
+  // Compute intermediate points along a geodesic (great circle) from p1 to p2.
+  // p1, p2 are [lat, lng] in degrees. Returns array of [lat, lng] including endpoints.
+  function geodesicPoints(p1, p2, numSegments) {
+    var toRad = Math.PI / 180, toDeg = 180 / Math.PI;
+    var lat1 = p1[0] * toRad, lng1 = p1[1] * toRad;
+    var lat2 = p2[0] * toRad, lng2 = p2[1] * toRad;
+
+    // Central angle via Haversine
+    var dlat = lat2 - lat1, dlng = lng2 - lng1;
+    var a = Math.sin(dlat / 2) * Math.sin(dlat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) * Math.sin(dlng / 2) * Math.sin(dlng / 2);
+    var d = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    if (d < 1e-10) return [p1, p2]; // points are coincident
+
+    var pts = [];
+    for (var i = 0; i <= numSegments; i++) {
+      var f = i / numSegments;
+      var A = Math.sin((1 - f) * d) / Math.sin(d);
+      var B = Math.sin(f * d) / Math.sin(d);
+      var x = A * Math.cos(lat1) * Math.cos(lng1) + B * Math.cos(lat2) * Math.cos(lng2);
+      var y = A * Math.cos(lat1) * Math.sin(lng1) + B * Math.cos(lat2) * Math.sin(lng2);
+      var z = A * Math.sin(lat1) + B * Math.sin(lat2);
+      pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)) * toDeg,
+                Math.atan2(y, x) * toDeg]);
+    }
+    return pts;
   }
 
   function updatePredictionLines() {
     clearPredictionLines();
     if (!predictionActive) return;
 
-    // Collect centroids of active red/purple locations
+    // Collect centroids of active red locations only (exclude purple/drones — item 6)
     var points = [];
     for (var name in locationStates) {
       var entry = locationStates[name];
-      if (!entry || (entry.state !== 'red' && entry.state !== 'purple')) continue;
+      if (!entry || entry.state !== 'red') continue;
       var poly = locationPolygons[name];
       if (!poly) continue;
-      points.push(polygonCentroid(poly));
+      var centroid = polygonCentroid(poly);
+      if (centroid) points.push(centroid);
     }
 
     if (points.length < 2) return;
@@ -1480,6 +1530,10 @@ body.idle #right-panel {
       var line = fitLine(cluster);
       if (!line) continue;
 
+      // Check elongation — skip if cluster is too round (item 3)
+      var elongation = line.lambda2 > 1e-12 ? line.lambda1 / line.lambda2 : Infinity;
+      if (elongation < PREDICTION_ELONGATION_MIN) continue;
+
       var cx = line.center[0], cy = line.center[1];
       var dx = line.direction[0], dy = line.direction[1];
 
@@ -1491,13 +1545,49 @@ body.idle #right-panel {
         if (proj > maxProj) maxProj = proj;
       }
 
-      // Extend the line beyond the cluster in both directions
-      var ext = PREDICTION_LINE_EXTEND;
-      var p1 = [cx + (minProj - ext) * dx, cy + (minProj - ext) * dy];
-      var p2 = [cx + (maxProj + ext) * dx, cy + (maxProj + ext) * dy];
+      // Determine which direction (positive or negative along the principal axis)
+      // points AWAY from Israel's center — that is the source direction (item 5)
+      var posEnd = [cx + maxProj * dx, cy + maxProj * dy];
+      var negEnd = [cx + minProj * dx, cy + minProj * dy];
+      var posDist = (posEnd[0] - ISRAEL_CENTER[0]) * (posEnd[0] - ISRAEL_CENTER[0]) +
+                    (posEnd[1] - ISRAEL_CENTER[1]) * (posEnd[1] - ISRAEL_CENTER[1]);
+      var negDist = (negEnd[0] - ISRAEL_CENTER[0]) * (negEnd[0] - ISRAEL_CENTER[0]) +
+                    (negEnd[1] - ISRAEL_CENTER[1]) * (negEnd[1] - ISRAEL_CENTER[1]);
 
-      // Draw the extended line (dashed)
-      var polyline = L.polyline([p1, p2], {
+      // sourceSign: +1 if source is in positive direction, -1 if negative
+      var sourceSign = posDist >= negDist ? 1 : -1;
+      var sourceDx = sourceSign * dx, sourceDy = sourceSign * dy;
+
+      // Geographic bearing from cluster center toward source (item 1)
+      // atan2(dlng, dlat) gives angle from north axis: 0°=N, 90°=E, ±180°=S, -90°=W
+      var bearingDeg = Math.atan2(sourceDy, sourceDx) * 180 / Math.PI;
+      var extSource = sourceExtensionDeg(bearingDeg);
+
+      // Source endpoint: cluster edge + extension toward source
+      var sourceEdgeProj = sourceSign > 0 ? maxProj : minProj;
+      var innerEdgeProj = sourceSign > 0 ? minProj : maxProj;
+
+      // Minimal inward extension (just a short tail past the cluster toward Israel)
+      var extInward = 0.3; // degrees (~33 km)
+      var pSource = [cx + (sourceEdgeProj + sourceSign * extSource) * dx,
+                     cy + (sourceEdgeProj + sourceSign * extSource) * dy];
+      var pInward = [cx + (innerEdgeProj - sourceSign * extInward) * dx,
+                     cy + (innerEdgeProj - sourceSign * extInward) * dy];
+
+      // For long distances, use geodesic intermediate points (item 4)
+      var distDeg = Math.sqrt((pSource[0] - pInward[0]) * (pSource[0] - pInward[0]) +
+                              (pSource[1] - pInward[1]) * (pSource[1] - pInward[1]));
+      var lineCoords;
+      if (distDeg > 3) {
+        // Use geodesic for distances > ~330 km
+        var numSeg = Math.max(20, Math.round(distDeg * 5));
+        lineCoords = geodesicPoints(pInward, pSource, numSeg);
+      } else {
+        lineCoords = [pInward, pSource];
+      }
+
+      // Draw the prediction line (dashed)
+      var polyline = L.polyline(lineCoords, {
         color: '#ff4444',
         weight: 2.5,
         opacity: 0.7,
@@ -1506,27 +1596,41 @@ body.idle #right-panel {
       }).addTo(map);
       predictionLines.push(polyline);
 
-      // Draw small arrow markers at both ends to indicate possible source directions
-      var arrowSize = 0.06; // degrees
-      var ends = [
-        { point: p1, sign: -1 },
-        { point: p2, sign: 1 }
-      ];
-      for (var ei = 0; ei < ends.length; ei++) {
-        var ep = ends[ei].point;
-        var s = ends[ei].sign;
-        // Perpendicular direction for arrowhead
-        var px = -dy, py = dx;
-        var tip = [ep[0] + s * dx * arrowSize, ep[1] + s * dy * arrowSize];
-        var left = [ep[0] + px * arrowSize * 0.5, ep[1] + py * arrowSize * 0.5];
-        var right = [ep[0] - px * arrowSize * 0.5, ep[1] - py * arrowSize * 0.5];
-        var arrow = L.polyline([left, tip, right], {
+      // Draw arrowhead at source end only
+      var arrowSize = 0.08;
+      var tipPt = lineCoords[lineCoords.length - 1];
+      var px = -sourceDy, py = sourceDx; // perpendicular
+      var tip = [tipPt[0] + sourceDx * arrowSize, tipPt[1] + sourceDy * arrowSize];
+      var left = [tipPt[0] + px * arrowSize * 0.5, tipPt[1] + py * arrowSize * 0.5];
+      var right = [tipPt[0] - px * arrowSize * 0.5, tipPt[1] - py * arrowSize * 0.5];
+      var arrow = L.polyline([left, tip, right], {
+        color: '#ff4444', weight: 2.5, opacity: 0.7, interactive: false
+      }).addTo(map);
+      predictionLines.push(arrow);
+
+      // Draw 1-sigma uncertainty band (item 3)
+      // sigma_perp = sqrt(lambda2 / n) — standard error of points perpendicular to the line
+      var sigmaPerp = Math.sqrt(Math.max(0, line.lambda2) / cluster.length);
+      if (sigmaPerp > 0.001) { // only draw if there's measurable spread
+        var perpDx = -dy, perpDy = dx; // perpendicular to principal axis
+        // Build polygon band along the line ± 1 sigma
+        var bandLeft = [], bandRight = [];
+        for (var bi = 0; bi < lineCoords.length; bi++) {
+          var pt = lineCoords[bi];
+          bandLeft.push([pt[0] + perpDx * sigmaPerp, pt[1] + perpDy * sigmaPerp]);
+          bandRight.push([pt[0] - perpDx * sigmaPerp, pt[1] - perpDy * sigmaPerp]);
+        }
+        bandRight.reverse();
+        var bandCoords = bandLeft.concat(bandRight);
+        var band = L.polygon(bandCoords, {
           color: '#ff4444',
-          weight: 2.5,
-          opacity: 0.7,
+          fillColor: '#ff4444',
+          fillOpacity: 0.1,
+          opacity: 0.2,
+          weight: 1,
           interactive: false
         }).addTo(map);
-        predictionLines.push(arrow);
+        predictionLines.push(band);
       }
     }
   }
