@@ -156,6 +156,15 @@
       }
     }
 
+    function isClusterEligibleForExtendedVisual(cluster) {
+      return !!(
+        cluster &&
+        cluster.geometry &&
+        Number.isFinite(cluster.normalizedDistanceRatio) &&
+        cluster.normalizedDistanceRatio < 1.5
+      );
+    }
+
     function buildScaledGeometry(sourceGeometry, scaleRatio) {
       if (!sourceGeometry || !Number.isFinite(scaleRatio) || scaleRatio <= 0) return null;
       if (sourceGeometry.type === 'circle') {
@@ -732,8 +741,16 @@
       }
 
       return buildUserEllipseAnalysis(userPos).then(function(analysis) {
-        var nearestCluster = analysis && analysis.clusters && analysis.clusters.length ? analysis.clusters[0] : null;
-        if (!nearestCluster || !nearestCluster.geometry) {
+        var nearestCluster = null;
+        if (analysis && analysis.clusters && analysis.clusters.length) {
+          for (var i = 0; i < analysis.clusters.length; i++) {
+            if (isClusterEligibleForExtendedVisual(analysis.clusters[i])) {
+              nearestCluster = analysis.clusters[i];
+              break;
+            }
+          }
+        }
+        if (!nearestCluster) {
           clearExtendedVisual();
           return;
         }
