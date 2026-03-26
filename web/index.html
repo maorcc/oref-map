@@ -133,7 +133,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   z-index: 1000;
   direction: rtl;
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .leaflet-popup-close-button {
@@ -194,7 +193,113 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 .location-item:hover { background: #f5f5f5; }
 
-#sound-btn, #timeline-btn, #location-btn, #locate-btn, #ellipse-btn {
+/* --- Hamburger menu --- */
+#menu-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1001;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  color: #555;
+  padding: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+#menu-btn:hover, #menu-btn[aria-expanded="true"] {
+  background: rgba(219, 234, 254, 0.92);
+  border-color: #93c5fd;
+}
+#menu-panel {
+  display: none;
+  position: fixed;
+  top: 60px;
+  right: 14px;
+  z-index: 1001;
+  background: rgba(255,255,255,0.97);
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  direction: rtl;
+  width: 180px;
+  max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.menu-item { border-bottom: 1px solid #f0f0f0; }
+.menu-item:last-child { border-bottom: none; }
+.menu-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+@media (hover: hover) {
+  .menu-item-row:hover { background: #f5f5f5; }
+}
+.menu-check {
+  margin-right: auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #aaa;
+  border-radius: 3px;
+  flex-shrink: 0;
+  position: relative;
+}
+.menu-item.active .menu-check {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+.menu-item.active .menu-check::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.menu-item-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu-item-label {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.menu-sub-panel {
+  display: none;
+  padding: 8px 16px 12px;
+  border-top: 1px solid #eee;
+  direction: rtl;
+}
+#menu-sound.sound-open .menu-sub-panel { display: block; }
+
+/* --- Right-panel buttons (timeline, ellipse) --- */
+#timeline-btn, #ellipse-btn {
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -205,16 +310,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   overflow: hidden;
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
-#gps-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  max-height: 40px;
-  transition: opacity 0.4s ease, max-height 0.4s ease, margin 0.4s ease;
-}
 @media (hover: hover) {
-  #sound-btn:not(.open):not(.active):hover, #location-btn:not(.active):hover, #locate-btn:not(.active):hover, #ellipse-btn:hover {
+  #ellipse-btn:hover {
     background: rgba(219, 234, 254, 0.92);
     border-color: #93c5fd;
   }
@@ -223,97 +320,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     border-color: #f59e0b;
   }
 }
-#share-btn {
-  position: fixed;
-  top: 14px;
-  right: 14px;
-  z-index: 1000;
-  background: rgba(255,255,255,0.55);
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 5px rgba(0,0,0,0.25);
-  color: #444;
-  padding: 0;
-}
-@media (pointer: coarse) {
-  #share-btn { display: flex; }
-}
-#locate-btn {
-  display: flex;
-  align-items: center;
-  font: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-  color: #555;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
-}
-#locate-btn.active, #location-btn.active, #sound-btn.active:not(.open) {
-  background: rgba(219, 234, 254, 0.92);
-  border-color: #93c5fd;
-}
-#locate-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-#location-btn {
-  direction: ltr;
-  display: flex;
-  align-items: center;
-  font: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-}
-#location-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-#sound-btn {
-  direction: ltr;
-  display: flex;
-  flex-direction: column-reverse;
-}
-#sound-btn.open {
-  width: 380px;
-  max-width: min(calc(100vw - 48px), 380px);
-  max-height: 400px;
-  cursor: default;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.97);
-}
-#sound-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-#sound-btn.open #sound-panel {
-  border-bottom: 1px solid #ddd;
-}
-#sound-panel {
-  display: none;
-  padding: 12px;
-  direction: rtl;
-}
-#sound-btn.open #sound-panel { display: block; }
 
 #ellipse-btn {
   display: none;
@@ -345,8 +351,6 @@ body.ellipse-mode #ellipse-btn { display: flex; }
   flex-direction: column-reverse;
 }
 #timeline-btn.has-data { display: flex; background: rgba(254, 243, 199, 0.92); border-color: #f59e0b; }
-#right-panel:has(#timeline-btn.open) #gps-row,
-#right-panel:has(#timeline-btn.open) #sound-btn { display: none; }
 #timeline-btn.open {
   width: 620px;
   max-width: min(calc(100vw - 48px), 620px);
@@ -526,30 +530,11 @@ body.ellipse-mode #ellipse-btn { display: flex; }
     top: 110px;
     left: 8px;
   }
-  #sound-btn, #timeline-btn, #location-btn, #locate-btn, #ellipse-btn {
+  #timeline-btn, #ellipse-btn {
     max-height: 36px;
   }
-  #gps-row {
-    gap: 6px;
-  }
-  #locate-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
-  #location-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
-  #sound-btn.open {
-    max-width: calc(100vw - 24px);
-  }
-  #sound-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
+  #menu-btn { width: 36px; height: 36px; }
+  #menu-panel { top: 56px; }
   #timeline-btn.open {
     max-width: calc(100vw - 24px);
   }
@@ -566,8 +551,6 @@ body.ellipse-mode #ellipse-btn { display: flex; }
   body.idle #right-panel { bottom: 8px; }
 }
 /* Idle mode: hide buttons after inactivity */
-body.idle #gps-row,
-body.idle #sound-btn,
 body.idle #timeline-btn,
 body.idle #ellipse-btn {
   opacity: 0;
@@ -587,12 +570,55 @@ body.idle #right-panel {
 <div id="map"></div>
 
 <h1 id="page-title">מפת העורף</h1>
-<button id="share-btn" type="button" title="שתף" aria-label="שתף">
-  <!-- iOS share icon: tray with upward arrow -->
-  <svg id="share-icon-ios" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="15"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5"/></svg>
-  <!-- Android share icon: connected nodes -->
-  <svg id="share-icon-android" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+<button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
 </button>
+<div id="menu-panel">
+  <div id="menu-gps" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><span class="blue-dot"></span></span>
+      <span class="menu-item-label">הראה אותי</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-zoom" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 4.5M12 2L9.5 4.5M12 22L9.5 19.5M12 22L14.5 19.5M2 12L4.5 9.5M2 12L4.5 14.5M22 12L19.5 14.5M22 12L19.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2" fill="transparent"/><path d="M14.5 14.5L17.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+      <span class="menu-item-label">זום אוטומטי</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-sound" class="menu-item">
+    <button id="menu-sound-row" class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
+      <span class="menu-item-label">מצב שקט</span>
+    </button>
+    <div class="menu-sub-panel">
+      <p style="margin:0 0 8px; font-weight:bold;">בחר מיקום לקבלת התרעות קוליות:</p>
+      <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
+             style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
+      <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px;">
+        <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
+      </div>
+    </div>
+  </div>
+  <div id="menu-share" class="menu-item" style="display:none;">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon">
+        <svg id="share-icon-ios" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="15"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5"/></svg>
+        <svg id="share-icon-android" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </span>
+      <span class="menu-item-label">שתף</span>
+    </button>
+  </div>
+  <div id="menu-about" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg></span>
+      <span class="menu-item-label">אודות</span>
+    </button>
+  </div>
+</div>
 
 
 <div id="status">
@@ -626,32 +652,6 @@ body.idle #right-panel {
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
     <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
   </div>
-  <div id="gps-row">
-    <button id="locate-btn" type="button" title="הצג התרעות במפה">
-      <div id="locate-btn-row">
-        <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path class="pan-arrows" d="M12 2L14.5 4.5M12 2L9.5 4.5M12 22L9.5 19.5M12 22L14.5 19.5M2 12L4.5 9.5M2 12L4.5 14.5M22 12L19.5 14.5M22 12L19.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle class="zoom-lens" cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2" fill="transparent"/><path d="M14.5 14.5L17.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="btn-text">זום</span>
-      </div>
-    </button>
-    <button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
-      <div id="location-btn-row">
-        <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
-      </div>
-    </button>
-  </div>
-  <div id="sound-btn" title="השמעת צלילים">
-  <div id="sound-btn-row">
-    <span class="btn-icon">🔇</span><span class="btn-text">ללא התרעה קולית</span>
-  </div>
-  <div id="sound-panel">
-    <p style="margin:0 0 8px; font-weight:bold; direction:rtl;">בחר מיקום לקבלת התראות קוליות:</p>
-    <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
-           style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
-    <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
-    <div style="display:flex; gap:8px;">
-      <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
-    </div>
-  </div>
-</div>
   <button id="ellipse-btn" type="button" title="סמן אליפסה">
     <div id="ellipse-btn-row">
       <span class="btn-icon">📝</span><span class="btn-text">אליפסה</span>
@@ -775,9 +775,9 @@ body.idle #right-panel {
   var userLocationMarker = null;
 
   function initUserLocation() {
-    var btn = document.getElementById('location-btn');
-    var btnText = btn.querySelector('.btn-text');
-    if (!navigator.geolocation) { btn.style.display = 'none'; return; }
+    var menuGps = document.getElementById('menu-gps');
+    var gpsLabel = menuGps.querySelector('.menu-item-label');
+    if (!navigator.geolocation) { menuGps.style.display = 'none'; return; }
 
     var icon = L.divIcon({
       html: '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>',
@@ -798,24 +798,19 @@ body.idle #right-panel {
     }
 
     function setIdle() {
-      btnText.textContent = 'הראה אותי';
-      btnText.style.display = '';
-      btn.title = 'הצג מיקום שלי על המפה';
-      btn.classList.remove('active');
+      gpsLabel.textContent = 'הראה אותי';
+      menuGps.classList.remove('active');
     }
 
     function setActive() {
       if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
-      btnText.textContent = '';
-      btnText.style.display = 'none';
-      btn.title = 'הסר מיקום מהמפה';
-      btn.classList.add('active');
+      gpsLabel.textContent = 'הראה אותי';
+      menuGps.classList.add('active');
     }
 
     function setTransient(msg) {
       if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
-      btnText.style.display = '';
-      btnText.textContent = msg;
+      gpsLabel.textContent = msg;
       transientTimeout = setTimeout(function() { transientTimeout = null; setIdle(); }, 3000);
     }
 
@@ -865,7 +860,7 @@ body.idle #right-panel {
       }).catch(function() {});
     }
 
-    document.getElementById('location-btn-row').addEventListener('click', function() {
+    menuGps.querySelector('.menu-item-row').addEventListener('click', function() {
       if (watchId !== null || userLocationMarker) {
         stopWatching();
         showToast('מיקום הוסר מהמפה');
@@ -892,17 +887,17 @@ body.idle #right-panel {
   var isZoomingProgrammatically = false;
 
   if (autoZoomActive) {
-    document.getElementById('locate-btn').classList.add('active');
+    document.getElementById('menu-zoom').classList.add('active');
   }
 
   map.on('moveend', function() {
     isZoomingProgrammatically = false;
   });
 
-  document.getElementById('locate-btn').addEventListener('click', function() {
+  document.getElementById('menu-zoom').querySelector('.menu-item-row').addEventListener('click', function() {
     autoZoomActive = !autoZoomActive;
     localStorage.setItem('oref-auto-zoom', autoZoomActive);
-    document.getElementById('locate-btn').classList.toggle('active', autoZoomActive);
+    document.getElementById('menu-zoom').classList.toggle('active', autoZoomActive);
     if (autoZoomActive) {
       showToast('זום אוטומטי מופעל');
       maybeZoomToEvent();
@@ -997,6 +992,52 @@ body.idle #right-panel {
       history.back();
     }
   }
+
+  // --- Hamburger menu ---
+  var menuPanel = document.getElementById('menu-panel');
+  var menuBtn = document.getElementById('menu-btn');
+  var menuOpen = false;
+  var menuSoundItem = document.getElementById('menu-sound');
+  var menuSoundRow = document.getElementById('menu-sound-row');
+  var soundSubPanelOpen = false;
+
+  function openMenu() {
+    menuPanel.style.display = 'block';
+    menuBtn.setAttribute('aria-expanded', 'true');
+    menuOpen = true;
+    pushPanelHistory();
+    updateOverlay();
+  }
+
+  function closeSoundSubPanel() {
+    menuSoundItem.classList.remove('sound-open');
+    soundSubPanelOpen = false;
+  }
+
+  function closeMenu() {
+    if (!menuOpen) return;
+    menuPanel.style.display = 'none';
+    menuBtn.setAttribute('aria-expanded', 'false');
+    menuOpen = false;
+    closeSoundSubPanel();
+    updateOverlay();
+  }
+
+  function toggleMenu() {
+    if (menuOpen) {
+      closeMenu();
+      popPanelHistory();
+    } else {
+      closeTimelinePanel();
+      map.closePopup();
+      openMenu();
+    }
+  }
+
+  menuBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleMenu();
+  });
 
   // --- Polygon state ---
   var locationPolygons = {};  // name → L.polygon
@@ -1269,7 +1310,7 @@ body.idle #right-panel {
 
   function updateOverlay() {
     var tlBtn = document.getElementById('timeline-btn');
-    var panelOpen = document.getElementById('sound-btn').classList.contains('open') ||
+    var panelOpen = menuOpen ||
       (tlBtn && tlBtn.classList.contains('open'));
     var popupOpen = openPopupName !== null;
     document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
@@ -1301,7 +1342,7 @@ body.idle #right-panel {
     'חדירת כלי טיס עוין': 'חדירת כטב״מ',
     'נשק לא קונבנציונלי': 'נשק לא קונבנציונלי',
     'חדירת מחבלים': 'חדירת מחבלים',
-    'בדקות הקרובות צפויות להתקבל התרעות באזורך': 'תיתכן אזעקת טילים בדקות הקרובות',
+    'בדקות הקרובות צפויות להתקבל התרעות באזורך': 'התרעה מוקדמת',
     'היכנסו מייד למרחב המוגן': 'היכנסו מייד למרחב המוגן',
     'היכנסו למרחב המוגן': 'היכנסו למרחב המוגן',
     'על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך. במקרה של קבלת התרעה, יש להיכנס למרחב המוגן ולשהות בו עד להודעה חדשה.': 'שיפור מיקום למיגון מיטבי',
@@ -1386,8 +1427,8 @@ body.idle #right-panel {
       var label = displayLabel(e.title);
       var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
       var nextEntry = entries[i + 1];
-      var border = (nextEntry && nextEntry.state === 'green') ? 'border-bottom:1px solid #ccc;' : '';
-      return '<div style="padding:4px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
+      var border = (nextEntry && nextEntry.state === 'green') ? 'border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:4px;' : '';
+      return '<div style="padding:1px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
         (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
         '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
       '</div>';
@@ -1398,7 +1439,7 @@ body.idle #right-panel {
     var starBtn = '<span class="fav-star" onclick="window._toggleFav()" ' +
       'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
       'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
-    return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
+    return '<div style="direction:rtl;width:min(170px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
       (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
       '</div>';
   }
@@ -1420,7 +1461,7 @@ body.idle #right-panel {
     openPopupMarker = marker;
     openPopupLatlng = latlng || null;
     marker.setStyle(ACTIVE_STYLE);
-    marker.bindPopup(buildPopupHtml(name), { maxWidth: 350 })
+    marker.bindPopup(buildPopupHtml(name), { maxWidth: 180 })
       .openPopup()
       .on('popupclose', function() {
         openPopupName = null; openPopupMarker = null;
@@ -2150,7 +2191,7 @@ body.idle #right-panel {
     function isOpen() { return container.classList.contains('open'); }
 
     function openTimeline() {
-      closeSoundPanel();
+      if (menuOpen) { closeMenu(); }
       map.closePopup();
       container.classList.add('open');
       pushPanelHistory();
@@ -2676,7 +2717,6 @@ body.idle #right-panel {
     hint.addEventListener('animationend', function() { hint.remove(); });
   }
 
-  document.getElementById('page-title').addEventListener('click', openAbout);
   document.getElementById('about-close').addEventListener('click', closeAbout);
   document.getElementById('about-backdrop').addEventListener('click', function(e) {
     if (e.target === this) closeAbout();
@@ -2712,71 +2752,62 @@ body.idle #right-panel {
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeAbout();
-      if (soundBtn.classList.contains('open')) {
-        closeSoundPanel();
-        popPanelHistory();
+      if (menuOpen) {
+        if (soundSubPanelOpen) {
+          closeSoundSubPanel();
+        } else {
+          closeMenu();
+          popPanelHistory();
+        }
       }
       map.closePopup();
       document.getElementById('errorDetail').style.display = 'none';
     }
   });
 
-  // --- Sound control & modal ---
-  var soundBtn = document.getElementById('sound-btn');
-  var soundBtnRow = document.getElementById('sound-btn-row');
+  // --- Sound control (in menu) ---
   var soundSearch = document.getElementById('sound-search');
   var soundResults = document.getElementById('sound-results');
 
-  function updateSoundButton() {
-    var icon = soundMuted ? '\uD83D\uDD07' : '\uD83D\uDD0A';
-    var text = soundMuted ? 'ללא התרעה קולית' : (soundLocation === 'all' ? 'צליל מופעל' : soundLocation);
-    soundBtnRow.querySelector('.btn-icon').textContent = icon;
-    soundBtnRow.querySelector('.btn-text').textContent = text;
-    soundBtn.title = soundMuted ? 'השמעת צלילים' : 'צלילים: ' + (soundLocation === 'all' ? 'כל הארץ' : soundLocation);
-    soundBtn.classList.toggle('active', !soundMuted);
+  var svgSoundOff = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+  var svgSoundOn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+  function updateMenuSoundUI() {
+    var icon = soundMuted ? svgSoundOff : svgSoundOn;
+    var text = soundMuted ? 'מצב שקט' : (soundLocation === 'all' ? 'צליל מופעל' : soundLocation);
+    menuSoundRow.querySelector('.menu-item-icon').innerHTML = icon;
+    menuSoundRow.querySelector('.menu-item-label').textContent = text;
+    menuSoundItem.classList.toggle('active', !soundMuted);
   }
-  updateSoundButton();
+  updateMenuSoundUI();
 
-  function isSoundOpen() { return soundBtn.classList.contains('open'); }
-
-  function openSoundPanel() {
-    closeTimelinePanel();
-    map.closePopup();
-    soundBtn.classList.add('open');
-    pushPanelHistory();
+  function openSoundSubPanel() {
+    menuSoundItem.classList.add('sound-open');
+    soundSubPanelOpen = true;
     soundSearch.value = '';
     soundResults.innerHTML = '';
     soundSearch.focus();
-    updateOverlay();
-  }
-
-  function closeSoundPanel() {
-    soundBtn.classList.remove('open');
-    updateOverlay();
   }
 
   function selectSoundLocation(loc) {
     soundLocation = loc;
     soundMuted = false;
-    updateSoundButton();
+    updateMenuSoundUI();
     try {
       localStorage.setItem('oref-sound-muted', 'false');
       localStorage.setItem('oref-sound-location', loc);
     } catch(e) {}
     getAudioContext();
-    closeSoundPanel();
-    popPanelHistory();
+    closeSoundSubPanel();
   }
 
-  soundBtnRow.addEventListener('click', function() {
-    if (isSoundOpen()) {
-      closeSoundPanel();
-      popPanelHistory();
+  menuSoundRow.addEventListener('click', function() {
+    if (soundSubPanelOpen) {
+      closeSoundSubPanel();
     } else if (soundMuted) {
-      openSoundPanel();
+      openSoundSubPanel();
     } else {
       soundMuted = true;
-      updateSoundButton();
+      updateMenuSoundUI();
       try { localStorage.setItem('oref-sound-muted', 'true'); } catch(e) {}
     }
   });
@@ -2794,7 +2825,7 @@ body.idle #right-panel {
     var matches = Object.keys(locationPolygons).filter(function(name) {
       return name.includes(q);
     }).slice(0, 20);
-    
+
     soundResults.innerHTML = matches.map(function(m) {
       return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
     }).join('');
@@ -2810,7 +2841,7 @@ body.idle #right-panel {
   // --- Mobile back button closes panels ---
   window.addEventListener('popstate', function() {
     panelHistoryPushed = false;
-    closeSoundPanel();
+    closeMenu();
     closeTimelinePanel();
     map.closePopup();
   });
@@ -2818,8 +2849,8 @@ body.idle #right-panel {
   // --- Click outside to close panels ---
   document.addEventListener('click', function(e) {
     var closed = false;
-    if (soundBtn.classList.contains('open') && !soundBtn.contains(e.target)) {
-      closeSoundPanel();
+    if (menuOpen && !menuPanel.contains(e.target) && !menuBtn.contains(e.target)) {
+      closeMenu();
       closed = true;
     }
     if (closed) popPanelHistory();
@@ -2853,8 +2884,7 @@ body.idle #right-panel {
   var IDLE_MS = 45000;
   var _idleTimer = null;
   function _enterIdle() {
-    if (document.getElementById('sound-btn').classList.contains('open') ||
-        document.getElementById('timeline-btn').classList.contains('open')) {
+    if (menuOpen || document.getElementById('timeline-btn').classList.contains('open')) {
       _resetIdle(); return;
     }
     document.body.classList.add('idle');
@@ -2868,20 +2898,33 @@ body.idle #right-panel {
     .forEach(function(e) { document.addEventListener(e, _resetIdle, {passive:true}); });
   _resetIdle();
 
-  // --- Share button ---
+  // --- Menu: Share ---
   var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   document.getElementById(isIos ? 'share-icon-ios' : 'share-icon-android').style.display = 'block';
 
-  document.getElementById('share-btn').addEventListener('click', async function() {
-    try { await navigator.share({
-        title: 'מפת העורף',
-        text: 'מפת העורף - מפת התרעות פיקוד העורף בזמן אמת',
-        url: 'https://oref-map.org'
-      });
-    } catch (e) {
-      if (e.name !== 'AbortError') console.error('Share failed:', e);
-    }
+  if (navigator.share && ('ontouchstart' in window)) {
+    document.getElementById('menu-share').style.display = '';
+    document.getElementById('menu-share').querySelector('.menu-item-row').addEventListener('click', async function() {
+      closeMenu();
+      popPanelHistory();
+      try {
+        await navigator.share({
+          title: 'מפת העורף',
+          text: 'מפת העורף - מפת התרעות פיקוד העורף בזמן אמת',
+          url: 'https://oref-map.org'
+        });
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('Share failed:', e);
+      }
+    });
+  }
+
+  // --- Menu: About ---
+  document.getElementById('menu-about').querySelector('.menu-item-row').addEventListener('click', function() {
+    closeMenu();
+    popPanelHistory();
+    openAbout();
   });
 
   init();
