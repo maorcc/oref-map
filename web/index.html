@@ -560,6 +560,11 @@ body.idle #right-panel {
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
 </button>
 <div id="menu-panel">
+  <div id="menu-search" class="menu-item" style="padding:8px 16px 4px;">
+    <input type="text" id="search-input" placeholder="חיפוש יישוב..." dir="rtl"
+           style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+    <div id="search-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-top:8px;"></div>
+  </div>
   <div id="menu-gps" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><span class="blue-dot"></span></span>
@@ -1008,6 +1013,8 @@ body.idle #right-panel {
   var menuEllipseItem = document.getElementById('menu-ellipse');
   var menuEllipseSelect = document.getElementById('menu-ellipse-select');
   var soundSubPanelOpen = false;
+  var searchInput = document.getElementById('search-input');
+  var searchResults = document.getElementById('search-results');
 
   if (isEllipseMode) {
     menuEllipseItem.style.display = '';
@@ -1026,12 +1033,18 @@ body.idle #right-panel {
     soundSubPanelOpen = false;
   }
 
+  function clearSearch() {
+    searchInput.value = '';
+    searchResults.innerHTML = '';
+  }
+
   function closeMenu() {
     if (!menuOpen) return;
     menuPanel.style.display = 'none';
     menuBtn.setAttribute('aria-expanded', 'false');
     menuOpen = false;
     closeSoundSubPanel();
+    clearSearch();
     updateOverlay();
   }
 
@@ -1426,7 +1439,8 @@ body.idle #right-panel {
   window._toggleFav = function() {
     var name = openPopupName;
     if (!name) return;
-    var latlng = openPopupLatlng || favorites[name];
+    var polygon = locationPolygons[name];
+    var latlng = openPopupLatlng || favorites[name] || (polygon && polygon.getBounds().getCenter());
     if (!latlng) return;
     toggleFavorite(name, latlng);
   };
@@ -1575,7 +1589,7 @@ body.idle #right-panel {
         updateShadowState(loc, state);
       }
     }
-    if (autoZoomActive && isLiveMode && isNewAlert) {
+    if (autoZoomActive && isLiveMode && isNewAlert && !openPopupName) {
       maybeZoomToEvent();
     }
     syncEllipseMode();
@@ -2860,6 +2874,42 @@ body.idle #right-panel {
     if (item) {
       selectSoundLocation(item.getAttribute('data-name'));
     }
+  });
+
+  // --- Location search (in menu) ---
+  searchInput.addEventListener('input', function() {
+    var q = searchInput.value.trim();
+    if (q.length < 2) {
+      searchResults.innerHTML = '';
+      return;
+    }
+    var matches = Object.keys(locationPolygons).filter(function(name) {
+      return name.includes(q);
+    }).slice(0, 20);
+
+    searchResults.innerHTML = matches.map(function(m) {
+      return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
+    }).join('');
+  });
+
+  searchResults.addEventListener('click', function(e) {
+    var item = e.target.closest('.location-item');
+    if (!item) return;
+    var name = item.getAttribute('data-name');
+    var polygon = locationPolygons[name];
+    if (!polygon) return;
+
+    closeMenu();
+    popPanelHistory();
+
+    var bounds = polygon.getBounds();
+    isZoomingProgrammatically = true;
+    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 12, duration: 0.7 });
+
+    map.once('moveend', function() {
+      isZoomingProgrammatically = false;
+      showPopup(name, polygon);
+    });
   });
 
   // --- Mobile back button closes panels ---
