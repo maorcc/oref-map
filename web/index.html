@@ -2938,5 +2938,45 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
 }
 </script>
+<script>
+(function() {
+  var STORAGE_KEY = 'pwa_install';
+  var stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+  // Don't prompt if already installed or permanently dismissed
+  if (stored.installed || stored.dismissed) return;
+
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    var today = new Date().toISOString().slice(0, 10);
+    if (stored.lastDay !== today) {
+      stored.lastDay = today;
+      stored.todayCount = 0;
+    }
+    stored.todayCount = (stored.todayCount || 0) + 1;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+
+    if (stored.todayCount >= 3) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(result) {
+        if (result.outcome === 'accepted') {
+          stored.installed = true;
+        } else {
+          stored.dismissed = true;
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+        deferredPrompt = null;
+      });
+    }
+  });
+
+  window.addEventListener('appinstalled', function() {
+    stored.installed = true;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+  });
+})();
+</script>
 </body>
 </html>
