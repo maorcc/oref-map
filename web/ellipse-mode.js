@@ -14,8 +14,10 @@
     var orefPointsPromise = null;
     var ellipseMarkers = [];
     var ellipseOverlays = [];
+    var ellipseVisualLayers = [];
     var enabled = false;
     var lastRenderKey = '';
+    var displayMode = 0;
 
     function getDisplayedRedAlerts() {
       var locationStates = getLocationStates();
@@ -66,6 +68,64 @@
         map.removeLayer(ellipseOverlays[j]);
       }
       ellipseOverlays = [];
+      clearExtendedVisual();
+    }
+
+    function formatPercent(ratio) {
+      if (ratio === null || !Number.isFinite(ratio)) return 'N/A';
+      return Math.round(ratio * 100) + '%';
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, function(ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+      });
+    }
+
+    function clearExtendedVisual() {
+      for (var i = 0; i < ellipseVisualLayers.length; i++) {
+        map.removeLayer(ellipseVisualLayers[i]);
+      }
+      ellipseVisualLayers = [];
+    }
+
+    function drawExtendedVisual(cluster, userPos) {
+      if (!cluster || !cluster.geometry || !userPos) return;
+      clearExtendedVisual();
+
+      var centerLatLng = [cluster.geometry.center.lat, cluster.geometry.center.lng];
+      var userLatLng = [userPos.lat, userPos.lng];
+      var midLatLng = [
+        (centerLatLng[0] + userLatLng[0]) / 2,
+        (centerLatLng[1] + userLatLng[1]) / 2
+      ];
+
+      var centerMarker = L.circleMarker(centerLatLng, {
+        radius: 6,
+        color: '#1d4ed8',
+        weight: 2,
+        fillColor: '#ffffff',
+        fillOpacity: 1
+      }).addTo(map);
+
+      var connectionLine = L.polyline([centerLatLng, userLatLng], {
+        color: '#1d4ed8',
+        weight: 2,
+        opacity: 0.9,
+        dashArray: '6 6'
+      }).addTo(map);
+
+      var ratioLabel = L.marker(midLatLng, {
+        interactive: false,
+        icon: L.divIcon({
+          className: '',
+          html: '<div style="background:rgba(255,255,255,0.96);border:1px solid #93c5fd;border-radius:12px;padding:4px 8px;color:#1d4ed8;font:12px Arial,sans-serif;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' +
+            escapeHtml(formatPercent(cluster.normalizedDistanceRatio)) + '</div>',
+          iconSize: null
+        })
+      }).addTo(map);
+
+      ellipseVisualLayers.push(centerMarker, connectionLine, ratioLabel);
     }
 
     function buildRenderKey(redAlerts) {
@@ -189,6 +249,64 @@
         latlngs.push(unprojectEllipsePoint({ x: x, y: y }));
       }
       return latlngs;
+    }
+
+    function geometryContainsLatLng(geometry, latlng) {
+      if (!geometry || !latlng) return false;
+      if (geometry.type === 'circle') {
+        return map.distance(
+          [geometry.center.lat, geometry.center.lng],
+          [latlng.lat, latlng.lng]
+        ) <= geometry.radiusMeters;
+      }
+
+      var projected = projectEllipsePoint({ lat: latlng.lat, lng: latlng.lng });
+      var dx = projected.x - geometry.centerProjected.x;
+      var dy = projected.y - geometry.centerProjected.y;
+      var u = dx * geometry.majorAxis.x + dy * geometry.majorAxis.y;
+      var v = dx * geometry.minorAxis.x + dy * geometry.minorAxis.y;
+      var ellipseEq =
+        (u * u) / (geometry.semiMajor * geometry.semiMajor) +
+        (v * v) / (geometry.semiMinor * geometry.semiMinor);
+      return ellipseEq <= 1;
+    }
+
+    function getGeometryPositionMetrics(geometry, latlng) {
+      if (!geometry || !latlng) return null;
+      if (geometry.type === 'circle') {
+        var distanceMeters = map.distance(
+          [geometry.center.lat, geometry.center.lng],
+          [latlng.lat, latlng.lng]
+        );
+        return {
+          centerDistanceMeters: distanceMeters,
+          normalizedDistanceRatio: geometry.radiusMeters > 0 ? distanceMeters / geometry.radiusMeters : null
+        };
+      }
+
+      var projected = projectEllipsePoint({ lat: latlng.lat, lng: latlng.lng });
+      var dx = projected.x - geometry.centerProjected.x;
+      var dy = projected.y - geometry.centerProjected.y;
+      var u = dx * geometry.majorAxis.x + dy * geometry.majorAxis.y;
+      var v = dx * geometry.minorAxis.x + dy * geometry.minorAxis.y;
+      var normalizedDistanceRatio = Math.sqrt(
+        (u * u) / (geometry.semiMajor * geometry.semiMajor) +
+        (v * v) / (geometry.semiMinor * geometry.semiMinor)
+      );
+
+      return {
+        centerDistanceMeters: map.distance(
+          [geometry.center.lat, geometry.center.lng],
+          [latlng.lat, latlng.lng]
+        ),
+        normalizedDistanceRatio: normalizedDistanceRatio
+      };
+    }
+
+    function buildClusterLabel(cluster) {
+      if (!cluster.length) return '';
+      if (cluster.length === 1) return cluster[0].location;
+      return cluster[0].location + ' +' + (cluster.length - 1);
     }
 
     function addEllipseOverlay(points, alerts) {
@@ -408,6 +526,121 @@
       return { missing: missing, clusterCount: clusters.length };
     }
 
+    function buildUserEllipseAnalysis(userLatLng) {
+      if (!enabled) {
+        return Promise.resolve({
+          enabled: false,
+          hasAlerts: false,
+          clusterCount: 0,
+          totalAlerts: 0,
+          clusters: []
+        });
+      }
+
+      var redAlerts = getDisplayedRedAlerts();
+      if (!redAlerts.length) {
+        return Promise.resolve({
+          enabled: true,
+          hasAlerts: false,
+          clusterCount: 0,
+          totalAlerts: 0,
+          clusters: []
+        });
+      }
+
+      return ensureOrefPoints().then(function(pointsMap) {
+        var clusters = buildRedAlertClusters(redAlerts);
+        var reportClusters = [];
+
+        for (var i = 0; i < clusters.length; i++) {
+          var cluster = clusters[i];
+          var placedPoints = [];
+          var latestAlertDate = '';
+          for (var j = 0; j < cluster.length; j++) {
+            var alert = cluster[j];
+            var point = pointsMap[alert.location];
+            if (point && point.length >= 2) {
+              placedPoints.push({ lat: point[0], lng: point[1] });
+            }
+            if (alert.alertDate && (!latestAlertDate || alert.alertDate > latestAlertDate)) {
+              latestAlertDate = alert.alertDate;
+            }
+          }
+
+          var geometry = buildEllipseGeometry(placedPoints);
+          var positionMetrics = getGeometryPositionMetrics(geometry, userLatLng);
+          var minDistanceMeters = Infinity;
+          for (var k = 0; k < placedPoints.length; k++) {
+            var distanceMeters = map.distance(
+              [userLatLng.lat, userLatLng.lng],
+              [placedPoints[k].lat, placedPoints[k].lng]
+            );
+            if (distanceMeters < minDistanceMeters) minDistanceMeters = distanceMeters;
+          }
+
+          reportClusters.push({
+            label: buildClusterLabel(cluster),
+            locations: cluster.map(function(alert) { return alert.location; }),
+            locationCount: cluster.length,
+            latestAlertDate: latestAlertDate,
+            containsUser: geometryContainsLatLng(geometry, userLatLng),
+            distanceMeters: Number.isFinite(minDistanceMeters) ? minDistanceMeters : null,
+            geometry: geometry ? {
+              type: geometry.type,
+              center: {
+                lat: geometry.center.lat,
+                lng: geometry.center.lng
+              },
+              widthMeters: geometry.type === 'circle' ? geometry.radiusMeters * 2 : geometry.semiMajor * 2,
+              heightMeters: geometry.type === 'circle' ? geometry.radiusMeters * 2 : geometry.semiMinor * 2
+            } : null,
+            centerDistanceMeters: positionMetrics ? positionMetrics.centerDistanceMeters : null,
+            normalizedDistanceRatio: positionMetrics ? positionMetrics.normalizedDistanceRatio : null
+          });
+        }
+
+        reportClusters.sort(function(a, b) {
+          var distA = a.distanceMeters === null ? Infinity : a.distanceMeters;
+          var distB = b.distanceMeters === null ? Infinity : b.distanceMeters;
+          return distA - distB;
+        });
+
+        return {
+          enabled: true,
+          hasAlerts: reportClusters.length > 0,
+          clusterCount: reportClusters.length,
+          totalAlerts: redAlerts.length,
+          insideClusterCount: reportClusters.filter(function(cluster) {
+            return cluster.containsUser;
+          }).length,
+          nearestClusterDistanceMeters: reportClusters.length ? reportClusters[0].distanceMeters : null,
+          clusters: reportClusters
+        };
+      });
+    }
+
+    function refreshExtendedVisual() {
+      var getCurrentUserPosition = options.getCurrentUserPosition;
+      var userPos = getCurrentUserPosition ? getCurrentUserPosition() : null;
+      var shouldDraw = !!(enabled && displayMode === 2 && userPos);
+      if (!shouldDraw) {
+        clearExtendedVisual();
+        return Promise.resolve();
+      }
+
+      return buildUserEllipseAnalysis(userPos).then(function(analysis) {
+        var nearestCluster = analysis && analysis.clusters && analysis.clusters.length ? analysis.clusters[0] : null;
+        if (!nearestCluster || !nearestCluster.geometry) {
+          clearExtendedVisual();
+          return;
+        }
+        drawExtendedVisual(nearestCluster, userPos);
+      }).catch(function(err) {
+        clearExtendedVisual();
+        console.error('Failed to build ellipse visual:', err);
+      });
+    }
+
     function sync(force, opts) {
       if (!enabled) {
         clear();
@@ -431,6 +664,7 @@
         } else {
           var result = drawEllipseOverlays(redAlerts, pointsMap);
           lastRenderKey = renderKey;
+          refreshExtendedVisual();
           if (result.missing.length > 0) {
             if (opts.showToast) showToast('סומנו ' + result.clusterCount + ' אשכולות, חסרות נקודות עבור ' + result.missing.length + ' יישובים');
           } else if (opts.showToast) {
@@ -455,12 +689,22 @@
       return sync(true, opts);
     }
 
+    function setDisplayMode(nextMode) {
+      displayMode = nextMode;
+      return refreshExtendedVisual();
+    }
+
     return {
       clear: clear,
       render: function() { return setEnabled(true, { showToast: true }); },
       sync: sync,
       setEnabled: setEnabled,
+      setDisplayMode: setDisplayMode,
+      refreshExtendedVisual: refreshExtendedVisual,
+      clearExtendedVisual: clearExtendedVisual,
+      buildUserEllipseAnalysis: buildUserEllipseAnalysis,
       isEnabled: function() { return enabled; },
+      getDisplayMode: function() { return displayMode; },
       isLiveMode: function() { return getIsLiveMode(); },
       currentViewTime: function() { return getCurrentViewTime(); }
     };

@@ -344,6 +344,11 @@ body.ellipse-mode #ellipse-btn { display: flex; }
   direction: rtl;
   cursor: pointer;
 }
+body.ellipse-mode #ellipse-btn.extended {
+  background: rgba(219, 234, 254, 0.92);
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
 
 #timeline-btn {
   display: none;
@@ -640,7 +645,6 @@ body.idle #right-panel {
   </div>
 </div>
 
-
 <div id="tap-hint" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; z-index:1001; direction:rtl; text-align:center; animation:tapHintFade 5s forwards; pointer-events:none;">
   לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
@@ -773,6 +777,21 @@ body.idle #right-panel {
 
   // --- User location ---
   var userLocationMarker = null;
+  var currentUserLatLng = null;
+
+  function getUrlPosition() {
+    var raw = new URLSearchParams(window.location.search).get('myPosition');
+    if (!raw) return null;
+    var parts = raw.split(',').map(function(part) { return Number(part.trim()); });
+    if (parts.length !== 2 || parts.some(function(n) { return Number.isNaN(n); })) return null;
+    return [parts[0], parts[1]];
+  }
+
+  function getCurrentUserPosition() {
+    if (currentUserLatLng) return currentUserLatLng;
+    var urlPos = getUrlPosition();
+    return urlPos ? { lat: urlPos[0], lng: urlPos[1] } : null;
+  }
 
   function initUserLocation() {
     var menuGps = document.getElementById('menu-gps');
@@ -788,14 +807,6 @@ body.idle #right-panel {
 
     var watchId = null;
     var transientTimeout = null;
-
-    function getUrlPosition() {
-      var raw = new URLSearchParams(window.location.search).get('myPosition');
-      if (!raw) return null;
-      var parts = raw.split(',').map(function(part) { return Number(part.trim()); });
-      if (parts.length !== 2 || parts.some(function(n) { return Number.isNaN(n); })) return null;
-      return [parts[0], parts[1]];
-    }
 
     function setIdle() {
       gpsLabel.textContent = 'הראה אותי';
@@ -817,6 +828,10 @@ body.idle #right-panel {
     function stopWatching() {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+      currentUserLatLng = null;
+      if (ellipseModeController && ellipseModeController.refreshExtendedVisual) {
+        ellipseModeController.refreshExtendedVisual();
+      }
     }
 
     function showUserLocation(latlng) {
@@ -834,7 +849,11 @@ body.idle #right-panel {
       } else {
         userLocationMarker.setLatLng(latlng);
       }
+      currentUserLatLng = { lat: latlng[0], lng: latlng[1] };
       setActive();
+      if (ellipseModeController && ellipseModeController.refreshExtendedVisual) {
+        ellipseModeController.refreshExtendedVisual();
+      }
       return true;
     }
 
@@ -2723,9 +2742,13 @@ body.idle #right-panel {
   });
   var ellipseModeController = null;
   var ellipseBtn = document.getElementById('ellipse-btn');
+  var ellipseDisplayMode = 0;
   function updateEllipseButton() {
     if (!ellipseModeController || !ellipseBtn) return;
-    ellipseBtn.classList.toggle('active', ellipseModeController.isEnabled());
+    ellipseBtn.classList.toggle('active', ellipseDisplayMode > 0);
+    ellipseBtn.classList.toggle('extended', ellipseDisplayMode === 2);
+    ellipseBtn.title = ellipseDisplayMode === 0 ? 'סמן אליפסה' : (ellipseDisplayMode === 1 ? 'אליפסה רגילה' : 'אליפסה מורחבת');
+    ellipseModeController.setDisplayMode(ellipseDisplayMode);
   }
   function syncEllipseMode(force) {
     if (!ellipseModeController || !ellipseModeController.sync) return;
@@ -2738,15 +2761,29 @@ body.idle #right-panel {
       getLocationStates: function() { return locationStates; },
       getLocationHistory: function() { return locationHistory; },
       getLocationPolygons: function() { return locationPolygons; },
+      getCurrentUserPosition: getCurrentUserPosition,
       getIsLiveMode: function() { return isLiveMode; },
       getCurrentViewTime: function() { return currentViewTime; },
       showToast: showToast
     });
     updateEllipseButton();
     ellipseBtn.addEventListener('click', function() {
-      var nextEnabled = !ellipseModeController.isEnabled();
-      ellipseModeController.setEnabled(nextEnabled, { showToast: true });
-      updateEllipseButton();
+      var previousMode = ellipseDisplayMode;
+      ellipseDisplayMode = (ellipseDisplayMode + 1) % 3;
+      if (ellipseDisplayMode === 0) {
+        ellipseModeController.setEnabled(false, { showToast: true });
+        updateEllipseButton();
+        return;
+      }
+      if (previousMode === 0) {
+        ellipseModeController.setEnabled(true, { showToast: true }).then(function() {
+          updateEllipseButton();
+        });
+        return;
+      }
+      ellipseModeController.sync(true).then(function() {
+        updateEllipseButton();
+      });
     });
   }
   document.addEventListener('keydown', function(e) {
@@ -2759,6 +2796,9 @@ body.idle #right-panel {
           closeMenu();
           popPanelHistory();
         }
+      }
+      if (ellipseModeController && ellipseModeController.clearExtendedVisual) {
+        ellipseModeController.clearExtendedVisual();
       }
       map.closePopup();
       document.getElementById('errorDetail').style.display = 'none';
