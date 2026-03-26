@@ -789,6 +789,14 @@ body.idle #right-panel {
     var watchId = null;
     var transientTimeout = null;
 
+    function getUrlPosition() {
+      var raw = new URLSearchParams(window.location.search).get('myPosition');
+      if (!raw) return null;
+      var parts = raw.split(',').map(function(part) { return Number(part.trim()); });
+      if (parts.length !== 2 || parts.some(function(n) { return Number.isNaN(n); })) return null;
+      return [parts[0], parts[1]];
+    }
+
     function setIdle() {
       btnText.textContent = 'הראה אותי';
       btnText.style.display = '';
@@ -816,26 +824,32 @@ body.idle #right-panel {
       if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
     }
 
+    function showUserLocation(latlng) {
+      if (!isInIsrael(latlng)) {
+        setTransient('בעיית GPS');
+        return false;
+      }
+      if (!userLocationMarker) {
+        userLocationMarker = L.marker(latlng, {
+          icon: icon,
+          interactive: false,
+          zIndexOffset: 1000
+        }).addTo(map);
+        showToast('מראה מיקום על המפה');
+      } else {
+        userLocationMarker.setLatLng(latlng);
+      }
+      setActive();
+      return true;
+    }
+
     function startWatching() {
       if (watchId !== null) return;
       watchId = navigator.geolocation.watchPosition(function(pos) {
         var latlng = [pos.coords.latitude, pos.coords.longitude];
-        if (!isInIsrael(latlng)) {
+        if (!showUserLocation(latlng)) {
           stopWatching();
-          setTransient('בעיית GPS');
-          return;
         }
-        if (!userLocationMarker) {
-          userLocationMarker = L.marker(latlng, {
-            icon: icon,
-            interactive: false,
-            zIndexOffset: 1000
-          }).addTo(map);
-          showToast('מראה מיקום על המפה');
-        } else {
-          userLocationMarker.setLatLng(latlng);
-        }
-        setActive();
       }, function(err) {
         console.warn('Geolocation error:', err.code, err.message);
         if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
@@ -858,6 +872,12 @@ body.idle #right-panel {
         setIdle();
         localStorage.setItem('oref-location-hidden', 'true');
       } else {
+        var urlPos = getUrlPosition();
+        if (urlPos) {
+          localStorage.removeItem('oref-location-hidden');
+          showUserLocation(urlPos);
+          return;
+        }
         setTransient('מאתר...');
         startWatching();
         localStorage.removeItem('oref-location-hidden');
