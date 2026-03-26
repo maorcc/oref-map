@@ -2303,7 +2303,7 @@ body.idle #right-panel {
     function isOpen() { return container.classList.contains('open'); }
 
     function openTimeline() {
-      if (menuOpen) { closeMenu(); popPanelHistory(); }
+      if (menuOpen) { closeMenu(); }
       map.closePopup();
       container.classList.add('open');
       pushPanelHistory();
