@@ -13,7 +13,7 @@
     var orefPoints = null;
     var orefPointsPromise = null;
     var ellipseMarkers = [];
-    var ellipseCircles = [];
+    var ellipseOverlays = [];
 
     function getDisplayedRedAlerts() {
       var locationStates = getLocationStates();
@@ -60,10 +60,10 @@
         map.removeLayer(ellipseMarkers[i]);
       }
       ellipseMarkers = [];
-      for (var j = 0; j < ellipseCircles.length; j++) {
-        map.removeLayer(ellipseCircles[j]);
+      for (var j = 0; j < ellipseOverlays.length; j++) {
+        map.removeLayer(ellipseOverlays[j]);
       }
-      ellipseCircles = [];
+      ellipseOverlays = [];
     }
 
     function projectEllipsePoint(point) {
@@ -71,146 +71,146 @@
       return { x: projected.x, y: projected.y, lat: point.lat, lng: point.lng };
     }
 
-    function circleRadiusMeters(circle, point) {
-      return map.distance([circle.center.lat, circle.center.lng], [point.lat, point.lng]);
+    function unprojectEllipsePoint(point) {
+      return map.options.crs.unproject(L.point(point.x, point.y));
     }
 
-    function pointInCircle(point, circle) {
-      if (!circle) return false;
-      var dx = point.x - circle.cx;
-      var dy = point.y - circle.cy;
-      return (dx * dx + dy * dy) <= (circle.r2 + 1e-12);
+    function normalizeVector(vector, fallback) {
+      var length = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+      if (length < 1e-12) return fallback;
+      return { x: vector.x / length, y: vector.y / length };
     }
 
-    function circleFromTwoPoints(a, b) {
-      var cx = (a.x + b.x) / 2;
-      var cy = (a.y + b.y) / 2;
-      var dx = a.x - cx;
-      var dy = a.y - cy;
-      var centerLatLng = map.options.crs.unproject(L.point(cx, cy));
-      return {
-        cx: cx,
-        cy: cy,
-        r2: dx * dx + dy * dy,
-        center: { lat: centerLatLng.lat, lng: centerLatLng.lng }
-      };
-    }
-
-    function circleFromThreePoints(a, b, c) {
-      var ax = a.x, ay = a.y;
-      var bx = b.x, by = b.y;
-      var cx = c.x, cy = c.y;
-      var d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
-
-      if (Math.abs(d) < 1e-12) {
-        var candidates = [
-          circleFromTwoPoints(a, b),
-          circleFromTwoPoints(a, c),
-          circleFromTwoPoints(b, c)
-        ];
-        var best = null;
-        for (var i = 0; i < candidates.length; i++) {
-          var candidate = candidates[i];
-          if (pointInCircle(a, candidate) && pointInCircle(b, candidate) && pointInCircle(c, candidate)) {
-            if (!best || candidate.r2 < best.r2) best = candidate;
-          }
-        }
-        return best;
-      }
-
-      var ux = (
-        (ax * ax + ay * ay) * (by - cy) +
-        (bx * bx + by * by) * (cy - ay) +
-        (cx * cx + cy * cy) * (ay - by)
-      ) / d;
-      var uy = (
-        (ax * ax + ay * ay) * (cx - bx) +
-        (bx * bx + by * by) * (ax - cx) +
-        (cx * cx + cy * cy) * (bx - ax)
-      ) / d;
-      var centerLatLng = map.options.crs.unproject(L.point(ux, uy));
-      var dx = ax - ux;
-      var dy = ay - uy;
-      return {
-        cx: ux,
-        cy: uy,
-        r2: dx * dx + dy * dy,
-        center: { lat: centerLatLng.lat, lng: centerLatLng.lng }
-      };
-    }
-
-    function shufflePoints(points) {
-      var shuffled = points.slice();
-      for (var i = shuffled.length - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
-        var tmp = shuffled[i];
-        shuffled[i] = shuffled[j];
-        shuffled[j] = tmp;
-      }
-      return shuffled;
-    }
-
-    function minimalEnclosingCircle(points) {
+    function buildEllipseGeometry(points) {
       if (!points.length) return null;
-      if (points.length === 1) {
-        return {
-          cx: points[0].x,
-          cy: points[0].y,
-          r2: 0,
-          center: { lat: points[0].lat, lng: points[0].lng }
-        };
-      }
-
-      var shuffled = shufflePoints(points);
-      var circle = null;
-
-      for (var i = 0; i < shuffled.length; i++) {
-        var p = shuffled[i];
-        if (circle && pointInCircle(p, circle)) continue;
-
-        circle = {
-          cx: p.x,
-          cy: p.y,
-          r2: 0,
-          center: { lat: p.lat, lng: p.lng }
-        };
-        for (var j = 0; j < i; j++) {
-          var q = shuffled[j];
-          if (pointInCircle(q, circle)) continue;
-
-          circle = circleFromTwoPoints(p, q);
-          for (var k = 0; k < j; k++) {
-            var r = shuffled[k];
-            if (pointInCircle(r, circle)) continue;
-            circle = circleFromThreePoints(p, q, r);
-          }
-        }
-      }
-
-      return circle;
-    }
-
-    function addEllipseCircle(points) {
-      if (!points.length) return;
 
       var projectedPoints = points.map(projectEllipsePoint);
-      var circle = minimalEnclosingCircle(projectedPoints);
-      if (!circle) return;
-
-      var radiusMeters = 0;
-      for (var i = 0; i < points.length; i++) {
-        radiusMeters = Math.max(radiusMeters, circleRadiusMeters(circle, points[i]));
+      if (projectedPoints.length === 1) {
+        return {
+          type: 'circle',
+          center: points[0],
+          radiusMeters: 700
+        };
       }
 
-      ellipseCircles.push(L.circle([circle.center.lat, circle.center.lng], {
-        radius: radiusMeters,
-        color: '#9922cc',
-        weight: 2,
-        opacity: 0.95,
-        fillColor: '#9922cc',
-        fillOpacity: 0.06,
-        interactive: false
-      }).addTo(map));
+      var centerX = 0;
+      var centerY = 0;
+      for (var i = 0; i < projectedPoints.length; i++) {
+        centerX += projectedPoints[i].x;
+        centerY += projectedPoints[i].y;
+      }
+      centerX /= projectedPoints.length;
+      centerY /= projectedPoints.length;
+
+      var majorAxis;
+      if (projectedPoints.length === 2) {
+        majorAxis = normalizeVector({
+          x: projectedPoints[1].x - projectedPoints[0].x,
+          y: projectedPoints[1].y - projectedPoints[0].y
+        }, { x: 1, y: 0 });
+      } else {
+        var covXX = 0;
+        var covXY = 0;
+        var covYY = 0;
+        for (var j = 0; j < projectedPoints.length; j++) {
+          var dx = projectedPoints[j].x - centerX;
+          var dy = projectedPoints[j].y - centerY;
+          covXX += dx * dx;
+          covXY += dx * dy;
+          covYY += dy * dy;
+        }
+        var angle = 0.5 * Math.atan2(2 * covXY, covXX - covYY);
+        majorAxis = { x: Math.cos(angle), y: Math.sin(angle) };
+      }
+      majorAxis = normalizeVector(majorAxis, { x: 1, y: 0 });
+      var minorAxis = { x: -majorAxis.y, y: majorAxis.x };
+
+      var minU = Infinity;
+      var maxU = -Infinity;
+      var minV = Infinity;
+      var maxV = -Infinity;
+      for (var k = 0; k < projectedPoints.length; k++) {
+        var offsetX = projectedPoints[k].x - centerX;
+        var offsetY = projectedPoints[k].y - centerY;
+        var u = offsetX * majorAxis.x + offsetY * majorAxis.y;
+        var v = offsetX * minorAxis.x + offsetY * minorAxis.y;
+        if (u < minU) minU = u;
+        if (u > maxU) maxU = u;
+        if (v < minV) minV = v;
+        if (v > maxV) maxV = v;
+      }
+
+      var semiMajor = Math.max((maxU - minU) / 2, 450);
+      var semiMinor = Math.max((maxV - minV) / 2, 250);
+      semiMajor += 350;
+      semiMinor = Math.max(semiMinor + 250, semiMajor * 0.32);
+
+      var offsetU = (minU + maxU) / 2;
+      var offsetV = (minV + maxV) / 2;
+      var ellipseCenter = {
+        x: centerX + majorAxis.x * offsetU + minorAxis.x * offsetV,
+        y: centerY + majorAxis.y * offsetU + minorAxis.y * offsetV
+      };
+
+      return {
+        type: 'ellipse',
+        center: unprojectEllipsePoint(ellipseCenter),
+        centerProjected: ellipseCenter,
+        majorAxis: majorAxis,
+        minorAxis: minorAxis,
+        semiMajor: semiMajor,
+        semiMinor: semiMinor
+      };
+    }
+
+    function buildEllipseLatLngs(geometry) {
+      var latlngs = [];
+      for (var i = 0; i < 72; i++) {
+        var theta = (Math.PI * 2 * i) / 72;
+        var x = geometry.centerProjected.x +
+          geometry.majorAxis.x * Math.cos(theta) * geometry.semiMajor +
+          geometry.minorAxis.x * Math.sin(theta) * geometry.semiMinor;
+        var y = geometry.centerProjected.y +
+          geometry.majorAxis.y * Math.cos(theta) * geometry.semiMajor +
+          geometry.minorAxis.y * Math.sin(theta) * geometry.semiMinor;
+        latlngs.push(unprojectEllipsePoint({ x: x, y: y }));
+      }
+      return latlngs;
+    }
+
+    function addEllipseOverlay(points, alerts) {
+      if (!points.length) return;
+
+      var geometry = buildEllipseGeometry(points);
+      if (!geometry) return;
+
+      var popupHtml = alerts.map(function(alert) {
+        return alert.location + (alert.alertDate ? '<br><small>' + alert.alertDate + '</small>' : '');
+      }).join('<hr style="border:none;border-top:1px solid #eee;margin:6px 0;">');
+
+      var overlay;
+      if (geometry.type === 'circle') {
+        overlay = L.circle([geometry.center.lat, geometry.center.lng], {
+          radius: geometry.radiusMeters,
+          color: '#9922cc',
+          weight: 2,
+          opacity: 0.95,
+          fillColor: '#9922cc',
+          fillOpacity: 0.08
+        });
+      } else {
+        overlay = L.polygon(buildEllipseLatLngs(geometry), {
+          color: '#9922cc',
+          weight: 2,
+          opacity: 0.95,
+          fillColor: '#9922cc',
+          fillOpacity: 0.08
+        });
+      }
+
+      overlay.bindPopup(popupHtml, { maxWidth: 260 });
+      overlay.addTo(map);
+      ellipseOverlays.push(overlay);
     }
 
     function flattenPolygonLatLngs(polygon) {
@@ -347,7 +347,7 @@
           ellipseMarkers.push(marker);
           placedPoints.push({ lat: point[0], lng: point[1] });
         }
-        addEllipseCircle(placedPoints);
+        addEllipseOverlay(placedPoints, clusters[c]);
       }
       return { missing: missing, clusterCount: clusters.length };
     }
