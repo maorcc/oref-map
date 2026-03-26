@@ -29,6 +29,7 @@
 <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/ellipse-mode.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
@@ -53,7 +54,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   gap: 8px;
   z-index: 1000;
   pointer-events: none;
-  transition: bottom 0.4s ease, gap 0.4s ease;
+  transition: bottom 0.4s ease, top 0.4s ease, gap 0.4s ease;
 }
 #right-panel > * { pointer-events: auto; }
 #legend {
@@ -132,7 +133,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   z-index: 1000;
   direction: rtl;
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .leaflet-popup-close-button {
@@ -193,7 +193,113 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 .location-item:hover { background: #f5f5f5; }
 
-#sound-btn, #timeline-btn, #location-btn, #locate-btn, #predict-btn {
+/* --- Hamburger menu --- */
+#menu-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 1001;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  color: #555;
+  padding: 0;
+  transition: background 0.2s, border-color 0.2s;
+}
+#menu-btn:hover, #menu-btn[aria-expanded="true"] {
+  background: rgba(219, 234, 254, 0.92);
+  border-color: #93c5fd;
+}
+#menu-panel {
+  display: none;
+  position: fixed;
+  top: 60px;
+  right: 14px;
+  z-index: 1001;
+  background: rgba(255,255,255,0.97);
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  direction: rtl;
+  width: 180px;
+  max-width: calc(100vw - 28px);
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.menu-item { border-bottom: 1px solid #f0f0f0; }
+.menu-item:last-child { border-bottom: none; }
+.menu-item-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+}
+@media (hover: hover) {
+  .menu-item-row:hover { background: #f5f5f5; }
+}
+.menu-check {
+  margin-right: auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #aaa;
+  border-radius: 3px;
+  flex-shrink: 0;
+  position: relative;
+}
+.menu-item.active .menu-check {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+.menu-item.active .menu-check::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 0px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.menu-item-icon {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.menu-item-label {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.menu-sub-panel {
+  display: none;
+  padding: 8px 16px 12px;
+  border-top: 1px solid #eee;
+  direction: rtl;
+}
+#menu-sound.sound-open .menu-sub-panel { display: block; }
+
+/* --- Right-panel buttons (timeline, ellipse) --- */
+#timeline-btn, #ellipse-btn {
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -204,16 +310,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   overflow: hidden;
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
-#gps-row {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  max-height: 40px;
-  transition: opacity 0.4s ease, max-height 0.4s ease, margin 0.4s ease;
-}
 @media (hover: hover) {
-  #sound-btn:not(.open):not(.active):hover, #location-btn:not(.active):hover, #locate-btn:not(.active):hover {
+  #ellipse-btn:hover {
     background: rgba(219, 234, 254, 0.92);
     border-color: #93c5fd;
   }
@@ -222,20 +320,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     border-color: #f59e0b;
   }
 }
-#locate-btn {
-  display: flex;
+
+#ellipse-btn {
+  display: none;
   align-items: center;
   font: inherit;
   -webkit-appearance: none;
   appearance: none;
   color: #555;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
 }
-#locate-btn.active, #location-btn.active, #sound-btn.active:not(.open), #predict-btn.active {
+body.ellipse-mode #ellipse-btn.active {
   background: rgba(219, 234, 254, 0.92);
   border-color: #93c5fd;
+  color: #1d4ed8;
 }
-#locate-btn-row {
+body.ellipse-mode #ellipse-btn { display: flex; }
+#ellipse-btn-row {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -244,72 +344,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: rtl;
   cursor: pointer;
 }
-#predict-btn {
-  display: flex;
-  align-items: center;
-  font: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-  color: #555;
-  transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+body.ellipse-mode #ellipse-btn.extended {
+  background: rgba(219, 234, 254, 0.92);
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
-#predict-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-#location-btn {
-  direction: ltr;
-  display: flex;
-  align-items: center;
-  font: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-}
-#location-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-#sound-btn {
-  direction: ltr;
-  display: flex;
-  flex-direction: column-reverse;
-}
-#sound-btn.open {
-  width: 380px;
-  max-width: min(calc(100vw - 48px), 380px);
-  max-height: 400px;
-  cursor: default;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.97);
-}
-#sound-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-#sound-btn.open #sound-panel {
-  border-bottom: 1px solid #ddd;
-}
-#sound-panel {
-  display: none;
-  padding: 12px;
-  direction: rtl;
-}
-#sound-btn.open #sound-panel { display: block; }
 
 #timeline-btn {
   display: none;
@@ -317,8 +356,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   flex-direction: column-reverse;
 }
 #timeline-btn.has-data { display: flex; background: rgba(254, 243, 199, 0.92); border-color: #f59e0b; }
-#right-panel:has(#timeline-btn.open) #gps-row,
-#right-panel:has(#timeline-btn.open) #sound-btn { display: none; }
 #timeline-btn.open {
   width: 620px;
   max-width: min(calc(100vw - 48px), 620px);
@@ -498,35 +535,11 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     top: 110px;
     left: 8px;
   }
-  #sound-btn, #timeline-btn, #location-btn, #locate-btn, #predict-btn {
+  #timeline-btn, #ellipse-btn {
     max-height: 36px;
   }
-  #gps-row {
-    gap: 6px;
-  }
-  #locate-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
-  #predict-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
-  #location-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
-  #sound-btn.open {
-    max-width: calc(100vw - 24px);
-  }
-  #sound-btn-row {
-    height: 36px;
-    padding: 0 10px;
-    gap: 5px;
-  }
+  #menu-btn { width: 36px; height: 36px; }
+  #menu-panel { top: 56px; }
   #timeline-btn.open {
     max-width: calc(100vw - 24px);
   }
@@ -543,10 +556,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   body.idle #right-panel { bottom: 8px; }
 }
 /* Idle mode: hide buttons after inactivity */
-body.idle #gps-row,
-body.idle #sound-btn,
 body.idle #timeline-btn,
-body.idle #predict-btn {
+body.idle #ellipse-btn {
   opacity: 0;
   max-height: 0 !important;
   overflow: hidden;
@@ -564,6 +575,62 @@ body.idle #right-panel {
 <div id="map"></div>
 
 <h1 id="page-title">מפת העורף</h1>
+<button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+</button>
+<div id="menu-panel">
+  <div id="menu-gps" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><span class="blue-dot"></span></span>
+      <span class="menu-item-label">הראה אותי</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-zoom" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 4.5M12 2L9.5 4.5M12 22L9.5 19.5M12 22L14.5 19.5M2 12L4.5 9.5M2 12L4.5 14.5M22 12L19.5 14.5M22 12L19.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2" fill="transparent"/><path d="M14.5 14.5L17.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
+      <span class="menu-item-label">זום אוטומטי</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-sound" class="menu-item">
+    <button id="menu-sound-row" class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
+      <span class="menu-item-label">מצב שקט</span>
+    </button>
+    <div class="menu-sub-panel">
+      <p style="margin:0 0 8px; font-weight:bold;">בחר מיקום לקבלת התרעות קוליות:</p>
+      <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
+             style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
+      <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
+      <div style="display:flex; gap:8px;">
+        <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
+      </div>
+    </div>
+  </div>
+  <div id="menu-share" class="menu-item" style="display:none;">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon">
+        <svg id="share-icon-ios" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="15"/><path d="M20 14v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5"/></svg>
+        <svg id="share-icon-android" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </span>
+      <span class="menu-item-label">שתף</span>
+    </button>
+  </div>
+  <div id="menu-predict" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
+      <span class="menu-item-label">כיוון שיגור</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-about" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg></span>
+      <span class="menu-item-label">אודות</span>
+    </button>
+  </div>
+</div>
 
 
 <div id="status">
@@ -585,7 +652,6 @@ body.idle #right-panel {
   </div>
 </div>
 
-
 <div id="tap-hint" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:#fff; padding:10px 20px; border-radius:8px; font-size:14px; z-index:1001; direction:rtl; text-align:center; animation:tapHintFade 5s forwards; pointer-events:none;">
   לחצו על המפה לצפייה בהיסטוריית התרעות
 </div>
@@ -597,37 +663,11 @@ body.idle #right-panel {
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
     <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
   </div>
-  <div id="gps-row">
-    <button id="locate-btn" type="button" title="הצג התרעות במפה">
-      <div id="locate-btn-row">
-        <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path class="pan-arrows" d="M12 2L14.5 4.5M12 2L9.5 4.5M12 22L9.5 19.5M12 22L14.5 19.5M2 12L4.5 9.5M2 12L4.5 14.5M22 12L19.5 14.5M22 12L19.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle class="zoom-lens" cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2" fill="transparent"/><path d="M14.5 14.5L17.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="btn-text">זום</span>
-      </div>
-    </button>
-    <button id="location-btn" type="button" title="הצג מיקום שלי על המפה">
-      <div id="location-btn-row">
-        <span class="btn-icon"><span class="blue-dot"></span></span><span class="btn-text">הראה אותי</span>
-      </div>
-    </button>
-    <button id="predict-btn" type="button" title="חיזוי כיוון שיגור">
-      <div id="predict-btn-row">
-        <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span><span class="btn-text">כיוון שיגור</span>
-      </div>
-    </button>
-  </div>
-  <div id="sound-btn" title="השמעת צלילים">
-  <div id="sound-btn-row">
-    <span class="btn-icon">🔇</span><span class="btn-text">ללא התרעה קולית</span>
-  </div>
-  <div id="sound-panel">
-    <p style="margin:0 0 8px; font-weight:bold; direction:rtl;">בחר מיקום לקבלת התראות קוליות:</p>
-    <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
-           style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
-    <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
-    <div style="display:flex; gap:8px;">
-      <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
+  <button id="ellipse-btn" type="button" title="סמן אליפסה">
+    <div id="ellipse-btn-row">
+      <span class="btn-icon">📝</span><span class="btn-text">אליפסה</span>
     </div>
-  </div>
-</div>
+  </button>
   <div id="timeline-btn" title="ציר זמן">
     <div id="timeline-btn-row">
       <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
@@ -657,8 +697,12 @@ body.idle #right-panel {
 (function() {
   'use strict';
 
+  var pageParams = new URLSearchParams(location.search);
+  var isEllipseMode = pageParams.get('mode') === 'ellipse';
+  if (isEllipseMode) document.body.classList.add('ellipse-mode');
+
   // --- Debug overlay (append console.warn/error to on-screen log when ?debug) ---
-  var isDebugMode = new URLSearchParams(location.search).has('debug');
+  var isDebugMode = pageParams.has('debug');
   if (isDebugMode) {
     var debugOverlay = document.createElement('div');
     debugOverlay.id = 'debug-overlay';
@@ -689,7 +733,7 @@ body.idle #right-panel {
     apiPrefix = '/api';
   }
 
-  var debugApi = new URLSearchParams(location.search).get('debugapi');
+  var debugApi = pageParams.get('debugapi');
 
   function apiFetch(endpoint) {
     var url = PROXY_BASE + apiPrefix + '/' + endpoint;
@@ -740,11 +784,26 @@ body.idle #right-panel {
 
   // --- User location ---
   var userLocationMarker = null;
+  var currentUserLatLng = null;
+
+  function getUrlPosition() {
+    var raw = new URLSearchParams(window.location.search).get('myPosition');
+    if (!raw) return null;
+    var parts = raw.split(',').map(function(part) { return Number(part.trim()); });
+    if (parts.length !== 2 || parts.some(function(n) { return Number.isNaN(n); })) return null;
+    return [parts[0], parts[1]];
+  }
+
+  function getCurrentUserPosition() {
+    if (currentUserLatLng) return currentUserLatLng;
+    var urlPos = getUrlPosition();
+    return urlPos ? { lat: urlPos[0], lng: urlPos[1] } : null;
+  }
 
   function initUserLocation() {
-    var btn = document.getElementById('location-btn');
-    var btnText = btn.querySelector('.btn-text');
-    if (!navigator.geolocation) { btn.style.display = 'none'; return; }
+    var menuGps = document.getElementById('menu-gps');
+    var gpsLabel = menuGps.querySelector('.menu-item-label');
+    if (!navigator.geolocation) { menuGps.style.display = 'none'; return; }
 
     var icon = L.divIcon({
       html: '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>',
@@ -757,52 +816,61 @@ body.idle #right-panel {
     var transientTimeout = null;
 
     function setIdle() {
-      btnText.textContent = 'הראה אותי';
-      btnText.style.display = '';
-      btn.title = 'הצג מיקום שלי על המפה';
-      btn.classList.remove('active');
+      gpsLabel.textContent = 'הראה אותי';
+      menuGps.classList.remove('active');
     }
 
     function setActive() {
       if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
-      btnText.textContent = '';
-      btnText.style.display = 'none';
-      btn.title = 'הסר מיקום מהמפה';
-      btn.classList.add('active');
+      gpsLabel.textContent = 'הראה אותי';
+      menuGps.classList.add('active');
     }
 
     function setTransient(msg) {
       if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
-      btnText.style.display = '';
-      btnText.textContent = msg;
+      gpsLabel.textContent = msg;
       transientTimeout = setTimeout(function() { transientTimeout = null; setIdle(); }, 3000);
     }
 
     function stopWatching() {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+      currentUserLatLng = null;
+      if (ellipseModeController && ellipseModeController.refreshExtendedVisual) {
+        ellipseModeController.refreshExtendedVisual();
+      }
+    }
+
+    function showUserLocation(latlng) {
+      if (!isInIsrael(latlng)) {
+        setTransient('בעיית GPS');
+        return false;
+      }
+      if (!userLocationMarker) {
+        userLocationMarker = L.marker(latlng, {
+          icon: icon,
+          interactive: false,
+          zIndexOffset: 1000
+        }).addTo(map);
+        showToast('מראה מיקום על המפה');
+      } else {
+        userLocationMarker.setLatLng(latlng);
+      }
+      currentUserLatLng = { lat: latlng[0], lng: latlng[1] };
+      setActive();
+      if (ellipseModeController && ellipseModeController.refreshExtendedVisual) {
+        ellipseModeController.refreshExtendedVisual();
+      }
+      return true;
     }
 
     function startWatching() {
       if (watchId !== null) return;
       watchId = navigator.geolocation.watchPosition(function(pos) {
         var latlng = [pos.coords.latitude, pos.coords.longitude];
-        if (!isInIsrael(latlng)) {
+        if (!showUserLocation(latlng)) {
           stopWatching();
-          setTransient('בעיית GPS');
-          return;
         }
-        if (!userLocationMarker) {
-          userLocationMarker = L.marker(latlng, {
-            icon: icon,
-            interactive: false,
-            zIndexOffset: 1000
-          }).addTo(map);
-          showToast('מראה מיקום על המפה');
-        } else {
-          userLocationMarker.setLatLng(latlng);
-        }
-        setActive();
       }, function(err) {
         console.warn('Geolocation error:', err.code, err.message);
         if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
@@ -818,13 +886,19 @@ body.idle #right-panel {
       }).catch(function() {});
     }
 
-    document.getElementById('location-btn-row').addEventListener('click', function() {
+    menuGps.querySelector('.menu-item-row').addEventListener('click', function() {
       if (watchId !== null || userLocationMarker) {
         stopWatching();
         showToast('מיקום הוסר מהמפה');
         setIdle();
         localStorage.setItem('oref-location-hidden', 'true');
       } else {
+        var urlPos = getUrlPosition();
+        if (urlPos) {
+          localStorage.removeItem('oref-location-hidden');
+          showUserLocation(urlPos);
+          return;
+        }
         setTransient('מאתר...');
         startWatching();
         localStorage.removeItem('oref-location-hidden');
@@ -839,17 +913,17 @@ body.idle #right-panel {
   var isZoomingProgrammatically = false;
 
   if (autoZoomActive) {
-    document.getElementById('locate-btn').classList.add('active');
+    document.getElementById('menu-zoom').classList.add('active');
   }
 
   map.on('moveend', function() {
     isZoomingProgrammatically = false;
   });
 
-  document.getElementById('locate-btn').addEventListener('click', function() {
+  document.getElementById('menu-zoom').querySelector('.menu-item-row').addEventListener('click', function() {
     autoZoomActive = !autoZoomActive;
     localStorage.setItem('oref-auto-zoom', autoZoomActive);
-    document.getElementById('locate-btn').classList.toggle('active', autoZoomActive);
+    document.getElementById('menu-zoom').classList.toggle('active', autoZoomActive);
     if (autoZoomActive) {
       showToast('זום אוטומטי מופעל');
       maybeZoomToEvent();
@@ -891,10 +965,10 @@ body.idle #right-panel {
   var timelineMin = 0;
   var timelineMax = 0;
   var isLiveMode = true;
-  var isHullMode = location.search.indexOf('hull') !== -1;
   var isPlaying = false;
   var playRAF = null;
   var playFlyHandler = null;
+  var pausedForFly = false;
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
   var polygonHintInterval = null; // showPolygonHint animation interval
@@ -945,6 +1019,52 @@ body.idle #right-panel {
       history.back();
     }
   }
+
+  // --- Hamburger menu ---
+  var menuPanel = document.getElementById('menu-panel');
+  var menuBtn = document.getElementById('menu-btn');
+  var menuOpen = false;
+  var menuSoundItem = document.getElementById('menu-sound');
+  var menuSoundRow = document.getElementById('menu-sound-row');
+  var soundSubPanelOpen = false;
+
+  function openMenu() {
+    menuPanel.style.display = 'block';
+    menuBtn.setAttribute('aria-expanded', 'true');
+    menuOpen = true;
+    pushPanelHistory();
+    updateOverlay();
+  }
+
+  function closeSoundSubPanel() {
+    menuSoundItem.classList.remove('sound-open');
+    soundSubPanelOpen = false;
+  }
+
+  function closeMenu() {
+    if (!menuOpen) return;
+    menuPanel.style.display = 'none';
+    menuBtn.setAttribute('aria-expanded', 'false');
+    menuOpen = false;
+    closeSoundSubPanel();
+    updateOverlay();
+  }
+
+  function toggleMenu() {
+    if (menuOpen) {
+      closeMenu();
+      popPanelHistory();
+    } else {
+      closeTimelinePanel();
+      map.closePopup();
+      openMenu();
+    }
+  }
+
+  menuBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    toggleMenu();
+  });
 
   // --- Polygon state ---
   var locationPolygons = {};  // name → L.polygon
@@ -1183,18 +1303,16 @@ body.idle #right-panel {
     if (!polygon) return;
 
     var now = Date.now();
-    if (!isHullMode) {
-      var opacity = state === 'green'
-        ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
-        : 0.3;
-      polygon.setStyle({
-        color: COLORS[state],
-        fillColor: COLORS[state],
-        fillOpacity: opacity,
-        opacity: opacity + 0.15,
-        weight: state === 'red' ? 0.5 : 1
-      });
-    }
+    var opacity = state === 'green'
+      ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
+      : 0.3;
+    polygon.setStyle({
+      color: COLORS[state],
+      fillColor: COLORS[state],
+      fillOpacity: opacity,
+      opacity: opacity + 0.15,
+      weight: state === 'red' ? 0.5 : 1
+    });
     locationStates[name] = {
       state: state,
       since: since || Date.now(),
@@ -1202,163 +1320,36 @@ body.idle #right-panel {
     };
 
     playSoundForState(state, name);
-    if (isHullMode) updateHullLayers();
     updatePredictionLines();
   }
 
   function removeLocation(name) {
     var entry = locationStates[name];
-    if (!isHullMode && entry && entry.marker) {
+    if (entry && entry.marker) {
       entry.marker.setStyle(BASE_STYLE);
       entry.marker.closePopup();
     }
     delete locationStates[name];
-    if (isHullMode) updateHullLayers();
     updatePredictionLines();
-  }
-
-  // --- Convex hull rendering ---
-  var HULL_CLUSTER_THRESHOLD = 0.027; // degrees (~3 km) — max gap within one cluster
-  var hullPolygons = []; // flat list of all active hull L.polygon instances
-
-  function clearHullPolygons() {
-    for (var i = 0; i < hullPolygons.length; i++) map.removeLayer(hullPolygons[i]);
-    hullPolygons = [];
-  }
-
-  // Cluster locations by minimum vertex-to-vertex proximity. Returns array of index-arrays.
-  function clusterByIndex(vertexSets) {
-    var n = vertexSets.length;
-    var parent = [];
-    for (var i = 0; i < n; i++) parent[i] = i;
-    function find(i) {
-      while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
-      return i;
-    }
-    var t2 = HULL_CLUSTER_THRESHOLD * HULL_CLUSTER_THRESHOLD;
-    for (var i = 0; i < n; i++) {
-      for (var j = i + 1; j < n; j++) {
-        if (find(i) === find(j)) continue; // already merged
-        var vi = vertexSets[i], vj = vertexSets[j];
-        outer: for (var a = 0; a < vi.length; a++) {
-          for (var b = 0; b < vj.length; b++) {
-            var dl = vi[a][0] - vj[b][0], dg = vi[a][1] - vj[b][1];
-            if (dl*dl + dg*dg <= t2) { parent[find(i)] = find(j); break outer; }
-          }
-        }
-      }
-    }
-    var groups = {};
-    for (var i = 0; i < n; i++) {
-      var root = find(i);
-      if (!groups[root]) groups[root] = [];
-      groups[root].push(i);
-    }
-    return Object.keys(groups).map(function(k) { return groups[k]; });
-  }
-
-  // Collect all outer-ring vertices of a Leaflet polygon as [lat, lng] pairs.
-  function polyVertices(poly) {
-    var rings = poly.getLatLngs();
-    var outer = rings[0];
-    var pts = [];
-    for (var i = 0; i < outer.length; i++) pts.push([outer[i].lat, outer[i].lng]);
-    return pts;
-  }
-
-  function convexHull(points) {
-    if (points.length < 3) return points.slice();
-    var pivot = points.reduce(function(p, c) {
-      return c[0] < p[0] || (c[0] === p[0] && c[1] < p[1]) ? c : p;
-    });
-    var rest = points.filter(function(p) { return p !== pivot; });
-    rest.sort(function(a, b) {
-      var angA = Math.atan2(a[0] - pivot[0], a[1] - pivot[1]);
-      var angB = Math.atan2(b[0] - pivot[0], b[1] - pivot[1]);
-      if (Math.abs(angA - angB) > 1e-10) return angA - angB;
-      var dA = (a[0]-pivot[0])*(a[0]-pivot[0]) + (a[1]-pivot[1])*(a[1]-pivot[1]);
-      var dB = (b[0]-pivot[0])*(b[0]-pivot[0]) + (b[1]-pivot[1])*(b[1]-pivot[1]);
-      return dA - dB;
-    });
-    var hull = [pivot];
-    for (var i = 0; i < rest.length; i++) {
-      while (hull.length >= 2) {
-        var a = hull[hull.length - 2], b = hull[hull.length - 1], c = rest[i];
-        if ((b[1]-a[1])*(c[0]-a[0]) - (b[0]-a[0])*(c[1]-a[1]) <= 0) hull.pop();
-        else break;
-      }
-      hull.push(rest[i]);
-    }
-    return hull;
-  }
-
-  function updateHullLayers(stateMap) {
-    clearHullPolygons();
-    var sm = stateMap || locationStates;
-    var order = ['yellow', 'purple', 'red'];
-    var namesByState = { yellow: [], purple: [], red: [] };
-    for (var name in sm) {
-      var entry = sm[name];
-      if (!entry || entry.state === 'green') continue;
-      if (!locationPolygons[name]) continue;
-      if (namesByState[entry.state]) namesByState[entry.state].push(name);
-    }
-
-    // Phase 1: compute hull rings and fallback circles per state
-    var hullRings = { yellow: [], purple: [], red: [] };
-    var circles   = { yellow: [], purple: [], red: [] };
-    for (var si = 0; si < order.length; si++) {
-      var state = order[si];
-      var names = namesByState[state];
-      if (names.length === 0) continue;
-      var vertexSets = names.map(function(n) { return polyVertices(locationPolygons[n]); });
-      var clusters = clusterByIndex(vertexSets);
-      for (var ci = 0; ci < clusters.length; ci++) {
-        var indices = clusters[ci];
-        var allPts = [];
-        for (var ii = 0; ii < indices.length; ii++) {
-          var verts = vertexSets[indices[ii]];
-          for (var vi = 0; vi < verts.length; vi++) allPts.push(verts[vi]);
-        }
-        if (allPts.length >= 3) {
-          hullRings[state].push(convexHull(allPts));
-        } else {
-          var c = locationPolygons[names[indices[0]]].getBounds().getCenter();
-          circles[state].push([c.lat, c.lng]);
-        }
-      }
-    }
-
-    // Phase 2: draw — yellow first (underneath), then purple, then red (on top)
-    var style0 = { interactive: false, fillOpacity: 0.35, opacity: 0.5, weight: 2 };
-    for (var si = 0; si < order.length; si++) {
-      var state = order[si];
-      var style = Object.assign({}, style0, { color: COLORS[state], fillColor: COLORS[state] });
-      for (var ri = 0; ri < hullRings[state].length; ri++) {
-        hullPolygons.push(L.polygon(hullRings[state][ri], style).addTo(map));
-      }
-      for (var ci = 0; ci < circles[state].length; ci++) {
-        hullPolygons.push(L.circle(circles[state][ci], Object.assign({ radius: HULL_CLUSTER_THRESHOLD * 111000 }, style)).addTo(map));
-      }
-    }
   }
 
   // --- Launch source prediction ---
   var predictionLines = [];  // L.polyline/L.polygon instances on the map
   var predictionActive = localStorage.getItem('oref-predict') === 'true';
-  var PREDICTION_CLUSTER_THRESHOLD = 0.15; // degrees (~17 km) for grouping alerts into salvos
+  var PREDICTION_CLUSTER_THRESHOLD = 0.35; // degrees (~39 km) for grouping alerts into salvos
   var PREDICTION_ELONGATION_MIN = 2.5; // minimum eigenvalue ratio (lambda1/lambda2) to draw
+  var PREDICTION_MIN_SPAN = 0.1; // degrees (~11 km) minimum cluster extent along principal axis
   // Israel's approximate geographic center — used to determine "outward" direction
   var ISRAEL_CENTER = [31.5, 34.8];
 
-  if (predictionActive) {
-    document.getElementById('predict-btn').classList.add('active');
-  }
-
-  document.getElementById('predict-btn').addEventListener('click', function() {
+  // Set up menu toggle
+  var predictMenuItem = document.getElementById('menu-predict');
+  var predictCheck = predictMenuItem.querySelector('.menu-check');
+  if (predictionActive) predictCheck.textContent = '✓';
+  predictMenuItem.querySelector('.menu-item-row').addEventListener('click', function() {
     predictionActive = !predictionActive;
     localStorage.setItem('oref-predict', predictionActive);
-    document.getElementById('predict-btn').classList.toggle('active', predictionActive);
+    predictCheck.textContent = predictionActive ? '✓' : '';
     if (predictionActive) {
       showToast('חיזוי כיוון שיגור מופעל');
       updatePredictionLines();
@@ -1389,6 +1380,19 @@ body.idle #right-panel {
     return [sumLat / outer.length, sumLng / outer.length];
   }
 
+  // Compute approximate area of a Leaflet polygon using the shoelace formula (sq degrees).
+  function polygonArea(poly) {
+    var rings = poly.getLatLngs();
+    if (!rings || rings.length === 0) return 0;
+    var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+    if (outer.length < 3) return 0;
+    var area = 0;
+    for (var i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+      area += (outer[j].lng + outer[i].lng) * (outer[j].lat - outer[i].lat);
+    }
+    return Math.abs(area / 2);
+  }
+
   // Cluster 2D points by proximity (single-linkage). Returns array of point-arrays.
   function clusterPoints(points, threshold) {
     var n = points.length;
@@ -1415,27 +1419,27 @@ body.idle #right-panel {
     return Object.keys(groups).map(function(k) { return groups[k]; });
   }
 
-  // Fit a line through points using PCA. Returns {center, direction, lambda1, lambda2} or null.
-  // lambda1 >= lambda2 are the eigenvalues (variance along principal / minor axes).
+  // Fit a line through points using area-weighted PCA.
+  // Points are [lat, lng, weight]. Returns {center, direction, lambda1, lambda2, totalWeight} or null.
   function fitLine(points) {
     var n = points.length;
     if (n < 2) return null;
-
-    var cx = 0, cy = 0;
-    for (var i = 0; i < n; i++) { cx += points[i][0]; cy += points[i][1]; }
-    cx /= n; cy /= n;
-
+    var totalW = 0, cx = 0, cy = 0;
+    for (var i = 0; i < n; i++) {
+      var w = points[i][2] || 1;
+      totalW += w; cx += points[i][0] * w; cy += points[i][1] * w;
+    }
+    cx /= totalW; cy /= totalW;
     var cxx = 0, cxy = 0, cyy = 0;
     for (var i = 0; i < n; i++) {
+      var w = points[i][2] || 1;
       var dx = points[i][0] - cx, dy = points[i][1] - cy;
-      cxx += dx * dx; cxy += dx * dy; cyy += dy * dy;
+      cxx += w * dx * dx; cxy += w * dx * dy; cyy += w * dy * dy;
     }
-
     var diff = cxx - cyy;
     var disc = Math.sqrt(diff * diff + 4 * cxy * cxy);
     var lambda1 = (cxx + cyy + disc) / 2;
     var lambda2 = (cxx + cyy - disc) / 2;
-
     var vx, vy;
     if (Math.abs(cxy) > 1e-12) {
       vx = lambda1 - cyy; vy = cxy;
@@ -1446,49 +1450,45 @@ body.idle #right-panel {
     }
     var len = Math.sqrt(vx * vx + vy * vy);
     if (len > 0) { vx /= len; vy /= len; }
-
-    return { center: [cx, cy], direction: [vx, vy], lambda1: lambda1, lambda2: lambda2 };
+    return { center: [cx, cy], direction: [vx, vy], lambda1: lambda1, lambda2: lambda2, totalWeight: totalW };
   }
 
-  // Estimate extension distance (in degrees) toward the source based on bearing.
-  // Bearing is in degrees, 0 = north, 90 = east, etc.
-  // Returns distance in degrees (~111 km per degree).
+  // Extension distance (degrees) toward source, calibrated to reach the far border
+  // of the likely origin country based on bearing from Israel.
   function sourceExtensionDeg(bearingDeg) {
-    // Normalize to [0, 360)
     var b = ((bearingDeg % 360) + 360) % 360;
-    // North (330-30): Lebanon/Syria ~200 km → ~1.8 deg
-    if (b >= 330 || b < 30) return 2.0;
-    // Northeast (30-70): Syria/Iraq ~600 km → ~5.4 deg
-    if (b >= 30 && b < 70) return 5.5;
-    // East (70-120): Iraq/Iran ~1500 km → ~13.5 deg
-    if (b >= 70 && b < 120) return 14.0;
-    // Southeast (120-170): Iran/Yemen ~1800 km → ~16 deg
-    if (b >= 120 && b < 170) return 16.0;
-    // South (170-210): Yemen ~2000 km → ~18 deg
-    if (b >= 170 && b < 210) return 18.0;
-    // Southwest (210-260): Gaza/Egypt ~100 km → ~0.9 deg
-    if (b >= 210 && b < 260) return 1.0;
-    // West (260-290): Mediterranean — unlikely, minimal extension
-    if (b >= 260 && b < 290) return 1.0;
-    // Northwest (290-330): Lebanon coast ~150 km → ~1.4 deg
-    return 1.5;
+    // North (340-20): Lebanon — far border ~34.7°N → ~390 km
+    if (b >= 340 || b < 20) return 3.5;
+    // NNE-NE (20-55): Syria — far NE corner ~37.3°N 42°E → ~1000 km
+    if (b >= 20 && b < 55) return 9;
+    // ENE-E (55-120): Iran — far eastern border ~63°E → ~2800 km
+    if (b >= 55 && b < 120) return 25;
+    // ESE-SE (120-165): Iran/Yemen approach — ~2400 km
+    if (b >= 120 && b < 165) return 22;
+    // SSE-S (165-210): Yemen — southern coast ~12.5°N → ~2200 km
+    if (b >= 165 && b < 210) return 20;
+    // SSW-SW (210-250): Gaza/Sinai — far border ~170 km
+    if (b >= 210 && b < 250) return 1.5;
+    // W-NW (250-340): Mediterranean — shouldn't reach here (safety net), minimal
+    return 2;
+  }
+
+  // Angular difference between two bearings in [0, 180].
+  function bearingDiff(a, b) {
+    var d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
   }
 
   // Compute intermediate points along a geodesic (great circle) from p1 to p2.
-  // p1, p2 are [lat, lng] in degrees. Returns array of [lat, lng] including endpoints.
   function geodesicPoints(p1, p2, numSegments) {
     var toRad = Math.PI / 180, toDeg = 180 / Math.PI;
     var lat1 = p1[0] * toRad, lng1 = p1[1] * toRad;
     var lat2 = p2[0] * toRad, lng2 = p2[1] * toRad;
-
-    // Central angle via Haversine
     var dlat = lat2 - lat1, dlng = lng2 - lng1;
     var a = Math.sin(dlat / 2) * Math.sin(dlat / 2) +
             Math.cos(lat1) * Math.cos(lat2) * Math.sin(dlng / 2) * Math.sin(dlng / 2);
     var d = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    if (d < 1e-10) return [p1, p2]; // points are coincident
-
+    if (d < 1e-10) return [p1, p2];
     var pts = [];
     for (var i = 0; i <= numSegments; i++) {
       var f = i / numSegments;
@@ -1506,8 +1506,7 @@ body.idle #right-panel {
   function updatePredictionLines() {
     clearPredictionLines();
     if (!predictionActive) return;
-
-    // Collect centroids of active red locations only (exclude purple/drones — item 6)
+    // Collect area-weighted centroids of active red locations only (exclude purple/drones)
     var points = [];
     for (var name in locationStates) {
       var entry = locationStates[name];
@@ -1515,91 +1514,85 @@ body.idle #right-panel {
       var poly = locationPolygons[name];
       if (!poly) continue;
       var centroid = polygonCentroid(poly);
-      if (centroid) points.push(centroid);
+      if (centroid) {
+        var area = polygonArea(poly);
+        points.push([centroid[0], centroid[1], Math.max(area, 1e-6)]);
+      }
     }
-
-    if (points.length < 2) return;
-
-    // Cluster alerts into separate salvos/events
+    if (points.length < 3) return;
     var clusters = clusterPoints(points, PREDICTION_CLUSTER_THRESHOLD);
-
     for (var ci = 0; ci < clusters.length; ci++) {
       var cluster = clusters[ci];
-      if (cluster.length < 2) continue;
-
+      if (cluster.length < 3) continue;
       var line = fitLine(cluster);
       if (!line) continue;
-
-      // Check elongation — skip if cluster is too round (item 3)
       var elongation = line.lambda2 > 1e-12 ? line.lambda1 / line.lambda2 : Infinity;
       if (elongation < PREDICTION_ELONGATION_MIN) continue;
-
       var cx = line.center[0], cy = line.center[1];
       var dx = line.direction[0], dy = line.direction[1];
-
-      // Find the extent of the cluster along the line direction
       var minProj = Infinity, maxProj = -Infinity;
       for (var i = 0; i < cluster.length; i++) {
         var proj = (cluster[i][0] - cx) * dx + (cluster[i][1] - cy) * dy;
         if (proj < minProj) minProj = proj;
         if (proj > maxProj) maxProj = proj;
       }
-
-      // Determine which direction (positive or negative along the principal axis)
-      // points AWAY from Israel's center — that is the source direction (item 5)
-      var posEnd = [cx + maxProj * dx, cy + maxProj * dy];
-      var negEnd = [cx + minProj * dx, cy + minProj * dy];
-      var posDist = (posEnd[0] - ISRAEL_CENTER[0]) * (posEnd[0] - ISRAEL_CENTER[0]) +
-                    (posEnd[1] - ISRAEL_CENTER[1]) * (posEnd[1] - ISRAEL_CENTER[1]);
-      var negDist = (negEnd[0] - ISRAEL_CENTER[0]) * (negEnd[0] - ISRAEL_CENTER[0]) +
-                    (negEnd[1] - ISRAEL_CENTER[1]) * (negEnd[1] - ISRAEL_CENTER[1]);
-
-      // sourceSign: +1 if source is in positive direction, -1 if negative
-      var sourceSign = posDist >= negDist ? 1 : -1;
+      if (maxProj - minProj < PREDICTION_MIN_SPAN) continue;
+      // Determine source direction using bearing from Israel center to cluster center
+      var distFromCenter = Math.sqrt((cx - ISRAEL_CENTER[0]) * (cx - ISRAEL_CENTER[0]) +
+                                     (cy - ISRAEL_CENTER[1]) * (cy - ISRAEL_CENTER[1]));
+      var sourceSign;
+      if (distFromCenter > 0.05) {
+        var clusterBearing = Math.atan2(cy - ISRAEL_CENTER[1], cx - ISRAEL_CENTER[0]) * 180 / Math.PI;
+        var clusterBearingNorm = ((clusterBearing % 360) + 360) % 360;
+        var posBearing = Math.atan2(dy, dx) * 180 / Math.PI;
+        var posBearingNorm = ((posBearing % 360) + 360) % 360;
+        var negBearingNorm = (posBearingNorm + 180) % 360;
+        sourceSign = bearingDiff(posBearingNorm, clusterBearingNorm) <=
+                     bearingDiff(negBearingNorm, clusterBearingNorm) ? 1 : -1;
+      } else {
+        var posEnd = [cx + maxProj * dx, cy + maxProj * dy];
+        var negEnd = [cx + minProj * dx, cy + minProj * dy];
+        var posDist = (posEnd[0] - ISRAEL_CENTER[0]) * (posEnd[0] - ISRAEL_CENTER[0]) +
+                      (posEnd[1] - ISRAEL_CENTER[1]) * (posEnd[1] - ISRAEL_CENTER[1]);
+        var negDist = (negEnd[0] - ISRAEL_CENTER[0]) * (negEnd[0] - ISRAEL_CENTER[0]) +
+                      (negEnd[1] - ISRAEL_CENTER[1]) * (negEnd[1] - ISRAEL_CENTER[1]);
+        sourceSign = posDist >= negDist ? 1 : -1;
+      }
       var sourceDx = sourceSign * dx, sourceDy = sourceSign * dy;
-
-      // Geographic bearing from cluster center toward source (item 1)
-      // atan2(dlng, dlat) gives angle from north axis: 0°=N, 90°=E, ±180°=S, -90°=W
-      var bearingDeg = Math.atan2(sourceDy, sourceDx) * 180 / Math.PI;
-      var extSource = sourceExtensionDeg(bearingDeg);
-
-      // Source endpoint: cluster edge + extension toward source
+      // Safety net: if bearing points toward the Mediterranean (260-320°), flip
+      var sourceBearing = Math.atan2(sourceDy, sourceDx) * 180 / Math.PI;
+      var sourceBearingNorm = ((sourceBearing % 360) + 360) % 360;
+      if (sourceBearingNorm >= 260 && sourceBearingNorm <= 320) {
+        sourceSign = -sourceSign;
+        sourceDx = -sourceDx;
+        sourceDy = -sourceDy;
+        sourceBearingNorm = (sourceBearingNorm + 180) % 360;
+      }
+      // Extend to the far border of the likely source country
+      var extSource = sourceExtensionDeg(sourceBearingNorm);
       var sourceEdgeProj = sourceSign > 0 ? maxProj : minProj;
       var innerEdgeProj = sourceSign > 0 ? minProj : maxProj;
-
-      // Minimal inward extension (just a short tail past the cluster toward Israel)
-      var extInward = 0.3; // degrees (~33 km)
+      var extInward = 0.3;
       var pSource = [cx + (sourceEdgeProj + sourceSign * extSource) * dx,
                      cy + (sourceEdgeProj + sourceSign * extSource) * dy];
       var pInward = [cx + (innerEdgeProj - sourceSign * extInward) * dx,
                      cy + (innerEdgeProj - sourceSign * extInward) * dy];
-
-      // For long distances, use geodesic intermediate points (item 4)
       var distDeg = Math.sqrt((pSource[0] - pInward[0]) * (pSource[0] - pInward[0]) +
                               (pSource[1] - pInward[1]) * (pSource[1] - pInward[1]));
       var lineCoords;
       if (distDeg > 3) {
-        // Use geodesic for distances > ~330 km
         var numSeg = Math.max(20, Math.round(distDeg * 5));
         lineCoords = geodesicPoints(pInward, pSource, numSeg);
       } else {
         lineCoords = [pInward, pSource];
       }
-
-      // Draw the prediction line (dashed)
       var polyline = L.polyline(lineCoords, {
-        color: '#ff4444',
-        weight: 2.5,
-        opacity: 0.7,
-        dashArray: '10, 8',
-        interactive: false
+        color: '#ff4444', weight: 2.5, opacity: 0.7, dashArray: '10, 8', interactive: false
       }).addTo(map);
       predictionLines.push(polyline);
-
-      // Draw arrowhead at source end only
       var arrowSize = 0.08;
       var tipPt = lineCoords[lineCoords.length - 1];
-      var px = -sourceDy, py = sourceDx; // perpendicular
+      var px = -sourceDy, py = sourceDx;
       var tip = [tipPt[0] + sourceDx * arrowSize, tipPt[1] + sourceDy * arrowSize];
       var left = [tipPt[0] + px * arrowSize * 0.5, tipPt[1] + py * arrowSize * 0.5];
       var right = [tipPt[0] - px * arrowSize * 0.5, tipPt[1] - py * arrowSize * 0.5];
@@ -1607,13 +1600,9 @@ body.idle #right-panel {
         color: '#ff4444', weight: 2.5, opacity: 0.7, interactive: false
       }).addTo(map);
       predictionLines.push(arrow);
-
-      // Draw 1-sigma uncertainty band (item 3)
-      // sigma_perp = sqrt(lambda2 / n) — standard error of points perpendicular to the line
-      var sigmaPerp = Math.sqrt(Math.max(0, line.lambda2) / cluster.length);
-      if (sigmaPerp > 0.001) { // only draw if there's measurable spread
-        var perpDx = -dy, perpDy = dx; // perpendicular to principal axis
-        // Build polygon band along the line ± 1 sigma
+      var sigmaPerp = Math.sqrt(Math.max(0, line.lambda2) / line.totalWeight);
+      if (sigmaPerp > 0.001) {
+        var perpDx = -dy, perpDy = dx;
         var bandLeft = [], bandRight = [];
         for (var bi = 0; bi < lineCoords.length; bi++) {
           var pt = lineCoords[bi];
@@ -1621,14 +1610,9 @@ body.idle #right-panel {
           bandRight.push([pt[0] - perpDx * sigmaPerp, pt[1] - perpDy * sigmaPerp]);
         }
         bandRight.reverse();
-        var bandCoords = bandLeft.concat(bandRight);
-        var band = L.polygon(bandCoords, {
-          color: '#ff4444',
-          fillColor: '#ff4444',
-          fillOpacity: 0.1,
-          opacity: 0.2,
-          weight: 1,
-          interactive: false
+        var band = L.polygon(bandLeft.concat(bandRight), {
+          color: '#ff4444', fillColor: '#ff4444', fillOpacity: 0.1,
+          opacity: 0.2, weight: 1, interactive: false
         }).addTo(map);
         predictionLines.push(band);
       }
@@ -1641,7 +1625,7 @@ body.idle #right-panel {
 
   function updateOverlay() {
     var tlBtn = document.getElementById('timeline-btn');
-    var panelOpen = document.getElementById('sound-btn').classList.contains('open') ||
+    var panelOpen = menuOpen ||
       (tlBtn && tlBtn.classList.contains('open'));
     var popupOpen = openPopupName !== null;
     document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
@@ -1673,7 +1657,7 @@ body.idle #right-panel {
     'חדירת כלי טיס עוין': 'חדירת כטב״מ',
     'נשק לא קונבנציונלי': 'נשק לא קונבנציונלי',
     'חדירת מחבלים': 'חדירת מחבלים',
-    'בדקות הקרובות צפויות להתקבל התרעות באזורך': 'תיתכן אזעקת טילים בדקות הקרובות',
+    'בדקות הקרובות צפויות להתקבל התרעות באזורך': 'התרעה מוקדמת',
     'היכנסו מייד למרחב המוגן': 'היכנסו מייד למרחב המוגן',
     'היכנסו למרחב המוגן': 'היכנסו למרחב המוגן',
     'על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך. במקרה של קבלת התרעה, יש להיכנס למרחב המוגן ולשהות בו עד להודעה חדשה.': 'שיפור מיקום למיגון מיטבי',
@@ -1757,8 +1741,9 @@ body.idle #right-panel {
       var color = COLORS[e.state] || '#888';
       var label = displayLabel(e.title);
       var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
-      var border = i < entries.length - 1 ? 'border-bottom:1px solid #eee;' : '';
-      return '<div style="padding:4px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
+      var nextEntry = entries[i + 1];
+      var border = (nextEntry && nextEntry.state === 'green') ? 'border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:4px;' : '';
+      return '<div style="padding:1px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
         (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
         '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
       '</div>';
@@ -1769,7 +1754,7 @@ body.idle #right-panel {
     var starBtn = '<span class="fav-star" onclick="window._toggleFav()" ' +
       'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
       'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
-    return '<div style="direction:rtl;width:min(360px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
+    return '<div style="direction:rtl;width:min(170px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
       (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
       '</div>';
   }
@@ -1791,7 +1776,7 @@ body.idle #right-panel {
     openPopupMarker = marker;
     openPopupLatlng = latlng || null;
     marker.setStyle(ACTIVE_STYLE);
-    marker.bindPopup(buildPopupHtml(name), { maxWidth: 350 })
+    marker.bindPopup(buildPopupHtml(name), { maxWidth: 180 })
       .openPopup()
       .on('popupclose', function() {
         openPopupName = null; openPopupMarker = null;
@@ -1896,6 +1881,7 @@ body.idle #right-panel {
     if (autoZoomActive && isLiveMode && isNewAlert) {
       maybeZoomToEvent();
     }
+    syncEllipseMode();
   }
 
   // Expose for debugging/external injection
@@ -1969,7 +1955,10 @@ body.idle #right-panel {
     for (var i = 0; i < toRemove.length; i++) {
       removeLocation(toRemove[i]);
     }
-    if (toRemove.length > 0) updateLiveStatus();
+    if (toRemove.length > 0) {
+      updateLiveStatus();
+      syncEllipseMode();
+    }
   }
 
   function formatRelativeTime(ts) {
@@ -2122,7 +2111,7 @@ body.idle #right-panel {
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
       var alertDate = entry.alertDate || '';
-      if (lastHistoryDate && alertDate <= lastHistoryDate) continue;
+      if (lastHistoryDate && alertDate < lastHistoryDate) continue;
       processHistoryEntry(entry);
       newEntries++;
     }
@@ -2133,6 +2122,7 @@ body.idle #right-panel {
 
     if (newEntries > 0) {
       console.log('History: processed', newEntries, 'new entries');
+      syncEllipseMode();
     }
   }
 
@@ -2275,12 +2265,11 @@ body.idle #right-panel {
     for (var name in locationStates) {
       var entry = locationStates[name];
       if (entry && entry.marker) {
-        if (!isHullMode) entry.marker.setStyle(BASE_STYLE);
+        entry.marker.setStyle(BASE_STYLE);
         entry.marker.closePopup();
       }
     }
     locationStates = {};
-    if (isHullMode) clearHullPolygons();
 
     // Replay history up to targetTime
     var accumulated = {}; // {location: {state, since}}
@@ -2309,31 +2298,27 @@ body.idle #right-panel {
       if (s === 'green') {
         var elapsed = targetTime - sinceTime;
         if (elapsed >= GREEN_FADE_MS) continue; // already faded
-        if (!isHullMode) {
-          var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-          polygon.setStyle({
-            color: COLORS.green,
-            fillColor: COLORS.green,
-            fillOpacity: opacity,
-            opacity: opacity + 0.15,
-            weight: 1
-          });
-        }
+        var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
+        polygon.setStyle({
+          color: COLORS.green,
+          fillColor: COLORS.green,
+          fillOpacity: opacity,
+          opacity: opacity + 0.15,
+          weight: 1
+        });
       } else {
         if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
-        if (!isHullMode) {
-          polygon.setStyle({
-            color: COLORS[s],
-            fillColor: COLORS[s],
-            fillOpacity: 0.3,
-            opacity: 0.45,
-            weight: s === 'red' ? 0.5 : 1
-          });
-        }
+        polygon.setStyle({
+          color: COLORS[s],
+          fillColor: COLORS[s],
+          fillOpacity: 0.3,
+          opacity: 0.45,
+          weight: s === 'red' ? 0.5 : 1
+        });
       }
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
     }
-    if (isHullMode) updateHullLayers();
+    syncEllipseMode();
     updatePredictionLines();
   }
 
@@ -2361,6 +2346,7 @@ body.idle #right-panel {
       }
     }
     liveLocationStates = null;
+    syncEllipseMode();
   }
 
   function updateShadowState(name, state, since) {
@@ -2521,7 +2507,7 @@ body.idle #right-panel {
     function isOpen() { return container.classList.contains('open'); }
 
     function openTimeline() {
-      closeSoundPanel();
+      if (menuOpen) { closeMenu(); }
       map.closePopup();
       container.classList.add('open');
       pushPanelHistory();
@@ -2684,7 +2670,7 @@ body.idle #right-panel {
       time = clampTime(time);
       slider.value = Math.min(sliderFromTime(time), 999);
       enterHistoryMode(time);
-      maybeZoomToEvent();
+      if (autoZoomActive) maybeZoomToEvent();
     }
 
     // --- Slider input ---
@@ -2693,7 +2679,7 @@ body.idle #right-panel {
       var time = clampTime(timeFromSlider(parseInt(slider.value)));
       slider.value = sliderFromTime(time);
       enterHistoryMode(time);
-      maybeZoomToEvent();
+      if (autoZoomActive) maybeZoomToEvent();
     });
 
     // --- Timeline bands (show duration of active alerts) ---
@@ -2845,6 +2831,7 @@ body.idle #right-panel {
     // --- Play / Pause ---
     function stopPlay() {
       isPlaying = false;
+      pausedForFly = false;
       playBtn.textContent = '▶';
       if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
       if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
@@ -2920,23 +2907,27 @@ body.idle #right-panel {
         document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
         reconstructStateAt(newTime);
 
-        // Auto-zoom: fly to event area when entering a new event group
+        // Auto-zoom: fly to event area when entering a new event group (respects auto-zoom toggle)
         var curIdx = findEventIdx(newTime);
         if (curIdx !== playEventIdx) {
           playEventIdx = curIdx;
-          var bounds = curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+          var bounds = autoZoomActive && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
           if (bounds) {
             isZoomingProgrammatically = true;
             isPlaying = false;
+            pausedForFly = true;
             if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
             if (playFlyHandler) map.off('moveend', playFlyHandler);
             playFlyHandler = function() {
               map.off('moveend', playFlyHandler);
               playFlyHandler = null;
               isZoomingProgrammatically = false;
-              isPlaying = true;
-              lastFrame = performance.now();
-              playRAF = requestAnimationFrame(tick);
+              if (pausedForFly) {
+                pausedForFly = false;
+                isPlaying = true;
+                lastFrame = performance.now();
+                playRAF = requestAnimationFrame(tick);
+              }
             };
             map.on('moveend', playFlyHandler);
             map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
@@ -2950,6 +2941,7 @@ body.idle #right-panel {
     }
 
     playBtn.addEventListener('click', function() {
+      if (pausedForFly) { stopPlay(); return; }
       if (isPlaying) stopPlay(); else startPlay();
     });
 
@@ -3047,79 +3039,118 @@ body.idle #right-panel {
     hint.addEventListener('animationend', function() { hint.remove(); });
   }
 
-  document.getElementById('page-title').addEventListener('click', openAbout);
   document.getElementById('about-close').addEventListener('click', closeAbout);
   document.getElementById('about-backdrop').addEventListener('click', function(e) {
     if (e.target === this) closeAbout();
   });
+  var ellipseModeController = null;
+  var ellipseBtn = document.getElementById('ellipse-btn');
+  var ellipseDisplayMode = 0;
+  function updateEllipseButton() {
+    if (!ellipseModeController || !ellipseBtn) return;
+    ellipseBtn.classList.toggle('active', ellipseDisplayMode > 0);
+    ellipseBtn.classList.toggle('extended', ellipseDisplayMode === 2);
+    ellipseBtn.title = ellipseDisplayMode === 0 ? 'סמן אליפסה' : (ellipseDisplayMode === 1 ? 'אליפסה רגילה' : 'אליפסה מורחבת');
+    ellipseModeController.setDisplayMode(ellipseDisplayMode);
+  }
+  function syncEllipseMode(force) {
+    if (!ellipseModeController || !ellipseModeController.sync) return;
+    ellipseModeController.sync(!!force);
+    updateEllipseButton();
+  }
+  if (isEllipseMode && window.initEllipseMode) {
+    ellipseModeController = window.initEllipseMode({
+      map: map,
+      getLocationStates: function() { return locationStates; },
+      getLocationHistory: function() { return locationHistory; },
+      getLocationPolygons: function() { return locationPolygons; },
+      getCurrentUserPosition: getCurrentUserPosition,
+      getIsLiveMode: function() { return isLiveMode; },
+      getCurrentViewTime: function() { return currentViewTime; },
+      showToast: showToast
+    });
+    updateEllipseButton();
+    ellipseBtn.addEventListener('click', function() {
+      var previousMode = ellipseDisplayMode;
+      ellipseDisplayMode = (ellipseDisplayMode + 1) % 3;
+      if (ellipseDisplayMode === 0) {
+        ellipseModeController.setEnabled(false, { showToast: true });
+        updateEllipseButton();
+        return;
+      }
+      if (previousMode === 0) {
+        ellipseModeController.setEnabled(true, { showToast: true }).then(function() {
+          updateEllipseButton();
+        });
+        return;
+      }
+      ellipseModeController.sync(true).then(function() {
+        updateEllipseButton();
+      });
+    });
+  }
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeAbout();
-      if (soundBtn.classList.contains('open')) {
-        closeSoundPanel();
-        popPanelHistory();
+      if (menuOpen) {
+        if (soundSubPanelOpen) {
+          closeSoundSubPanel();
+        } else {
+          closeMenu();
+          popPanelHistory();
+        }
+      }
+      if (ellipseModeController && ellipseModeController.clearExtendedVisual) {
+        ellipseModeController.clearExtendedVisual();
       }
       map.closePopup();
       document.getElementById('errorDetail').style.display = 'none';
     }
   });
 
-  // --- Sound control & modal ---
-  var soundBtn = document.getElementById('sound-btn');
-  var soundBtnRow = document.getElementById('sound-btn-row');
+  // --- Sound control (in menu) ---
   var soundSearch = document.getElementById('sound-search');
   var soundResults = document.getElementById('sound-results');
 
-  function updateSoundButton() {
-    var icon = soundMuted ? '\uD83D\uDD07' : '\uD83D\uDD0A';
-    var text = soundMuted ? 'ללא התרעה קולית' : (soundLocation === 'all' ? 'צליל מופעל' : soundLocation);
-    soundBtnRow.querySelector('.btn-icon').textContent = icon;
-    soundBtnRow.querySelector('.btn-text').textContent = text;
-    soundBtn.title = soundMuted ? 'השמעת צלילים' : 'צלילים: ' + (soundLocation === 'all' ? 'כל הארץ' : soundLocation);
-    soundBtn.classList.toggle('active', !soundMuted);
+  var svgSoundOff = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>';
+  var svgSoundOn = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>';
+  function updateMenuSoundUI() {
+    var icon = soundMuted ? svgSoundOff : svgSoundOn;
+    var text = soundMuted ? 'מצב שקט' : (soundLocation === 'all' ? 'צליל מופעל' : soundLocation);
+    menuSoundRow.querySelector('.menu-item-icon').innerHTML = icon;
+    menuSoundRow.querySelector('.menu-item-label').textContent = text;
+    menuSoundItem.classList.toggle('active', !soundMuted);
   }
-  updateSoundButton();
+  updateMenuSoundUI();
 
-  function isSoundOpen() { return soundBtn.classList.contains('open'); }
-
-  function openSoundPanel() {
-    closeTimelinePanel();
-    map.closePopup();
-    soundBtn.classList.add('open');
-    pushPanelHistory();
+  function openSoundSubPanel() {
+    menuSoundItem.classList.add('sound-open');
+    soundSubPanelOpen = true;
     soundSearch.value = '';
     soundResults.innerHTML = '';
     soundSearch.focus();
-    updateOverlay();
-  }
-
-  function closeSoundPanel() {
-    soundBtn.classList.remove('open');
-    updateOverlay();
   }
 
   function selectSoundLocation(loc) {
     soundLocation = loc;
     soundMuted = false;
-    updateSoundButton();
+    updateMenuSoundUI();
     try {
       localStorage.setItem('oref-sound-muted', 'false');
       localStorage.setItem('oref-sound-location', loc);
     } catch(e) {}
     getAudioContext();
-    closeSoundPanel();
-    popPanelHistory();
+    closeSoundSubPanel();
   }
 
-  soundBtnRow.addEventListener('click', function() {
-    if (isSoundOpen()) {
-      closeSoundPanel();
-      popPanelHistory();
+  menuSoundRow.addEventListener('click', function() {
+    if (soundSubPanelOpen) {
+      closeSoundSubPanel();
     } else if (soundMuted) {
-      openSoundPanel();
+      openSoundSubPanel();
     } else {
       soundMuted = true;
-      updateSoundButton();
+      updateMenuSoundUI();
       try { localStorage.setItem('oref-sound-muted', 'true'); } catch(e) {}
     }
   });
@@ -3137,7 +3168,7 @@ body.idle #right-panel {
     var matches = Object.keys(locationPolygons).filter(function(name) {
       return name.includes(q);
     }).slice(0, 20);
-    
+
     soundResults.innerHTML = matches.map(function(m) {
       return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
     }).join('');
@@ -3153,7 +3184,7 @@ body.idle #right-panel {
   // --- Mobile back button closes panels ---
   window.addEventListener('popstate', function() {
     panelHistoryPushed = false;
-    closeSoundPanel();
+    closeMenu();
     closeTimelinePanel();
     map.closePopup();
   });
@@ -3161,8 +3192,8 @@ body.idle #right-panel {
   // --- Click outside to close panels ---
   document.addEventListener('click', function(e) {
     var closed = false;
-    if (soundBtn.classList.contains('open') && !soundBtn.contains(e.target)) {
-      closeSoundPanel();
+    if (menuOpen && !menuPanel.contains(e.target) && !menuBtn.contains(e.target)) {
+      closeMenu();
       closed = true;
     }
     if (closed) popPanelHistory();
@@ -3196,8 +3227,7 @@ body.idle #right-panel {
   var IDLE_MS = 45000;
   var _idleTimer = null;
   function _enterIdle() {
-    if (document.getElementById('sound-btn').classList.contains('open') ||
-        document.getElementById('timeline-btn').classList.contains('open')) {
+    if (menuOpen || document.getElementById('timeline-btn').classList.contains('open')) {
       _resetIdle(); return;
     }
     document.body.classList.add('idle');
@@ -3211,6 +3241,35 @@ body.idle #right-panel {
     .forEach(function(e) { document.addEventListener(e, _resetIdle, {passive:true}); });
   _resetIdle();
 
+  // --- Menu: Share ---
+  var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  document.getElementById(isIos ? 'share-icon-ios' : 'share-icon-android').style.display = 'block';
+
+  if (navigator.share && ('ontouchstart' in window)) {
+    document.getElementById('menu-share').style.display = '';
+    document.getElementById('menu-share').querySelector('.menu-item-row').addEventListener('click', async function() {
+      closeMenu();
+      popPanelHistory();
+      try {
+        await navigator.share({
+          title: 'מפת העורף',
+          text: 'מפת העורף - מפת התרעות פיקוד העורף בזמן אמת',
+          url: 'https://oref-map.org'
+        });
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error('Share failed:', e);
+      }
+    });
+  }
+
+  // --- Menu: About ---
+  document.getElementById('menu-about').querySelector('.menu-item-row').addEventListener('click', function() {
+    closeMenu();
+    popPanelHistory();
+    openAbout();
+  });
+
   init();
 })();
 </script>
@@ -3218,6 +3277,51 @@ body.idle #right-panel {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js');
 }
+</script>
+<script>
+(function() {
+  var STORAGE_KEY = 'pwa_install';
+  var stored;
+  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); } catch (e) { stored = {}; }
+  // Don't prompt if already installed or permanently dismissed
+  if (stored.installed || stored.dismissed) return;
+
+  function saveStored() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stored)); } catch (e) {}
+  }
+
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    var today = new Date().toISOString().slice(0, 10);
+    if (stored.lastDay !== today) {
+      stored.lastDay = today;
+      stored.todayCount = 0;
+    }
+    stored.todayCount = (stored.todayCount || 0) + 1;
+    saveStored();
+
+    if (stored.todayCount >= 3) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(result) {
+        if (result.outcome === 'accepted') {
+          stored.installed = true;
+        } else {
+          stored.dismissed = true;
+        }
+        saveStored();
+        deferredPrompt = null;
+      });
+    }
+  });
+
+  window.addEventListener('appinstalled', function() {
+    stored.installed = true;
+    saveStored();
+  });
+})();
 </script>
 </body>
 </html>
