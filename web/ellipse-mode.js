@@ -14,6 +14,8 @@
     var orefPointsPromise = null;
     var ellipseMarkers = [];
     var ellipseOverlays = [];
+    var enabled = false;
+    var lastRenderKey = '';
 
     function getDisplayedRedAlerts() {
       var locationStates = getLocationStates();
@@ -64,6 +66,17 @@
         map.removeLayer(ellipseOverlays[j]);
       }
       ellipseOverlays = [];
+    }
+
+    function buildRenderKey(redAlerts) {
+      if (!redAlerts.length) return '';
+      return redAlerts.map(function(alert) {
+        return [
+          alert.location || '',
+          alert.title || '',
+          alert.alertDate || ''
+        ].join('|');
+      }).join('||');
     }
 
     function projectEllipsePoint(point) {
@@ -352,31 +365,59 @@
       return { missing: missing, clusterCount: clusters.length };
     }
 
-    function render() {
-      var redAlerts = getDisplayedRedAlerts();
+    function sync(force, opts) {
+      if (!enabled) {
+        clear();
+        lastRenderKey = '';
+        return Promise.resolve();
+      }
 
-      ensureOrefPoints().then(function(pointsMap) {
+      opts = opts || {};
+      var redAlerts = getDisplayedRedAlerts();
+      var renderKey = buildRenderKey(redAlerts);
+
+      if (!force && renderKey === lastRenderKey) {
+        return Promise.resolve();
+      }
+
+      return ensureOrefPoints().then(function(pointsMap) {
         if (redAlerts.length === 0) {
           clear();
-          showToast('אין התרעות אדומות מוצגות');
+          lastRenderKey = renderKey;
+          if (opts.showToast) showToast('אין התרעות אדומות מוצגות');
         } else {
           var result = drawEllipseOverlays(redAlerts, pointsMap);
+          lastRenderKey = renderKey;
           if (result.missing.length > 0) {
-            showToast('סומנו ' + result.clusterCount + ' אשכולות, חסרות נקודות עבור ' + result.missing.length + ' יישובים');
-          } else {
+            if (opts.showToast) showToast('סומנו ' + result.clusterCount + ' אשכולות, חסרות נקודות עבור ' + result.missing.length + ' יישובים');
+          } else if (opts.showToast) {
             showToast('סומנו ' + result.clusterCount + ' אשכולות אדומים');
           }
         }
       }).catch(function(err) {
         clear();
+        lastRenderKey = '';
         console.error('Failed to load oref_points.json:', err);
-        showToast('שגיאה בטעינת נקודות התרעה');
+        if (opts.showToast) showToast('שגיאה בטעינת נקודות התרעה');
       });
+    }
+
+    function setEnabled(nextEnabled, opts) {
+      enabled = !!nextEnabled;
+      if (!enabled) {
+        clear();
+        lastRenderKey = '';
+        return Promise.resolve();
+      }
+      return sync(true, opts);
     }
 
     return {
       clear: clear,
-      render: render,
+      render: function() { return setEnabled(true, { showToast: true }); },
+      sync: sync,
+      setEnabled: setEnabled,
+      isEnabled: function() { return enabled; },
       isLiveMode: function() { return getIsLiveMode(); },
       currentViewTime: function() { return getCurrentViewTime(); }
     };
