@@ -29,6 +29,7 @@
 <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/ellipse-mode.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
@@ -53,7 +54,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   gap: 8px;
   z-index: 1000;
   pointer-events: none;
-  transition: bottom 0.4s ease, gap 0.4s ease;
+  transition: bottom 0.4s ease, top 0.4s ease, gap 0.4s ease;
 }
 #right-panel > * { pointer-events: auto; }
 #legend {
@@ -193,7 +194,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 .location-item:hover { background: #f5f5f5; }
 
-#sound-btn, #timeline-btn, #location-btn, #locate-btn {
+#sound-btn, #timeline-btn, #location-btn, #locate-btn, #ellipse-btn {
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -213,7 +214,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   transition: opacity 0.4s ease, max-height 0.4s ease, margin 0.4s ease;
 }
 @media (hover: hover) {
-  #sound-btn:not(.open):not(.active):hover, #location-btn:not(.active):hover, #locate-btn:not(.active):hover {
+  #sound-btn:not(.open):not(.active):hover, #location-btn:not(.active):hover, #locate-btn:not(.active):hover, #ellipse-btn:hover {
     background: rgba(219, 234, 254, 0.92);
     border-color: #93c5fd;
   }
@@ -313,6 +314,25 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: rtl;
 }
 #sound-btn.open #sound-panel { display: block; }
+
+#ellipse-btn {
+  display: none;
+  align-items: center;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  color: #555;
+}
+body.ellipse-mode #ellipse-btn { display: flex; }
+#ellipse-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
 
 #timeline-btn {
   display: none;
@@ -501,7 +521,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     top: 110px;
     left: 8px;
   }
-  #sound-btn, #timeline-btn, #location-btn, #locate-btn {
+  #sound-btn, #timeline-btn, #location-btn, #locate-btn, #ellipse-btn {
     max-height: 36px;
   }
   #gps-row {
@@ -543,7 +563,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 /* Idle mode: hide buttons after inactivity */
 body.idle #gps-row,
 body.idle #sound-btn,
-body.idle #timeline-btn {
+body.idle #timeline-btn,
+body.idle #ellipse-btn {
   opacity: 0;
   max-height: 0 !important;
   overflow: hidden;
@@ -626,6 +647,11 @@ body.idle #right-panel {
     </div>
   </div>
 </div>
+  <button id="ellipse-btn" type="button" title="סמן אליפסה">
+    <div id="ellipse-btn-row">
+      <span class="btn-icon">📝</span><span class="btn-text">אליפסה</span>
+    </div>
+  </button>
   <div id="timeline-btn" title="ציר זמן">
     <div id="timeline-btn-row">
       <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
@@ -655,8 +681,12 @@ body.idle #right-panel {
 (function() {
   'use strict';
 
+  var pageParams = new URLSearchParams(location.search);
+  var isEllipseMode = pageParams.get('mode') === 'ellipse';
+  if (isEllipseMode) document.body.classList.add('ellipse-mode');
+
   // --- Debug overlay (append console.warn/error to on-screen log when ?debug) ---
-  var isDebugMode = new URLSearchParams(location.search).has('debug');
+  var isDebugMode = pageParams.has('debug');
   if (isDebugMode) {
     var debugOverlay = document.createElement('div');
     debugOverlay.id = 'debug-overlay';
@@ -687,7 +717,7 @@ body.idle #right-panel {
     apiPrefix = '/api';
   }
 
-  var debugApi = new URLSearchParams(location.search).get('debugapi');
+  var debugApi = pageParams.get('debugapi');
 
   function apiFetch(endpoint) {
     var url = PROXY_BASE + apiPrefix + '/' + endpoint;
@@ -2756,6 +2786,21 @@ body.idle #right-panel {
   document.getElementById('about-backdrop').addEventListener('click', function(e) {
     if (e.target === this) closeAbout();
   });
+  var ellipseModeController = null;
+  if (isEllipseMode && window.initEllipseMode) {
+    ellipseModeController = window.initEllipseMode({
+      map: map,
+      getLocationStates: function() { return locationStates; },
+      getLocationHistory: function() { return locationHistory; },
+      getLocationPolygons: function() { return locationPolygons; },
+      getIsLiveMode: function() { return isLiveMode; },
+      getCurrentViewTime: function() { return currentViewTime; },
+      showToast: showToast
+    });
+    document.getElementById('ellipse-btn').addEventListener('click', function() {
+      ellipseModeController.render();
+    });
+  }
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeAbout();
