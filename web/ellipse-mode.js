@@ -323,7 +323,7 @@
       var clusters = buildRedAlertClusters(redAlerts);
       var icon = L.divIcon({
         className: 'ellipse-pin',
-        html: '<div style="width:16px;height:16px;background:#d00;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,0.4);"></div>',
+        html: '<div style="width:16px;height:16px;background:transparent;border:1px solid #fff;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,0.4);box-sizing:border-box;"></div>',
         iconSize: [16, 16],
         iconAnchor: [8, 8]
       });
