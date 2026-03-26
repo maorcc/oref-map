@@ -873,7 +873,8 @@ body.idle #right-panel {
           showUserLocation(urlPos);
           return;
         }
-        setTransient('מאתר...');
+        if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+        gpsLabel.textContent = 'מאתר...';
         startWatching();
         localStorage.removeItem('oref-location-hidden');
       }
