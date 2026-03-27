@@ -993,7 +993,7 @@ body.idle #right-panel {
   initUserLocation();
 
   // --- State ---
-  var autoZoomActive = localStorage.getItem('oref-auto-zoom') === 'true';
+  var autoZoomActive = localStorage.getItem('oref-auto-zoom') !== 'disabled';
   var isZoomingProgrammatically = false;
 
   if (autoZoomActive) {
@@ -1006,7 +1006,7 @@ body.idle #right-panel {
 
   document.getElementById('menu-zoom').querySelector('.menu-item-row').addEventListener('click', function() {
     autoZoomActive = !autoZoomActive;
-    localStorage.setItem('oref-auto-zoom', autoZoomActive);
+    localStorage.setItem('oref-auto-zoom', autoZoomActive ? 'enabled' : 'disabled');
     document.getElementById('menu-zoom').classList.toggle('active', autoZoomActive);
     if (autoZoomActive) {
       showToast('זום אוטומטי מופעל');
