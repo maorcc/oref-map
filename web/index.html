@@ -1377,7 +1377,7 @@ body.idle #right-panel {
     };
 
     playSoundForState(state, name);
-    updatePredictionLines();
+    schedulePredictionUpdate();
   }
 
   function removeLocation(name) {
@@ -1387,7 +1387,7 @@ body.idle #right-panel {
       entry.marker.closePopup();
     }
     delete locationStates[name];
-    updatePredictionLines();
+    schedulePredictionUpdate();
   }
 
   // --- Launch source prediction ---
@@ -1401,12 +1401,11 @@ body.idle #right-panel {
 
   // Set up menu toggle
   var predictMenuItem = document.getElementById('menu-predict');
-  var predictCheck = predictMenuItem.querySelector('.menu-check');
-  if (predictionActive) predictCheck.textContent = '✓';
+  if (predictionActive) predictMenuItem.classList.add('active');
   predictMenuItem.querySelector('.menu-item-row').addEventListener('click', function() {
     predictionActive = !predictionActive;
     localStorage.setItem('oref-predict', predictionActive);
-    predictCheck.textContent = predictionActive ? '✓' : '';
+    predictMenuItem.classList.toggle('active', predictionActive);
     if (predictionActive) {
       showToast('חיזוי כיוון שיגור מופעל');
       updatePredictionLines();
@@ -1415,6 +1414,16 @@ body.idle #right-panel {
       clearPredictionLines();
     }
   });
+
+  var predictionUpdateScheduled = false;
+  function schedulePredictionUpdate() {
+    if (predictionUpdateScheduled) return;
+    predictionUpdateScheduled = true;
+    requestAnimationFrame(function() {
+      predictionUpdateScheduled = false;
+      updatePredictionLines();
+    });
+  }
 
   function clearPredictionLines() {
     for (var i = 0; i < predictionLines.length; i++) {
@@ -1485,6 +1494,7 @@ body.idle #right-panel {
       cluster++;
     }
     // Assign noise points to nearest cluster
+    if (cluster === 0) return []; // all points are noise — no core points found
     for (var i = 0; i < n; i++) {
       if (labels[i] >= 0) continue;
       var best = Infinity, bestC = 0;
