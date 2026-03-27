@@ -74,6 +74,7 @@ Ways to help:
 - **Bug reports** — open an issue if something looks wrong
 - **Location data** — if a polygon is missing or misplaced, open an issue with the location name
 - **Features & fixes** — PRs are very welcome! Please keep each PR focused on a single feature or fix. For anything beyond a small bug fix, open an issue first so we can discuss the approach before you invest the effort
+- **Feature flags** — beta/experimental features are gated behind `f-` URL params (e.g. `?f-log`). To add a new flag, check `FF.<name>` in JS or use the `f-gated` CSS class for visibility toggling. See `CLAUDE.md` for details.
 
 To run locally, see the [Development](#development) section above.
 

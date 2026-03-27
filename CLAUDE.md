@@ -32,6 +32,19 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 - `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
 - `docs/map-requirements.md` — Feature requirements doc
 
+## Feature flags
+
+Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?f-log&f-ellipse`). On page load, a single block of JS parses all `f-*` params and:
+
+1. Populates `window.FF` — a global dict keyed by flag name (e.g. `FF.ellipse`). Boolean flags store `true`; value-carrying flags (e.g. `?f-debugapi=host`) store the string value.
+2. Adds a CSS class `f-<name>` to `<body>` — enabling pure-CSS gating.
+
+**To gate a new feature:**
+- **CSS-only** (e.g. hiding a menu item): add `class="f-gated"` to the element, then add a CSS rule `body.f-<name> #element.f-gated { display: block !important; }`.
+- **JS-only**: check `if (FF.myfeature) { ... }`.
+
+**Current flags:** `f-log` (on-screen console overlay), `f-debugapi` (force API proxy host).
+
 ## Oref API details
 
 ### Live Alerts API

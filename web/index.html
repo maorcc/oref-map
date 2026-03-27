@@ -233,6 +233,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   max-height: calc(100vh - 80px);
   overflow-y: auto;
 }
+/* Feature-flag-gated elements: hidden by default, shown when flag is active */
+.f-gated { display: none !important; }
+body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-row {
@@ -297,6 +300,21 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: rtl;
 }
 #menu-sound.sound-open .menu-sub-panel { display: block; }
+.menu-select-wrap {
+  padding: 10px 16px 14px;
+  border-top: 1px solid #eee;
+}
+.menu-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
 
 /* --- Right-panel buttons (timeline, ellipse) --- */
 #timeline-btn, #ellipse-btn {
@@ -579,6 +597,11 @@ body.idle #right-panel {
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
 </button>
 <div id="menu-panel">
+  <div id="menu-search" class="menu-item" style="padding:8px 16px 4px;">
+    <input type="text" id="search-input" placeholder="חיפוש יישוב..." dir="rtl"
+           style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; font-size:14px;">
+    <div id="search-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-top:8px;"></div>
+  </div>
   <div id="menu-gps" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><span class="blue-dot"></span></span>
@@ -606,6 +629,16 @@ body.idle #right-panel {
       <div style="display:flex; gap:8px;">
         <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
       </div>
+    </div>
+  </div>
+  <div id="menu-ellipse" class="menu-item f-gated">
+    <div class="menu-select-wrap">
+      <select id="menu-ellipse-select" class="menu-select" aria-label="מצב אליפסה">
+        <option value="0">אליפסה כבויה</option>
+        <option value="1">אליפסה בסיסית</option>
+        <option value="2">אליפסה רגילה</option>
+        <option value="3">אליפסה מפורטת</option>
+      </select>
     </div>
   </div>
   <div id="menu-share" class="menu-item" style="display:none;">
@@ -698,12 +731,23 @@ body.idle #right-panel {
   'use strict';
 
   var pageParams = new URLSearchParams(location.search);
+
+  // --- Feature flags (URL params with f- prefix, e.g. ?f-log&f-ellipse) ---
+  var FF = {};
+  pageParams.forEach(function(v, k) {
+    if (k.lastIndexOf('f-', 0) === 0) {
+      var name = k.substring(2);
+      FF[name] = v || true;
+      document.body.classList.add('f-' + name);
+    }
+  });
+  window.FF = FF;
+
   var isEllipseMode = pageParams.get('mode') === 'ellipse';
   if (isEllipseMode) document.body.classList.add('ellipse-mode');
 
-  // --- Debug overlay (append console.warn/error to on-screen log when ?debug) ---
-  var isDebugMode = pageParams.has('debug');
-  if (isDebugMode) {
+  // --- Debug overlay (append console.warn/error to on-screen log when ?f-log) ---
+  if (FF.log) {
     var debugOverlay = document.createElement('div');
     debugOverlay.id = 'debug-overlay';
     debugOverlay.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:30vh;overflow-y:auto;' +
@@ -733,11 +777,9 @@ body.idle #right-panel {
     apiPrefix = '/api';
   }
 
-  var debugApi = pageParams.get('debugapi');
-
   function apiFetch(endpoint) {
     var url = PROXY_BASE + apiPrefix + '/' + endpoint;
-    if (debugApi) url += '?debugapi=' + encodeURIComponent(debugApi);
+    if (FF.debugapi) url += '?debugapi=' + encodeURIComponent(FF.debugapi);
     var wasProxy = apiPrefix === '/api2';
 
     return fetch(url).then(function(resp) {
@@ -899,7 +941,8 @@ body.idle #right-panel {
           showUserLocation(urlPos);
           return;
         }
-        setTransient('מאתר...');
+        if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+        gpsLabel.textContent = 'מאתר...';
         startWatching();
         localStorage.removeItem('oref-location-hidden');
       }
@@ -1026,7 +1069,11 @@ body.idle #right-panel {
   var menuOpen = false;
   var menuSoundItem = document.getElementById('menu-sound');
   var menuSoundRow = document.getElementById('menu-sound-row');
+  var menuEllipseSelect = document.getElementById('menu-ellipse-select');
   var soundSubPanelOpen = false;
+  var searchInput = document.getElementById('search-input');
+  var searchResults = document.getElementById('search-results');
+
 
   function openMenu() {
     menuPanel.style.display = 'block';
@@ -1041,12 +1088,18 @@ body.idle #right-panel {
     soundSubPanelOpen = false;
   }
 
+  function clearSearch() {
+    searchInput.value = '';
+    searchResults.innerHTML = '';
+  }
+
   function closeMenu() {
     if (!menuOpen) return;
     menuPanel.style.display = 'none';
     menuBtn.setAttribute('aria-expanded', 'false');
     menuOpen = false;
     closeSoundSubPanel();
+    clearSearch();
     updateOverlay();
   }
 
@@ -1852,7 +1905,8 @@ body.idle #right-panel {
   window._toggleFav = function() {
     var name = openPopupName;
     if (!name) return;
-    var latlng = openPopupLatlng || favorites[name];
+    var polygon = locationPolygons[name];
+    var latlng = openPopupLatlng || favorites[name] || (polygon && polygon.getBounds().getCenter());
     if (!latlng) return;
     toggleFavorite(name, latlng);
   };
@@ -2001,7 +2055,7 @@ body.idle #right-panel {
         updateShadowState(loc, state);
       }
     }
-    if (autoZoomActive && isLiveMode && isNewAlert) {
+    if (autoZoomActive && isLiveMode && isNewAlert && !openPopupName) {
       maybeZoomToEvent();
     }
     syncEllipseMode();
@@ -3176,12 +3230,27 @@ body.idle #right-panel {
     ellipseBtn.title = ellipseDisplayMode === 0 ? 'סמן אליפסה' : (ellipseDisplayMode === 1 ? 'אליפסה רגילה' : 'אליפסה מורחבת');
     ellipseModeController.setDisplayMode(ellipseDisplayMode);
   }
+  function applyEllipseDisplayMode(nextMode, opts) {
+    if (!ellipseModeController) return Promise.resolve();
+    ellipseDisplayMode = nextMode;
+    if (menuEllipseSelect) menuEllipseSelect.value = String(nextMode);
+    if (ellipseDisplayMode === 0) {
+      ellipseModeController.setDisplayMode(0);
+      return ellipseModeController.setEnabled(false, opts || {});
+    }
+    if (!ellipseModeController.isEnabled()) {
+      ellipseModeController.setDisplayMode(ellipseDisplayMode);
+      return ellipseModeController.setEnabled(true, opts || {});
+    }
+    return ellipseModeController.setDisplayMode(ellipseDisplayMode);
+  }
   function syncEllipseMode(force) {
     if (!ellipseModeController || !ellipseModeController.sync) return;
     ellipseModeController.sync(!!force);
     updateEllipseButton();
+    ellipseModeController.refreshExtendedVisual();
   }
-  if (isEllipseMode && window.initEllipseMode) {
+  if ((isEllipseMode || FF.ellipse) && window.initEllipseMode) {
     ellipseModeController = window.initEllipseMode({
       map: map,
       getLocationStates: function() { return locationStates; },
@@ -3193,6 +3262,7 @@ body.idle #right-panel {
       showToast: showToast
     });
     updateEllipseButton();
+    applyEllipseDisplayMode(0);
     ellipseBtn.addEventListener('click', function() {
       var previousMode = ellipseDisplayMode;
       ellipseDisplayMode = (ellipseDisplayMode + 1) % 3;
@@ -3210,6 +3280,9 @@ body.idle #right-panel {
       ellipseModeController.sync(true).then(function() {
         updateEllipseButton();
       });
+    });
+    menuEllipseSelect.addEventListener('change', function() {
+      applyEllipseDisplayMode(Number(menuEllipseSelect.value), { showToast: true });
     });
   }
   document.addEventListener('keydown', function(e) {
@@ -3302,6 +3375,42 @@ body.idle #right-panel {
     if (item) {
       selectSoundLocation(item.getAttribute('data-name'));
     }
+  });
+
+  // --- Location search (in menu) ---
+  searchInput.addEventListener('input', function() {
+    var q = searchInput.value.trim();
+    if (q.length < 2) {
+      searchResults.innerHTML = '';
+      return;
+    }
+    var matches = Object.keys(locationPolygons).filter(function(name) {
+      return name.includes(q);
+    }).slice(0, 20);
+
+    searchResults.innerHTML = matches.map(function(m) {
+      return '<div class="location-item" data-name="' + m + '">' + m + '</div>';
+    }).join('');
+  });
+
+  searchResults.addEventListener('click', function(e) {
+    var item = e.target.closest('.location-item');
+    if (!item) return;
+    var name = item.getAttribute('data-name');
+    var polygon = locationPolygons[name];
+    if (!polygon) return;
+
+    closeMenu();
+    popPanelHistory();
+
+    var bounds = polygon.getBounds();
+    isZoomingProgrammatically = true;
+    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 12, duration: 0.7 });
+
+    map.once('moveend', function() {
+      isZoomingProgrammatically = false;
+      showPopup(name, polygon);
+    });
   });
 
   // --- Mobile back button closes panels ---

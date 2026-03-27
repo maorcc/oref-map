@@ -126,6 +126,98 @@
       }).addTo(map);
 
       ellipseVisualLayers.push(centerMarker, connectionLine, ratioLabel);
+
+      if (displayMode === 3 && cluster.sourceGeometry && Number.isFinite(cluster.normalizedDistanceRatio) && cluster.normalizedDistanceRatio > 0) {
+        var detailedGeometry = buildScaledGeometry(cluster.sourceGeometry, cluster.normalizedDistanceRatio);
+        var detailedOverlay = addGeometryOverlay(detailedGeometry, {
+          color: '#1d4ed8',
+          weight: 1.5,
+          opacity: 0.9,
+          fillColor: '#1d4ed8',
+          fillOpacity: 0.03,
+          dashArray: '8 6'
+        });
+        if (detailedOverlay) ellipseVisualLayers.push(detailedOverlay);
+
+        var labelLatLng = getGeometryTopLabelLatLng(detailedGeometry);
+        var circumferenceMeters = getGeometryCircumferenceMeters(detailedGeometry);
+        if (labelLatLng && circumferenceMeters !== null) {
+          var circumferenceLabel = L.marker(labelLatLng, {
+            interactive: false,
+            icon: L.divIcon({
+              className: '',
+              html: '<div style="background:rgba(255,255,255,0.96);border:1px solid #93c5fd;border-radius:12px;padding:4px 8px;color:#1d4ed8;font:12px Arial,sans-serif;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' +
+                escapeHtml(formatDistanceMeters(circumferenceMeters)) + '</div>',
+              iconSize: null
+            })
+          }).addTo(map);
+          ellipseVisualLayers.push(circumferenceLabel);
+        }
+      }
+    }
+
+    function isClusterEligibleForExtendedVisual(cluster) {
+      return !!(
+        cluster &&
+        cluster.geometry &&
+        Number.isFinite(cluster.normalizedDistanceRatio) &&
+        cluster.normalizedDistanceRatio < 1.5
+      );
+    }
+
+    function buildScaledGeometry(sourceGeometry, scaleRatio) {
+      if (!sourceGeometry || !Number.isFinite(scaleRatio) || scaleRatio <= 0) return null;
+      if (sourceGeometry.type === 'circle') {
+        return {
+          type: 'circle',
+          center: sourceGeometry.center,
+          radiusMeters: sourceGeometry.radiusMeters * scaleRatio
+        };
+      }
+
+      return {
+        type: 'ellipse',
+        center: sourceGeometry.center,
+        centerProjected: sourceGeometry.centerProjected,
+        majorAxis: sourceGeometry.majorAxis,
+        minorAxis: sourceGeometry.minorAxis,
+        semiMajor: sourceGeometry.semiMajor * scaleRatio,
+        semiMinor: sourceGeometry.semiMinor * scaleRatio
+      };
+    }
+
+    function formatDistanceMeters(distanceMeters) {
+      if (distanceMeters === null || !Number.isFinite(distanceMeters)) return 'N/A';
+      if (distanceMeters < 1000) return Math.round(distanceMeters) + ' m';
+      return (distanceMeters / 1000).toFixed(distanceMeters < 10000 ? 1 : 0) + ' km';
+    }
+
+    function getGeometryCircumferenceMeters(geometry) {
+      if (!geometry) return null;
+      if (geometry.type === 'circle') {
+        return 2 * Math.PI * geometry.radiusMeters;
+      }
+
+      var a = geometry.semiMajor;
+      var b = geometry.semiMinor;
+      if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
+      var h = Math.pow(a - b, 2) / Math.pow(a + b, 2);
+      return Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+    }
+
+    function getGeometryTopLabelLatLng(geometry) {
+      if (!geometry) return null;
+      if (geometry.type === 'circle') {
+        return L.latLng(geometry.center.lat + 0.006, geometry.center.lng);
+      }
+
+      var latlngs = buildEllipseLatLngs(geometry);
+      if (!latlngs.length) return null;
+      var topPoint = latlngs[0];
+      for (var i = 1; i < latlngs.length; i++) {
+        if (latlngs[i].lat > topPoint.lat) topPoint = latlngs[i];
+      }
+      return L.latLng(topPoint.lat + 0.004, topPoint.lng);
     }
 
     function buildRenderKey(redAlerts) {
@@ -251,6 +343,38 @@
       return latlngs;
     }
 
+    function addGeometryOverlay(geometry, style, popupHtml) {
+      if (!geometry) return null;
+
+      var overlay;
+      if (geometry.type === 'circle') {
+        overlay = L.circle([geometry.center.lat, geometry.center.lng], {
+          radius: geometry.radiusMeters,
+          color: style.color,
+          weight: style.weight,
+          opacity: style.opacity,
+          fillColor: style.fillColor,
+          fillOpacity: style.fillOpacity,
+          dashArray: style.dashArray || null
+        });
+      } else {
+        overlay = L.polygon(buildEllipseLatLngs(geometry), {
+          color: style.color,
+          weight: style.weight,
+          opacity: style.opacity,
+          fillColor: style.fillColor,
+          fillOpacity: style.fillOpacity,
+          dashArray: style.dashArray || null
+        });
+      }
+
+      if (popupHtml) {
+        overlay.bindPopup(popupHtml, { maxWidth: 260 });
+      }
+      overlay.addTo(map);
+      return overlay;
+    }
+
     function geometryContainsLatLng(geometry, latlng) {
       if (!geometry || !latlng) return false;
       if (geometry.type === 'circle') {
@@ -319,29 +443,14 @@
         return alert.location + (alert.alertDate ? '<br><small>' + alert.alertDate + '</small>' : '');
       }).join('<hr style="border:none;border-top:1px solid #eee;margin:6px 0;">');
 
-      var overlay;
-      if (geometry.type === 'circle') {
-        overlay = L.circle([geometry.center.lat, geometry.center.lng], {
-          radius: geometry.radiusMeters,
-          color: '#9922cc',
-          weight: 2,
-          opacity: 0.95,
-          fillColor: '#9922cc',
-          fillOpacity: 0.08
-        });
-      } else {
-        overlay = L.polygon(buildEllipseLatLngs(geometry), {
-          color: '#9922cc',
-          weight: 2,
-          opacity: 0.95,
-          fillColor: '#9922cc',
-          fillOpacity: 0.08
-        });
-      }
-
-      overlay.bindPopup(popupHtml, { maxWidth: 260 });
-      overlay.addTo(map);
-      ellipseOverlays.push(overlay);
+      var overlay = addGeometryOverlay(geometry, {
+        color: '#9922cc',
+        weight: 2,
+        opacity: 0.95,
+        fillColor: '#9922cc',
+        fillOpacity: 0.08
+      }, popupHtml);
+      if (overlay) ellipseOverlays.push(overlay);
     }
 
     function polygonRings(polygon) {
@@ -512,13 +621,15 @@
             continue;
           }
 
-          var marker = L.marker([point[0], point[1]], {
-            icon: icon,
-            keyboard: false
-          });
-          marker.bindPopup(alert.location + (alert.alertDate ? '<br>' + alert.alertDate : ''));
-          marker.addTo(map);
-          ellipseMarkers.push(marker);
+          if (displayMode >= 1) {
+            var marker = L.marker([point[0], point[1]], {
+              icon: icon,
+              keyboard: false
+            });
+            marker.bindPopup(alert.location + (alert.alertDate ? '<br>' + alert.alertDate : ''));
+            marker.addTo(map);
+            ellipseMarkers.push(marker);
+          }
           placedPoints.push({ lat: point[0], lng: point[1] });
         }
         addEllipseOverlay(placedPoints, clusters[c]);
@@ -594,6 +705,7 @@
               widthMeters: geometry.type === 'circle' ? geometry.radiusMeters * 2 : geometry.semiMajor * 2,
               heightMeters: geometry.type === 'circle' ? geometry.radiusMeters * 2 : geometry.semiMinor * 2
             } : null,
+            sourceGeometry: geometry,
             centerDistanceMeters: positionMetrics ? positionMetrics.centerDistanceMeters : null,
             normalizedDistanceRatio: positionMetrics ? positionMetrics.normalizedDistanceRatio : null
           });
@@ -622,15 +734,23 @@
     function refreshExtendedVisual() {
       var getCurrentUserPosition = options.getCurrentUserPosition;
       var userPos = getCurrentUserPosition ? getCurrentUserPosition() : null;
-      var shouldDraw = !!(enabled && displayMode === 2 && userPos);
+      var shouldDraw = !!(enabled && displayMode >= 2 && userPos);
       if (!shouldDraw) {
         clearExtendedVisual();
         return Promise.resolve();
       }
 
       return buildUserEllipseAnalysis(userPos).then(function(analysis) {
-        var nearestCluster = analysis && analysis.clusters && analysis.clusters.length ? analysis.clusters[0] : null;
-        if (!nearestCluster || !nearestCluster.geometry) {
+        var nearestCluster = null;
+        if (analysis && analysis.clusters && analysis.clusters.length) {
+          for (var i = 0; i < analysis.clusters.length; i++) {
+            if (isClusterEligibleForExtendedVisual(analysis.clusters[i])) {
+              nearestCluster = analysis.clusters[i];
+              break;
+            }
+          }
+        }
+        if (!nearestCluster) {
           clearExtendedVisual();
           return;
         }
@@ -691,7 +811,8 @@
 
     function setDisplayMode(nextMode) {
       displayMode = nextMode;
-      return refreshExtendedVisual();
+      if (!enabled) return refreshExtendedVisual();
+      return sync(true);
     }
 
     return {
