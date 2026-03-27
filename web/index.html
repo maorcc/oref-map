@@ -747,6 +747,10 @@ body.idle #right-panel {
     try { localStorage.setItem('oref-ellipse-mode', '3'); } catch (e) {}
     var s = document.createElement('script');
     s.src = '/ellipse-mode.js';
+    s.onerror = function() {
+      window._ellipseLoading = false;
+      try { localStorage.removeItem('oref-ellipse-mode'); } catch (e) {}
+    };
     document.head.appendChild(s);
   });
 
@@ -1127,6 +1131,8 @@ body.idle #right-panel {
     menuBtn.setAttribute('aria-expanded', 'false');
     menuOpen = false;
     closeSoundSubPanel();
+    document.getElementById('ext-section').classList.remove('ext-open');
+    document.getElementById('ext-chevron').style.transform = '';
     clearSearch();
     updateOverlay();
   }

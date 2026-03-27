@@ -536,10 +536,10 @@
         }
       }
 
-      for (var ra = 0; ra < ringsA.length; ra++) {
-        for (var rb = 0; rb < ringsB.length; rb++) {
-          var ptsA = ringsA[ra];
-          var ptsB = ringsB[rb];
+      for (ra = 0; ra < ringsA.length; ra++) {
+        for (rb = 0; rb < ringsB.length; rb++) {
+          ptsA = ringsA[ra];
+          ptsB = ringsB[rb];
           for (var a = 0; a < ptsA.length; a++) {
             var a1 = ptsA[a];
             var a2 = ptsA[(a + 1) % ptsA.length];
@@ -732,7 +732,7 @@
     }
 
     function refreshExtendedVisual() {
-      var userPos = getCurrentUserPosition ? getCurrentUserPosition() : null;
+      var userPos = getCurrentUserPosition();
       var shouldDraw = !!(enabled && userPos);
       if (!shouldDraw) {
         clearExtendedVisual();
@@ -860,7 +860,6 @@
 
     document.addEventListener('app:stateChanged', function() {
       controller.sync(false);
-      controller.refreshExtendedVisual();
     });
     document.addEventListener('app:locationChanged', function() {
       controller.refreshExtendedVisual();
