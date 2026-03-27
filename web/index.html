@@ -297,7 +297,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: rtl;
 }
 #menu-sound.sound-open .menu-sub-panel { display: block; }
-#ext-section.ext-open .menu-sub-panel { display: block; }
+#ext-section.ext-open > .menu-sub-panel { display: block; }
+/* "לא מומלץ" — footer footnote, visually outside the main menu */
+#ext-section { border-top: 1px solid #d1d5db; margin-top: 4px; }
+#ext-section > .menu-item-row { padding: 6px 16px; color: #9ca3af; }
+#ext-section > .menu-item-row .menu-item-label { font-size: 12px; font-weight: 400; }
+@media (hover: hover) { #ext-section > .menu-item-row:hover { background: transparent; } }
 .menu-select-wrap {
   padding: 10px 16px 14px;
   border-top: 1px solid #eee;
@@ -580,38 +585,6 @@ body.idle #right-panel {
       <span class="menu-check"></span>
     </button>
   </div>
-  <div id="menu-sound" class="menu-item">
-    <button id="menu-sound-row" class="menu-item-row" type="button">
-      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
-      <span class="menu-item-label">מצב שקט</span>
-    </button>
-    <div class="menu-sub-panel">
-      <p style="margin:0 0 8px; font-weight:bold;">בחר מיקום לקבלת התרעות קוליות:</p>
-      <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
-             style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
-      <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
-      <div style="display:flex; gap:8px;">
-        <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
-      </div>
-    </div>
-  </div>
-  <div id="ext-section" class="menu-item">
-    <button class="menu-item-row" type="button" id="ext-section-btn">
-      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
-      <span class="menu-item-label">לא מומלץ</span>
-      <svg id="ext-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:auto;transition:transform 0.2s"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
-    <div class="menu-sub-panel" style="padding:0">
-      <div id="ellipse-stub" class="menu-item">
-        <button class="menu-item-row" type="button" id="ellipse-enable-btn">
-          <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="10" ry="6"/></svg></span>
-          <span class="menu-item-label">אליפסה</span>
-          <span class="menu-check"></span>
-        </button>
-      </div>
-      <div id="ext-menu"></div>
-    </div>
-  </div>
   <div id="menu-share" class="menu-item" style="display:none;">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon">
@@ -626,6 +599,37 @@ body.idle #right-panel {
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg></span>
       <span class="menu-item-label">אודות</span>
     </button>
+  </div>
+  <div id="ext-section" class="menu-item">
+    <button class="menu-item-row" type="button" id="ext-section-btn">
+      <span class="menu-item-label">לא מומלץ</span>
+      <svg id="ext-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:auto;transition:transform 0.2s;opacity:0.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="menu-sub-panel" style="padding:0">
+      <div id="menu-sound" class="menu-item">
+        <button id="menu-sound-row" class="menu-item-row" type="button">
+          <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
+          <span class="menu-item-label">מצב שקט</span>
+        </button>
+        <div class="menu-sub-panel">
+          <p style="margin:0 0 8px; font-weight:bold;">בחר מיקום לקבלת התרעות קוליות:</p>
+          <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
+                 style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
+          <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
+          <div style="display:flex; gap:8px;">
+            <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
+          </div>
+        </div>
+      </div>
+      <div id="ellipse-stub" class="menu-item">
+        <button class="menu-item-row" type="button" id="ellipse-enable-btn">
+          <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="10" ry="6"/></svg></span>
+          <span class="menu-item-label">אליפסה</span>
+          <span class="menu-check"></span>
+        </button>
+      </div>
+      <div id="ext-menu"></div>
+    </div>
   </div>
 </div>
 
