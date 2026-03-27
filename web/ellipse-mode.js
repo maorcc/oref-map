@@ -248,6 +248,81 @@
       return { x: vector.x / length, y: vector.y / length };
     }
 
+    function erf(x) {
+      if (!Number.isFinite(x)) return NaN;
+      var sign = x < 0 ? -1 : 1;
+      var absX = Math.abs(x);
+      var t = 1 / (1 + 0.3275911 * absX);
+      var y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-absX * absX);
+      return sign * y;
+    }
+
+    function getDirectionalRadiusMeters(geometry, latlng) {
+      if (!geometry || !latlng) return null;
+      if (geometry.type === 'circle') {
+        return Number.isFinite(geometry.radiusMeters) ? geometry.radiusMeters : null;
+      }
+
+      var projected = projectEllipsePoint({ lat: latlng.lat, lng: latlng.lng });
+      var direction = normalizeVector({
+        x: projected.x - geometry.centerProjected.x,
+        y: projected.y - geometry.centerProjected.y
+      }, geometry.majorAxis);
+      if (!direction || !Number.isFinite(direction.x) || !Number.isFinite(direction.y)) return null;
+
+      var dirU = direction.x * geometry.majorAxis.x + direction.y * geometry.majorAxis.y;
+      var dirV = direction.x * geometry.minorAxis.x + direction.y * geometry.minorAxis.y;
+      var denom =
+        (dirU * dirU) / (geometry.semiMajor * geometry.semiMajor) +
+        (dirV * dirV) / (geometry.semiMinor * geometry.semiMinor);
+      if (!Number.isFinite(denom) || denom <= 0) return null;
+
+      var boundaryScale = 1 / Math.sqrt(denom);
+      if (!Number.isFinite(boundaryScale) || boundaryScale <= 0) return null;
+
+      var boundaryPoint = {
+        x: geometry.centerProjected.x + direction.x * boundaryScale,
+        y: geometry.centerProjected.y + direction.y * boundaryScale
+      };
+      var boundaryLatLng = unprojectEllipsePoint(boundaryPoint);
+      return map.distance(
+        [geometry.center.lat, geometry.center.lng],
+        [boundaryLatLng.lat, boundaryLatLng.lng]
+      );
+    }
+
+    function halfNormalCdf(x, sigma) {
+      if (!Number.isFinite(x) || !Number.isFinite(sigma) || sigma <= 0) return null;
+      if (x <= 0) return 0;
+      return erf(x / (sigma * Math.SQRT2));
+    }
+
+    function getPlusMinusWindowProbability(geometry, latlng, windowHalfWidthMeters, positionMetrics) {
+      if (!geometry || !latlng || !Number.isFinite(windowHalfWidthMeters) || windowHalfWidthMeters < 0) return null;
+
+      positionMetrics = positionMetrics || getGeometryPositionMetrics(geometry, latlng);
+      if (!positionMetrics || !Number.isFinite(positionMetrics.centerDistanceMeters)) return null;
+
+      var directionalRadiusMeters = getDirectionalRadiusMeters(geometry, latlng);
+      if (!Number.isFinite(directionalRadiusMeters) || directionalRadiusMeters <= 0) return null;
+
+      var q99 = 2.5758293035489004;
+      var sigma = directionalRadiusMeters / q99;
+      if (!Number.isFinite(sigma) || sigma <= 0) return null;
+
+      var lower = Math.max(0, positionMetrics.centerDistanceMeters - windowHalfWidthMeters);
+      var upper = positionMetrics.centerDistanceMeters + windowHalfWidthMeters;
+      var lowerCdf = halfNormalCdf(lower, sigma);
+      var upperCdf = halfNormalCdf(upper, sigma);
+      if (lowerCdf === null || upperCdf === null) return null;
+
+      return {
+        centerDistanceMeters: positionMetrics.centerDistanceMeters,
+        directionalRadiusMeters: directionalRadiusMeters,
+        plusMinus100mProbability: upperCdf - lowerCdf
+      };
+    }
+
     function buildEllipseGeometry(points) {
       if (!points.length) return null;
 
@@ -707,7 +782,9 @@
             } : null,
             sourceGeometry: geometry,
             centerDistanceMeters: positionMetrics ? positionMetrics.centerDistanceMeters : null,
-            normalizedDistanceRatio: positionMetrics ? positionMetrics.normalizedDistanceRatio : null
+            normalizedDistanceRatio: positionMetrics ? positionMetrics.normalizedDistanceRatio : null,
+            directionalRadiusMeters: null,
+            plusMinus100mProbability: null
           });
         }
 
@@ -753,6 +830,24 @@
           clearExtendedVisual();
           return;
         }
+        var probabilityMetrics = getPlusMinusWindowProbability(
+          nearestCluster.sourceGeometry,
+          userPos,
+          100,
+          {
+            centerDistanceMeters: nearestCluster.centerDistanceMeters,
+            normalizedDistanceRatio: nearestCluster.normalizedDistanceRatio
+          }
+        );
+        nearestCluster.directionalRadiusMeters = probabilityMetrics ? probabilityMetrics.directionalRadiusMeters : null;
+        nearestCluster.plusMinus100mProbability = probabilityMetrics ? probabilityMetrics.plusMinus100mProbability : null;
+        console.log({
+          cluster: nearestCluster.label,
+          normalizedDistanceRatio: nearestCluster.normalizedDistanceRatio,
+          centerDistanceMeters: nearestCluster.centerDistanceMeters,
+          directionalRadiusMeters: nearestCluster.directionalRadiusMeters,
+          plusMinus100mProbability: nearestCluster.plusMinus100mProbability
+        });
         drawExtendedVisual(nearestCluster, userPos);
       }).catch(function(err) {
         clearExtendedVisual();
