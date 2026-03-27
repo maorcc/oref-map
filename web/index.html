@@ -317,7 +317,7 @@ body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
 }
 
 /* --- Right-panel buttons (timeline, ellipse) --- */
-#timeline-btn {
+#timeline-btn, #ellipse-btn {
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -329,10 +329,43 @@ body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
 @media (hover: hover) {
+  #ellipse-btn:hover {
+    background: rgba(219, 234, 254, 0.92);
+    border-color: #93c5fd;
+  }
   #timeline-btn:not(.open):hover {
     background: rgba(253, 230, 138, 0.92);
     border-color: #f59e0b;
   }
+}
+
+#ellipse-btn {
+  display: none;
+  align-items: center;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+  color: #555;
+}
+body.ellipse-mode #ellipse-btn.active {
+  background: rgba(219, 234, 254, 0.92);
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+body.ellipse-mode #ellipse-btn { display: flex; }
+#ellipse-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 40px;
+  direction: rtl;
+  cursor: pointer;
+}
+body.ellipse-mode #ellipse-btn.extended {
+  background: rgba(219, 234, 254, 0.92);
+  border-color: #93c5fd;
+  color: #1d4ed8;
 }
 
 #timeline-btn {
@@ -520,7 +553,7 @@ body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
     top: 110px;
     left: 8px;
   }
-  #timeline-btn {
+  #timeline-btn, #ellipse-btn {
     max-height: 36px;
   }
   #menu-btn { width: 36px; height: 36px; }
@@ -541,7 +574,8 @@ body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
   body.idle #right-panel { bottom: 8px; }
 }
 /* Idle mode: hide buttons after inactivity */
-body.idle #timeline-btn {
+body.idle #timeline-btn,
+body.idle #ellipse-btn {
   opacity: 0;
   max-height: 0 !important;
   overflow: hidden;
@@ -616,6 +650,13 @@ body.idle #right-panel {
       <span class="menu-item-label">שתף</span>
     </button>
   </div>
+  <div id="menu-predict" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
+      <span class="menu-item-label">כיוון שיגור</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
   <div id="menu-about" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg></span>
@@ -655,6 +696,11 @@ body.idle #right-panel {
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
     <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
   </div>
+  <button id="ellipse-btn" type="button" title="סמן אליפסה">
+    <div id="ellipse-btn-row">
+      <span class="btn-icon">📝</span><span class="btn-text">אליפסה</span>
+    </div>
+  </button>
   <div id="timeline-btn" title="ציר זמן">
     <div id="timeline-btn-row">
       <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
@@ -696,6 +742,9 @@ body.idle #right-panel {
     }
   });
   window.FF = FF;
+
+  var isEllipseMode = pageParams.get('mode') === 'ellipse';
+  if (isEllipseMode) document.body.classList.add('ellipse-mode');
 
   // --- Debug overlay (append console.warn/error to on-screen log when ?f-log) ---
   if (FF.log) {
@@ -962,6 +1011,7 @@ body.idle #right-panel {
   var isPlaying = false;
   var playRAF = null;
   var playFlyHandler = null;
+  var pausedForFly = false;
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
   var polygonHintInterval = null; // showPolygonHint animation interval
@@ -1071,6 +1121,10 @@ body.idle #right-panel {
 
   // --- Polygon state ---
   var locationPolygons = {};  // name → L.polygon
+  var orefPoints = {};        // name → [lat, lng] — settlement coordinates for prediction
+  fetch('oref_points.json').then(function(r) { return r.json(); })
+    .then(function(data) { orefPoints = data; })
+    .catch(function() {});
 
   // --- Colors ---
   var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
@@ -1323,6 +1377,7 @@ body.idle #right-panel {
     };
 
     playSoundForState(state, name);
+    schedulePredictionUpdate();
   }
 
   function removeLocation(name) {
@@ -1332,6 +1387,422 @@ body.idle #right-panel {
       entry.marker.closePopup();
     }
     delete locationStates[name];
+    schedulePredictionUpdate();
+  }
+
+  // --- Launch source prediction ---
+  var predictionLines = [];  // L.polyline/L.polygon instances on the map
+  var predictionActive = localStorage.getItem('oref-predict') === 'true';
+  var PREDICTION_CLUSTER_THRESHOLD = 0.15; // degrees (~17 km) — generous initial clustering
+  var PREDICTION_ELONGATION_MIN = 2.5; // minimum eigenvalue ratio (lambda1/lambda2) to draw
+  var PREDICTION_MIN_SPAN = 0.1; // degrees (~11 km) minimum cluster extent along principal axis
+  // Israel's approximate geographic center — used to determine "outward" direction
+  var ISRAEL_CENTER = [31.5, 34.8];
+
+  // Set up menu toggle
+  var predictMenuItem = document.getElementById('menu-predict');
+  if (predictionActive) predictMenuItem.classList.add('active');
+  predictMenuItem.querySelector('.menu-item-row').addEventListener('click', function() {
+    predictionActive = !predictionActive;
+    localStorage.setItem('oref-predict', predictionActive);
+    predictMenuItem.classList.toggle('active', predictionActive);
+    if (predictionActive) {
+      showToast('חיזוי כיוון שיגור מופעל');
+      updatePredictionLines();
+    } else {
+      showToast('חיזוי כיוון שיגור כובה');
+      clearPredictionLines();
+    }
+  });
+
+  var predictionUpdateScheduled = false;
+  function schedulePredictionUpdate() {
+    if (predictionUpdateScheduled) return;
+    predictionUpdateScheduled = true;
+    requestAnimationFrame(function() {
+      predictionUpdateScheduled = false;
+      updatePredictionLines();
+    });
+  }
+
+  function clearPredictionLines() {
+    for (var i = 0; i < predictionLines.length; i++) {
+      map.removeLayer(predictionLines[i]);
+    }
+    predictionLines = [];
+  }
+
+  // Compute centroid of a Leaflet polygon (outer ring). Returns [lat, lng] or null.
+  function polygonCentroid(poly) {
+    var rings = poly.getLatLngs();
+    if (!rings || rings.length === 0) return null;
+    var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+    if (outer.length === 0 || typeof outer[0].lat !== 'number') return null;
+    var sumLat = 0, sumLng = 0;
+    for (var i = 0; i < outer.length; i++) {
+      sumLat += outer[i].lat;
+      sumLng += outer[i].lng;
+    }
+    return [sumLat / outer.length, sumLng / outer.length];
+  }
+
+  // Compute approximate area of a Leaflet polygon using the shoelace formula (sq degrees).
+  function polygonArea(poly) {
+    var rings = poly.getLatLngs();
+    if (!rings || rings.length === 0) return 0;
+    var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+    if (outer.length < 3) return 0;
+    var area = 0;
+    for (var i = 0, j = outer.length - 1; i < outer.length; j = i++) {
+      area += (outer[j].lng + outer[i].lng) * (outer[j].lat - outer[i].lat);
+    }
+    return Math.abs(area / 2);
+  }
+
+  // DBSCAN clustering. eps = max neighbor distance, minPts = min neighbors to be a core point.
+  function clusterPoints(points, eps, minPts) {
+    if (!minPts) minPts = 2;
+    var n = points.length;
+    var eps2 = eps * eps;
+    var labels = [];
+    for (var i = 0; i < n; i++) labels[i] = -1; // unvisited
+    function neighbors(i) {
+      var nb = [];
+      for (var j = 0; j < n; j++) {
+        var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
+        if (dl * dl + dg * dg <= eps2) nb.push(j);
+      }
+      return nb;
+    }
+    var cluster = 0;
+    for (var i = 0; i < n; i++) {
+      if (labels[i] !== -1) continue;
+      var nb = neighbors(i);
+      if (nb.length < minPts) { labels[i] = -2; continue; } // noise
+      labels[i] = cluster;
+      var queue = nb.slice(), qi = 0;
+      while (qi < queue.length) {
+        var j = queue[qi++];
+        if (labels[j] === -2) labels[j] = cluster; // noise → border
+        if (labels[j] !== -1) continue;
+        labels[j] = cluster;
+        var jnb = neighbors(j);
+        if (jnb.length >= minPts) {
+          for (var k = 0; k < jnb.length; k++) queue.push(jnb[k]);
+        }
+      }
+      cluster++;
+    }
+    // Assign noise points to nearest cluster
+    if (cluster === 0) return []; // all points are noise — no core points found
+    for (var i = 0; i < n; i++) {
+      if (labels[i] >= 0) continue;
+      var best = Infinity, bestC = 0;
+      for (var j = 0; j < n; j++) {
+        if (labels[j] < 0) continue;
+        var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
+        var d2 = dl * dl + dg * dg;
+        if (d2 < best) { best = d2; bestC = labels[j]; }
+      }
+      labels[i] = bestC;
+    }
+    var groups = {};
+    for (var i = 0; i < n; i++) {
+      var c = labels[i];
+      if (!groups[c]) groups[c] = [];
+      groups[c].push(points[i]);
+    }
+    return Object.keys(groups).map(function(k) { return groups[k]; });
+  }
+
+  // Fit a line through points using area-weighted PCA.
+  // Points are [lat, lng, weight]. Returns {center, direction, lambda1, lambda2, totalWeight} or null.
+  function fitLine(points) {
+    var n = points.length;
+    if (n < 2) return null;
+    var totalW = 0, cx = 0, cy = 0;
+    for (var i = 0; i < n; i++) {
+      var w = points[i][2] || 1;
+      totalW += w; cx += points[i][0] * w; cy += points[i][1] * w;
+    }
+    cx /= totalW; cy /= totalW;
+    var cxx = 0, cxy = 0, cyy = 0;
+    for (var i = 0; i < n; i++) {
+      var w = points[i][2] || 1;
+      var dx = points[i][0] - cx, dy = points[i][1] - cy;
+      cxx += w * dx * dx; cxy += w * dx * dy; cyy += w * dy * dy;
+    }
+    var diff = cxx - cyy;
+    var disc = Math.sqrt(diff * diff + 4 * cxy * cxy);
+    var lambda1 = (cxx + cyy + disc) / 2;
+    var lambda2 = (cxx + cyy - disc) / 2;
+    var vx, vy;
+    if (Math.abs(cxy) > 1e-12) {
+      vx = lambda1 - cyy; vy = cxy;
+    } else if (cxx >= cyy) {
+      vx = 1; vy = 0;
+    } else {
+      vx = 0; vy = 1;
+    }
+    var len = Math.sqrt(vx * vx + vy * vy);
+    if (len > 0) { vx /= len; vy /= len; }
+    return { center: [cx, cy], direction: [vx, vy], lambda1: lambda1, lambda2: lambda2, totalWeight: totalW };
+  }
+
+  // Extension distance (degrees) toward source, calibrated to reach the far border
+  // of the likely origin country based on bearing from Israel.
+  function sourceExtensionDeg(bearingDeg) {
+    var b = ((bearingDeg % 360) + 360) % 360;
+    // North (340-20): Lebanon — northern border ~220 km
+    if (b >= 340 || b < 20) return 2;
+    // NNE-NE (20-55): Syria — eastern border ~610 km
+    if (b >= 20 && b < 55) return 5.5;
+    // ENE-E (55-120): Iran — far eastern border ~63°E → ~2800 km
+    if (b >= 55 && b < 120) return 25;
+    // ESE-SE (120-165): Iran/Yemen approach — ~2400 km
+    if (b >= 120 && b < 165) return 22;
+    // SSE-S (165-210): Yemen — southern coast ~12.5°N → ~2200 km
+    if (b >= 165 && b < 210) return 20;
+    // SSW-SW (210-250): Gaza/Sinai — far border ~170 km
+    if (b >= 210 && b < 250) return 1.5;
+    // W-NW (250-340): Mediterranean — shouldn't reach here (safety net), minimal
+    return 2;
+  }
+
+  // Angular difference between two bearings in [0, 180].
+  function bearingDiff(a, b) {
+    var d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
+  }
+
+  // Approximate Mediterranean coastline [lat, lng] from south to north, with ~3 km sea buffer.
+  var MED_COAST = [
+    [29.5, 32.53], [30.5, 33.60], [31.0, 34.10], [31.33, 34.23],
+    [31.67, 34.53], [31.85, 34.62], [32.08, 34.74], [32.50, 34.87],
+    [32.82, 34.95], [33.09, 35.07], [33.50, 35.25], [34.0, 35.47],
+    [34.5, 35.70], [35.0, 35.90], [36.0, 35.80]
+  ];
+  // Returns the coastline longitude at a given latitude (linear interpolation).
+  // Points west of this are over the sea. Returns null if lat is out of range.
+  function coastLng(lat) {
+    if (lat <= MED_COAST[0][0] || lat >= MED_COAST[MED_COAST.length - 1][0]) return null;
+    for (var i = 0; i < MED_COAST.length - 1; i++) {
+      if (lat >= MED_COAST[i][0] && lat <= MED_COAST[i + 1][0]) {
+        var t = (lat - MED_COAST[i][0]) / (MED_COAST[i + 1][0] - MED_COAST[i][0]);
+        return MED_COAST[i][1] + t * (MED_COAST[i + 1][1] - MED_COAST[i][1]);
+      }
+    }
+    return null;
+  }
+  function isOverSea(pt) {
+    var cl = coastLng(pt[0]);
+    return cl !== null && pt[1] < cl;
+  }
+  // Clip a polyline array at sea boundaries. Trims from both ends, interpolating
+  // the crossing point so the line stops right at the coastline.
+  function clipAtCoast(coords) {
+    if (coords.length < 2) return coords;
+    // Trim from start
+    var startIdx = 0;
+    while (startIdx < coords.length && isOverSea(coords[startIdx])) startIdx++;
+    if (startIdx >= coords.length) return [];
+    // Trim from end
+    var endIdx = coords.length - 1;
+    while (endIdx >= 0 && isOverSea(coords[endIdx])) endIdx--;
+    if (endIdx < startIdx) return [];
+    var result = coords.slice(startIdx, endIdx + 1);
+    // Interpolate crossing point at start
+    if (startIdx > 0) {
+      var a = coords[startIdx - 1], b = coords[startIdx];
+      var clA = coastLng(a[0]), clB = coastLng(b[0]);
+      if (clA !== null && clB !== null) {
+        var dA = clA - a[1], dB = clB - b[1]; // positive = over sea
+        if (Math.abs(dA - dB) > 1e-10) {
+          var t = dA / (dA - dB);
+          result.unshift([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]);
+        }
+      }
+    }
+    // Interpolate crossing point at end
+    if (endIdx < coords.length - 1) {
+      var a = coords[endIdx], b = coords[endIdx + 1];
+      var clA = coastLng(a[0]), clB = coastLng(b[0]);
+      if (clA !== null && clB !== null) {
+        var dA = clA - a[1], dB = clB - b[1];
+        if (Math.abs(dA - dB) > 1e-10) {
+          var t = dA / (dA - dB);
+          result.push([a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]);
+        }
+      }
+    }
+    return result;
+  }
+
+  // Destination point on a great circle given start [lat,lng], bearing (deg), arc distance (deg).
+  function gcDest(lat, lng, bearingDeg, distDeg) {
+    var toRad = Math.PI / 180, toDeg = 180 / Math.PI;
+    var lat1 = lat * toRad, lng1 = lng * toRad, brng = bearingDeg * toRad, d = distDeg * toRad;
+    var lat2 = Math.asin(Math.sin(lat1) * Math.cos(d) + Math.cos(lat1) * Math.sin(d) * Math.cos(brng));
+    var lng2 = lng1 + Math.atan2(Math.sin(brng) * Math.sin(d) * Math.cos(lat1),
+                                  Math.cos(d) - Math.sin(lat1) * Math.sin(lat2));
+    return [lat2 * toDeg, lng2 * toDeg];
+  }
+
+  function updatePredictionLines() {
+    clearPredictionLines();
+    if (!predictionActive) return;
+    // Collect one representative point per red location for spatial clustering.
+    // [3] = location name, used to gather polygon vertices for PCA.
+    var locPoints = [];
+    for (var name in locationStates) {
+      var entry = locationStates[name];
+      if (!entry || entry.state !== 'red') continue;
+      var pt = orefPoints[name];
+      if (!pt) { var poly = locationPolygons[name]; if (poly) pt = polygonCentroid(poly); }
+      if (pt) locPoints.push([pt[0], pt[1], 1, name]);
+    }
+    if (locPoints.length < 3) return;
+    // Spatial clustering
+    var clusters = clusterPoints(locPoints, PREDICTION_CLUSTER_THRESHOLD);
+    for (var ci = 0; ci < clusters.length; ci++) {
+      var cluster = clusters[ci];
+      if (cluster.length < 3) continue;
+      // Collect ALL polygon vertices from this cluster's locations for PCA.
+      // This gives PCA the actual visual shape of the red blob, not just discrete points.
+      var VERTS_PER_POLY = 12; // fixed sample per polygon so each location has equal PCA weight
+      var vertices = [];
+      for (var i = 0; i < cluster.length; i++) {
+        var poly = locationPolygons[cluster[i][3]];
+        if (!poly) continue;
+        var rings = poly.getLatLngs();
+        var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+        var step = Math.max(1, Math.floor(outer.length / VERTS_PER_POLY));
+        for (var j = 0; j < outer.length; j += step) vertices.push([outer[j].lat, outer[j].lng, 1]);
+      }
+      if (vertices.length < 6) continue;
+      var line = fitLine(vertices);
+      if (!line) continue;
+      // Area-weighted centroid: each polygon's centroid contributes proportionally to its area.
+      // This matches the visual center of the colored blob on screen.
+      var awLat = 0, awLng = 0, awTotal = 0;
+      for (var i = 0; i < cluster.length; i++) {
+        var poly = locationPolygons[cluster[i][3]];
+        if (!poly) continue;
+        var c = polygonCentroid(poly);
+        if (!c) continue;
+        var a = Math.max(polygonArea(poly), 1e-6);
+        awLat += c[0] * a; awLng += c[1] * a; awTotal += a;
+      }
+      if (awTotal < 1e-12) continue;
+      var cx = awLat / awTotal, cy = awLng / awTotal;
+      var elongation = line.lambda2 > 1e-12 ? line.lambda1 / line.lambda2 : Infinity;
+      if (elongation < PREDICTION_ELONGATION_MIN) continue;
+      var dx = line.direction[0], dy = line.direction[1];
+      // Compute cluster span along PCA axis (before choosing direction)
+      var _minP = Infinity, _maxP = -Infinity;
+      for (var i = 0; i < vertices.length; i++) {
+        var _p = (vertices[i][0] - cx) * dx + (vertices[i][1] - cy) * dy;
+        if (_p < _minP) _minP = _p;
+        if (_p > _maxP) _maxP = _p;
+      }
+      var clusterSpan = _maxP - _minP;
+      var posBearingNorm = ((Math.atan2(dy, dx) * 180 / Math.PI % 360) + 360) % 360;
+      var negBearingNorm = (posBearingNorm + 180) % 360;
+      var sourceSign;
+      var usedNorthernBias = false;
+      // Northern bias: small clusters near the northern border are most likely from Lebanon.
+      // Short-range rockets create small impact zones; long-range salvos spread wider.
+      if (cx > 32.5 && clusterSpan < 0.5) {
+        // Prefer PCA direction closest to north (toward Lebanon, ~0°)
+        sourceSign = bearingDiff(posBearingNorm, 0) <= bearingDiff(negBearingNorm, 0) ? 1 : -1;
+        usedNorthernBias = true;
+      } else {
+        // Default: pick direction pointing outward from Israel's center
+        var distFromCenter = Math.sqrt((cx - ISRAEL_CENTER[0]) * (cx - ISRAEL_CENTER[0]) +
+                                       (cy - ISRAEL_CENTER[1]) * (cy - ISRAEL_CENTER[1]));
+        if (distFromCenter > 0.05) {
+          var clusterBearing = Math.atan2(cy - ISRAEL_CENTER[1], cx - ISRAEL_CENTER[0]) * 180 / Math.PI;
+          var clusterBearingNorm = ((clusterBearing % 360) + 360) % 360;
+          sourceSign = bearingDiff(posBearingNorm, clusterBearingNorm) <=
+                       bearingDiff(negBearingNorm, clusterBearingNorm) ? 1 : -1;
+        } else {
+          sourceSign = 1;
+        }
+      }
+      var sourceDx = sourceSign * dx, sourceDy = sourceSign * dy;
+      // Safety net: if bearing points toward the Mediterranean (260-320°), flip.
+      // Skip when northern bias was used — Lebanon IS northwest of northern Israel.
+      var sourceBearingNorm = ((Math.atan2(sourceDy, sourceDx) * 180 / Math.PI % 360) + 360) % 360;
+      if (!usedNorthernBias && sourceBearingNorm >= 260 && sourceBearingNorm <= 320) {
+        sourceDx = -sourceDx; sourceDy = -sourceDy;
+        sourceBearingNorm = (sourceBearingNorm + 180) % 360;
+      }
+
+      // --- Compute extent along source direction (using vertices = visual extent) ---
+      var minProj = Infinity, maxProj = -Infinity;
+      for (var i = 0; i < vertices.length; i++) {
+        var proj = (vertices[i][0] - cx) * sourceDx + (vertices[i][1] - cy) * sourceDy;
+        if (proj < minProj) minProj = proj;
+        if (proj > maxProj) maxProj = proj;
+      }
+      if (maxProj - minProj < PREDICTION_MIN_SPAN) continue;
+
+      // Extend to the far border of the likely source country
+      var extSource = sourceExtensionDeg(sourceBearingNorm);
+      // Convert lat/lng projections to approximate arc degrees (account for longitude shrink)
+      var cosLat = Math.cos(cx * Math.PI / 180);
+      var projToArc = Math.sqrt(sourceDx * sourceDx + sourceDy * sourceDy * cosLat * cosLat);
+      var arcInward = Math.min(minProj, 0) * projToArc;   // negative or zero
+      var arcSource = Math.max(maxProj, 0) * projToArc + extSource; // positive
+      // Trace great circle from center outward in both directions
+      var totalArc = arcSource - arcInward;
+      var numSeg = Math.max(20, Math.round(totalArc * 5));
+      var lineCoords = [];
+      for (var si = 0; si <= numSeg; si++) {
+        var d = arcInward + (si / numSeg) * totalArc;
+        if (d >= 0) {
+          lineCoords.push(gcDest(cx, cy, sourceBearingNorm, d));
+        } else {
+          lineCoords.push(gcDest(cx, cy, (sourceBearingNorm + 180) % 360, -d));
+        }
+      }
+      lineCoords = clipAtCoast(lineCoords);
+      if (lineCoords.length < 2) continue;
+      var polyline = L.polyline(lineCoords, {
+        color: '#ff4444', weight: 2.5, opacity: 0.7, dashArray: '10, 8', interactive: false
+      }).addTo(map);
+      predictionLines.push(polyline);
+      var arrowSize = 0.08;
+      var tipPt = lineCoords[lineCoords.length - 1];
+      var px = -sourceDy, py = sourceDx;
+      var tip = [tipPt[0] + sourceDx * arrowSize, tipPt[1] + sourceDy * arrowSize];
+      var left = [tipPt[0] + px * arrowSize * 0.5, tipPt[1] + py * arrowSize * 0.5];
+      var right = [tipPt[0] - px * arrowSize * 0.5, tipPt[1] - py * arrowSize * 0.5];
+      var arrow = L.polyline([left, tip, right], {
+        color: '#ff4444', weight: 2.5, opacity: 0.7, interactive: false
+      }).addTo(map);
+      predictionLines.push(arrow);
+      var sigmaPerp = Math.sqrt(Math.max(0, line.lambda2) / line.totalWeight);
+      var lambda1Safe = Math.max(line.lambda1, 1e-6);
+      if (sigmaPerp > 0.001) {
+        var perpDx = -sourceDy, perpDy = sourceDx;
+        var bandLeft = [], bandRight = [];
+        for (var bi = 0; bi < lineCoords.length; bi++) {
+          var pt = lineCoords[bi];
+          // Prediction interval: width grows with distance from centroid along main axis
+          var dMain = (pt[0] - cx) * sourceDx + (pt[1] - cy) * sourceDy;
+          var w = sigmaPerp * Math.sqrt(1 + dMain * dMain / lambda1Safe);
+          bandLeft.push([pt[0] + perpDx * w, pt[1] + perpDy * w]);
+          bandRight.push([pt[0] - perpDx * w, pt[1] - perpDy * w]);
+        }
+        bandRight.reverse();
+        var band = L.polygon(bandLeft.concat(bandRight), {
+          color: '#ff4444', fillColor: '#ff4444', fillOpacity: 0.1,
+          opacity: 0.2, weight: 1, interactive: false
+        }).addTo(map);
+        predictionLines.push(band);
+      }
+    }
   }
 
   // --- Alert history per location ---
@@ -2035,6 +2506,7 @@ body.idle #right-panel {
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
     }
     syncEllipseMode();
+    updatePredictionLines();
   }
 
   function saveLiveState() {
@@ -2385,7 +2857,7 @@ body.idle #right-panel {
       time = clampTime(time);
       slider.value = Math.min(sliderFromTime(time), 999);
       enterHistoryMode(time);
-      maybeZoomToEvent();
+      if (autoZoomActive) maybeZoomToEvent();
     }
 
     // --- Slider input ---
@@ -2394,7 +2866,7 @@ body.idle #right-panel {
       var time = clampTime(timeFromSlider(parseInt(slider.value)));
       slider.value = sliderFromTime(time);
       enterHistoryMode(time);
-      maybeZoomToEvent();
+      if (autoZoomActive) maybeZoomToEvent();
     });
 
     // --- Timeline bands (show duration of active alerts) ---
@@ -2546,6 +3018,7 @@ body.idle #right-panel {
     // --- Play / Pause ---
     function stopPlay() {
       isPlaying = false;
+      pausedForFly = false;
       playBtn.textContent = '▶';
       if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
       if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
@@ -2621,23 +3094,27 @@ body.idle #right-panel {
         document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
         reconstructStateAt(newTime);
 
-        // Auto-zoom: fly to event area when entering a new event group
+        // Auto-zoom: fly to event area when entering a new event group (respects auto-zoom toggle)
         var curIdx = findEventIdx(newTime);
         if (curIdx !== playEventIdx) {
           playEventIdx = curIdx;
-          var bounds = curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+          var bounds = autoZoomActive && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
           if (bounds) {
             isZoomingProgrammatically = true;
             isPlaying = false;
+            pausedForFly = true;
             if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
             if (playFlyHandler) map.off('moveend', playFlyHandler);
             playFlyHandler = function() {
               map.off('moveend', playFlyHandler);
               playFlyHandler = null;
               isZoomingProgrammatically = false;
-              isPlaying = true;
-              lastFrame = performance.now();
-              playRAF = requestAnimationFrame(tick);
+              if (pausedForFly) {
+                pausedForFly = false;
+                isPlaying = true;
+                lastFrame = performance.now();
+                playRAF = requestAnimationFrame(tick);
+              }
             };
             map.on('moveend', playFlyHandler);
             map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
@@ -2651,6 +3128,7 @@ body.idle #right-panel {
     }
 
     playBtn.addEventListener('click', function() {
+      if (pausedForFly) { stopPlay(); return; }
       if (isPlaying) stopPlay(); else startPlay();
     });
 
@@ -2753,7 +3231,15 @@ body.idle #right-panel {
     if (e.target === this) closeAbout();
   });
   var ellipseModeController = null;
+  var ellipseBtn = document.getElementById('ellipse-btn');
   var ellipseDisplayMode = 0;
+  function updateEllipseButton() {
+    if (!ellipseModeController || !ellipseBtn) return;
+    ellipseBtn.classList.toggle('active', ellipseDisplayMode > 0);
+    ellipseBtn.classList.toggle('extended', ellipseDisplayMode === 2);
+    ellipseBtn.title = ellipseDisplayMode === 0 ? 'סמן אליפסה' : (ellipseDisplayMode === 1 ? 'אליפסה רגילה' : 'אליפסה מורחבת');
+    ellipseModeController.setDisplayMode(ellipseDisplayMode);
+  }
   function applyEllipseDisplayMode(nextMode, opts) {
     if (!ellipseModeController) return Promise.resolve();
     ellipseDisplayMode = nextMode;
@@ -2771,9 +3257,10 @@ body.idle #right-panel {
   function syncEllipseMode(force) {
     if (!ellipseModeController || !ellipseModeController.sync) return;
     ellipseModeController.sync(!!force);
+    updateEllipseButton();
     ellipseModeController.refreshExtendedVisual();
   }
-  if (FF.ellipse && window.initEllipseMode) {
+  if ((isEllipseMode || FF.ellipse) && window.initEllipseMode) {
     ellipseModeController = window.initEllipseMode({
       map: map,
       getLocationStates: function() { return locationStates; },
@@ -2784,7 +3271,26 @@ body.idle #right-panel {
       getCurrentViewTime: function() { return currentViewTime; },
       showToast: showToast
     });
+    updateEllipseButton();
     applyEllipseDisplayMode(0);
+    ellipseBtn.addEventListener('click', function() {
+      var previousMode = ellipseDisplayMode;
+      ellipseDisplayMode = (ellipseDisplayMode + 1) % 3;
+      if (ellipseDisplayMode === 0) {
+        ellipseModeController.setEnabled(false, { showToast: true });
+        updateEllipseButton();
+        return;
+      }
+      if (previousMode === 0) {
+        ellipseModeController.setEnabled(true, { showToast: true }).then(function() {
+          updateEllipseButton();
+        });
+        return;
+      }
+      ellipseModeController.sync(true).then(function() {
+        updateEllipseButton();
+      });
+    });
     menuEllipseSelect.addEventListener('change', function() {
       applyEllipseDisplayMode(Number(menuEllipseSelect.value), { showToast: true });
     });
