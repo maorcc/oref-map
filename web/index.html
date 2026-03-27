@@ -39,7 +39,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 .leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes toastFade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes toastFade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
 
 #right-panel {
@@ -298,11 +298,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 #menu-sound.sound-open .menu-sub-panel { display: block; }
 #ext-section.ext-open > .menu-sub-panel { display: block; }
-/* "לא מומלץ" — footer footnote, visually outside the main menu */
+/* "אזור ניסיוני" — footer footnote, visually outside the main menu */
 #ext-section { border-top: 1px solid #d1d5db; margin-top: 4px; }
 #ext-section > .menu-item-row { padding: 6px 16px; color: #9ca3af; }
 #ext-section > .menu-item-row .menu-item-label { font-size: 12px; font-weight: 400; }
 @media (hover: hover) { #ext-section > .menu-item-row:hover { background: transparent; } }
+/* Sub-items: indented + smaller font to signal secondary importance */
+#ext-section .menu-sub-panel .menu-item-row { padding-right: 28px; }
+#ext-section .menu-sub-panel .menu-item-label { font-size: 13px; color: #555; }
 .menu-select-wrap {
   padding: 10px 16px 14px;
   border-top: 1px solid #eee;
@@ -602,7 +605,7 @@ body.idle #right-panel {
   </div>
   <div id="ext-section" class="menu-item">
     <button class="menu-item-row" type="button" id="ext-section-btn">
-      <span class="menu-item-label">לא מומלץ</span>
+      <span class="menu-item-label">אזור ניסיוני</span>
       <svg id="ext-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:auto;transition:transform 0.2s;opacity:0.5"><polyline points="6 9 12 15 18 9"/></svg>
     </button>
     <div class="menu-sub-panel" style="padding:0">
@@ -738,7 +741,7 @@ body.idle #right-panel {
     }
   })();
 
-  // "לא מומלץ" section toggle
+  // "אזור ניסיוני" section toggle
   document.getElementById('ext-section-btn').addEventListener('click', function() {
     var open = document.getElementById('ext-section').classList.toggle('ext-open');
     document.getElementById('ext-chevron').style.transform = open ? 'rotate(180deg)' : '';
@@ -831,9 +834,9 @@ body.idle #right-panel {
   function showToast(msg) {
     var el = document.createElement('div');
     el.textContent = msg;
-    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toastFade 3s forwards;pointer-events:none;';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toastFade 4s forwards;pointer-events:none;';
     document.body.appendChild(el);
-    setTimeout(function() { el.remove(); }, 3000);
+    setTimeout(function() { el.remove(); }, 4000);
   }
 
   // --- User location ---

@@ -845,6 +845,13 @@
       ellipseEnabled = on;
       if (stub) stub.classList.toggle('active', on);
       try { localStorage.setItem('oref-ellipse-mode', on ? '3' : '0'); } catch (e) {}
+      if (on && opts && opts.showToast) {
+        var msg = getCurrentUserPosition()
+          ? 'האליפסה מסמנת את אזור ההתרעה ביחס למיקומך'
+          : 'האליפסה מסמנת את אזור ההתרעה. הפעל מיקום לניתוח יחסי';
+        showToast(msg);
+        return controller.setEnabled(on, {});
+      }
       return controller.setEnabled(on, opts || {});
     }
 
