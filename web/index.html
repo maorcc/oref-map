@@ -2756,7 +2756,7 @@ body.idle #right-panel {
   var ellipseDisplayMode = 0;
   try {
     var savedEllipseMode = Number(localStorage.getItem('oref-ellipse-mode'));
-    if ([0, 1, 2].indexOf(savedEllipseMode) !== -1) {
+    if ([0, 1, 2, 3].indexOf(savedEllipseMode) !== -1) {
       ellipseDisplayMode = savedEllipseMode;
     }
   } catch (e) {}
