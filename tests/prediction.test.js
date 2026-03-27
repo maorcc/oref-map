@@ -95,8 +95,8 @@ function fitLine(points) {
 
 function sourceExtensionDeg(bearingDeg) {
   var b = ((bearingDeg % 360) + 360) % 360;
-  if (b >= 340 || b < 20) return 3.5;
-  if (b >= 20 && b < 55) return 9;
+  if (b >= 340 || b < 20) return 2;
+  if (b >= 20 && b < 55) return 5.5;
   if (b >= 55 && b < 120) return 25;
   if (b >= 120 && b < 165) return 22;
   if (b >= 165 && b < 210) return 20;
@@ -180,6 +180,23 @@ function detectSourceDirection(cluster, line) {
     sourceBearingNorm = (sourceBearingNorm + 180) % 360;
   }
   return { sourceSign: sourceSign, bearing: sourceBearingNorm };
+}
+
+
+// Temporal clustering helper (mirrors the logic in updatePredictionLines)
+var PREDICTION_TIME_GAP_MS = 3 * 60 * 1000;
+function temporalCluster(points) {
+  points.sort(function(a, b) { return a[3] - b[3]; });
+  var groups = [[points[0]]];
+  for (var i = 1; i < points.length; i++) {
+    var last = groups[groups.length - 1];
+    if (points[i][3] - last[last.length - 1][3] <= PREDICTION_TIME_GAP_MS) {
+      last.push(points[i]);
+    } else {
+      groups.push([points[i]]);
+    }
+  }
+  return groups;
 }
 
 
@@ -309,13 +326,13 @@ section('bearingDiff');
 section('sourceExtensionDeg — bearing to country mapping');
 (function() {
   // Lebanon (N)
-  assert(sourceExtensionDeg(0) === 3.5, 'bearing 0° → Lebanon (3.5)');
-  assert(sourceExtensionDeg(350) === 3.5, 'bearing 350° → Lebanon (3.5)');
-  assert(sourceExtensionDeg(10) === 3.5, 'bearing 10° → Lebanon (3.5)');
+  assert(sourceExtensionDeg(0) === 2, 'bearing 0° → Lebanon (2)');
+  assert(sourceExtensionDeg(350) === 2, 'bearing 350° → Lebanon (2)');
+  assert(sourceExtensionDeg(10) === 2, 'bearing 10° → Lebanon (2)');
 
   // Syria (NE)
-  assert(sourceExtensionDeg(30) === 9, 'bearing 30° → Syria (9)');
-  assert(sourceExtensionDeg(45) === 9, 'bearing 45° → Syria (9)');
+  assert(sourceExtensionDeg(30) === 5.5, 'bearing 30° → Syria (5.5)');
+  assert(sourceExtensionDeg(45) === 5.5, 'bearing 45° → Syria (5.5)');
 
   // Iran (E)
   assert(sourceExtensionDeg(60) === 25, 'bearing 60° → Iran (25)');
@@ -463,6 +480,50 @@ section('full pipeline — minimum span filter');
   assert(maxP - minP < 0.1, 'tiny cluster span (' + (maxP - minP).toFixed(3) + ') < 0.1 threshold');
 })();
 
+
+section('temporal clustering');
+(function() {
+  var t0 = 1000000;
+  var min = 60000;
+
+  // Two salvos 5 min apart → 2 time groups
+  var pts = [
+    [32.0, 35.0, 1, t0], [32.1, 35.1, 1, t0 + min], [32.2, 35.0, 1, t0 + 2*min],
+    [31.0, 34.5, 1, t0 + 8*min], [31.1, 34.6, 1, t0 + 9*min], [31.2, 34.5, 1, t0 + 10*min]
+  ];
+  var groups = temporalCluster(pts);
+  assert(groups.length === 2, 'two salvos 5 min apart → 2 groups (got ' + groups.length + ')');
+  assert(groups[0].length === 3 && groups[1].length === 3, 'each group has 3 points');
+
+  // All within 3 min → single group
+  var close = [
+    [32.0, 35.0, 1, t0], [31.5, 34.8, 1, t0 + min], [31.0, 34.5, 1, t0 + 2*min]
+  ];
+  assert(temporalCluster(close).length === 1, 'all within 3 min → 1 group');
+
+  // Three salvos well separated → 3 groups
+  var three = [
+    [32.0, 35.0, 1, t0],
+    [31.5, 34.8, 1, t0 + 10*min],
+    [31.0, 34.5, 1, t0 + 20*min]
+  ];
+  assert(temporalCluster(three).length === 3, 'three salvos 10 min apart → 3 groups');
+
+  // Single point → 1 group
+  assert(temporalCluster([[0, 0, 1, t0]]).length === 1, 'single point → 1 group');
+
+  // Points exactly at 3 min boundary → same group
+  var boundary = [
+    [32.0, 35.0, 1, t0], [31.5, 34.8, 1, t0 + 3*min]
+  ];
+  assert(temporalCluster(boundary).length === 1, 'exactly 3 min gap → same group');
+
+  // Points just over 3 min boundary → separate
+  var overBoundary = [
+    [32.0, 35.0, 1, t0], [31.5, 34.8, 1, t0 + 3*min + 1]
+  ];
+  assert(temporalCluster(overBoundary).length === 2, 'just over 3 min gap → 2 groups');
+})();
 
 // ── Summary ──────────────────────────────────────────────────────────
 console.log('\n' + '═'.repeat(50));
