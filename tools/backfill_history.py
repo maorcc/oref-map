@@ -170,6 +170,10 @@ async def main() -> None:
         all_dates.append(d.isoformat())
         d += timedelta(days=1)
 
+    if not all_dates:
+        print("No eligible dates in selected range; exiting.")
+        return
+
     print(f"Date range: {all_dates[0]} .. {all_dates[-1]} ({len(all_dates)} dates)")
     print(f"  (dates before {safe_start} skipped — API retention limit)")
     if update_today:
