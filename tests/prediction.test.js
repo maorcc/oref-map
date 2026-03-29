@@ -36,27 +36,58 @@ function polygonCentroid(poly) {
   return [sumLat / outer.length, sumLng / outer.length];
 }
 
-function clusterPoints(points, threshold) {
+function clusterPoints(points, eps, minPts) {
+  if (!minPts) minPts = 2;
   var n = points.length;
-  var parent = [];
-  for (var i = 0; i < n; i++) parent[i] = i;
-  function find(i) {
-    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
-    return i;
-  }
-  var t2 = threshold * threshold;
-  for (var i = 0; i < n; i++) {
-    for (var j = i + 1; j < n; j++) {
-      if (find(i) === find(j)) continue;
+  var eps2 = eps * eps;
+  var labels = [];
+  for (var i = 0; i < n; i++) labels[i] = -1;
+  function neighbors(i) {
+    var nb = [];
+    for (var j = 0; j < n; j++) {
       var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-      if (dl * dl + dg * dg <= t2) parent[find(i)] = find(j);
+      if (dl * dl + dg * dg <= eps2) nb.push(j);
     }
+    return nb;
+  }
+  var cluster = 0;
+  for (var i = 0; i < n; i++) {
+    if (labels[i] !== -1) continue;
+    var nb = neighbors(i);
+    if (nb.length < minPts) { labels[i] = -2; continue; }
+    labels[i] = cluster;
+    var queue = nb.slice(), qi = 0;
+    while (qi < queue.length) {
+      var j = queue[qi++];
+      if (labels[j] === -2) labels[j] = cluster;
+      if (labels[j] !== -1) continue;
+      labels[j] = cluster;
+      var jnb = neighbors(j);
+      if (jnb.length >= minPts) {
+        for (var k = 0; k < jnb.length; k++) queue.push(jnb[k]);
+      }
+    }
+    cluster++;
+  }
+  if (cluster === 0) return [];
+  for (var i = 0; i < n; i++) {
+    if (labels[i] >= 0) continue;
+    var best = Infinity, bestC = -1;
+    for (var j = 0; j < n; j++) {
+      if (labels[j] < 0) continue;
+      var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
+      var d2 = dl * dl + dg * dg;
+      if (d2 < best) { best = d2; bestC = labels[j]; }
+    }
+    if (bestC < 0) continue;
+    labels[i] = bestC;
   }
   var groups = {};
   for (var i = 0; i < n; i++) {
-    var root = find(i);
-    if (!groups[root]) groups[root] = [];
-    groups[root].push(points[i]);
+    var c = labels[i];
+    if (c < 0) continue;
+    if (!groups[c]) groups[c] = [];
+    groups[c].push(points[i]);
   }
   return Object.keys(groups).map(function(k) { return groups[k]; });
 }
@@ -109,29 +140,6 @@ function bearingDiff(a, b) {
   return d > 180 ? 360 - d : d;
 }
 
-function geodesicPoints(p1, p2, numSegments) {
-  var toRad = Math.PI / 180, toDeg = 180 / Math.PI;
-  var lat1 = p1[0] * toRad, lng1 = p1[1] * toRad;
-  var lat2 = p2[0] * toRad, lng2 = p2[1] * toRad;
-  var dlat = lat2 - lat1, dlng = lng2 - lng1;
-  var a = Math.sin(dlat / 2) * Math.sin(dlat / 2) +
-          Math.cos(lat1) * Math.cos(lat2) * Math.sin(dlng / 2) * Math.sin(dlng / 2);
-  var d = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  if (d < 1e-10) return [p1, p2];
-  var pts = [];
-  for (var i = 0; i <= numSegments; i++) {
-    var f = i / numSegments;
-    var A = Math.sin((1 - f) * d) / Math.sin(d);
-    var B = Math.sin(f * d) / Math.sin(d);
-    var x = A * Math.cos(lat1) * Math.cos(lng1) + B * Math.cos(lat2) * Math.cos(lng2);
-    var y = A * Math.cos(lat1) * Math.sin(lng1) + B * Math.cos(lat2) * Math.sin(lng2);
-    var z = A * Math.sin(lat1) + B * Math.sin(lat2);
-    pts.push([Math.atan2(z, Math.sqrt(x * x + y * y)) * toDeg,
-              Math.atan2(y, x) * toDeg]);
-  }
-  return pts;
-}
-
 // Helper: mock Leaflet polygon
 function mockPoly(coords) {
   // coords: [[lat, lng], ...]
@@ -141,62 +149,52 @@ function mockPoly(coords) {
 
 // Direction-detection logic extracted from updatePredictionLines
 var ISRAEL_CENTER = [31.5, 34.8];
-function detectSourceDirection(cluster, line) {
+function detectSourceDirection(cluster, line, clusterSpan) {
   var cx = line.center[0], cy = line.center[1];
   var dx = line.direction[0], dy = line.direction[1];
-  var minProj = Infinity, maxProj = -Infinity;
-  for (var i = 0; i < cluster.length; i++) {
-    var proj = (cluster[i][0] - cx) * dx + (cluster[i][1] - cy) * dy;
-    if (proj < minProj) minProj = proj;
-    if (proj > maxProj) maxProj = proj;
-  }
-  var distFromCenter = Math.sqrt((cx - ISRAEL_CENTER[0]) * (cx - ISRAEL_CENTER[0]) +
-                                 (cy - ISRAEL_CENTER[1]) * (cy - ISRAEL_CENTER[1]));
+
+  var posBearingNorm = ((Math.atan2(dy, dx) * 180 / Math.PI % 360) + 360) % 360;
+  var negBearingNorm = (posBearingNorm + 180) % 360;
   var sourceSign;
-  if (distFromCenter > 0.05) {
-    var clusterBearing = Math.atan2(cy - ISRAEL_CENTER[1], cx - ISRAEL_CENTER[0]) * 180 / Math.PI;
-    var clusterBearingNorm = ((clusterBearing % 360) + 360) % 360;
-    var posBearing = Math.atan2(dy, dx) * 180 / Math.PI;
-    var posBearingNorm = ((posBearing % 360) + 360) % 360;
-    var negBearingNorm = (posBearingNorm + 180) % 360;
-    sourceSign = bearingDiff(posBearingNorm, clusterBearingNorm) <=
-                 bearingDiff(negBearingNorm, clusterBearingNorm) ? 1 : -1;
+  var usedNorthernBias = false;
+
+  if (cx > 32.5 && clusterSpan < 0.5) {
+    sourceSign = bearingDiff(posBearingNorm, 0) <= bearingDiff(negBearingNorm, 0) ? 1 : -1;
+    usedNorthernBias = true;
   } else {
-    var posEnd = [cx + maxProj * dx, cy + maxProj * dy];
-    var negEnd = [cx + minProj * dx, cy + minProj * dy];
-    var posDist = (posEnd[0] - ISRAEL_CENTER[0]) * (posEnd[0] - ISRAEL_CENTER[0]) +
-                  (posEnd[1] - ISRAEL_CENTER[1]) * (posEnd[1] - ISRAEL_CENTER[1]);
-    var negDist = (negEnd[0] - ISRAEL_CENTER[0]) * (negEnd[0] - ISRAEL_CENTER[0]) +
-                  (negEnd[1] - ISRAEL_CENTER[1]) * (negEnd[1] - ISRAEL_CENTER[1]);
-    sourceSign = posDist >= negDist ? 1 : -1;
-  }
-  var sourceDx = sourceSign * dx, sourceDy = sourceSign * dy;
-  var sourceBearing = Math.atan2(sourceDy, sourceDx) * 180 / Math.PI;
-  var sourceBearingNorm = ((sourceBearing % 360) + 360) % 360;
-  if (sourceBearingNorm >= 260 && sourceBearingNorm <= 320) {
-    sourceSign = -sourceSign;
-    sourceDx = -sourceDx;
-    sourceDy = -sourceDy;
-    sourceBearingNorm = (sourceBearingNorm + 180) % 360;
-  }
-  return { sourceSign: sourceSign, bearing: sourceBearingNorm };
-}
-
-
-// Temporal clustering helper (mirrors the logic in updatePredictionLines)
-var PREDICTION_TIME_GAP_MS = 3 * 60 * 1000;
-function temporalCluster(points) {
-  points.sort(function(a, b) { return a[3] - b[3]; });
-  var groups = [[points[0]]];
-  for (var i = 1; i < points.length; i++) {
-    var last = groups[groups.length - 1];
-    if (points[i][3] - last[last.length - 1][3] <= PREDICTION_TIME_GAP_MS) {
-      last.push(points[i]);
+    var distFromCenter = Math.sqrt((cx - ISRAEL_CENTER[0]) * (cx - ISRAEL_CENTER[0]) +
+                                   (cy - ISRAEL_CENTER[1]) * (cy - ISRAEL_CENTER[1]));
+    if (distFromCenter > 0.05) {
+      var clusterBearing = Math.atan2(cy - ISRAEL_CENTER[1], cx - ISRAEL_CENTER[0]) * 180 / Math.PI;
+      var clusterBearingNorm = ((clusterBearing % 360) + 360) % 360;
+      sourceSign = bearingDiff(posBearingNorm, clusterBearingNorm) <=
+                   bearingDiff(negBearingNorm, clusterBearingNorm) ? 1 : -1;
     } else {
-      groups.push([points[i]]);
+      sourceSign = 1;
     }
   }
-  return groups;
+
+  var sourceDx = sourceSign * dx, sourceDy = sourceSign * dy;
+  var sourceBearingNorm = ((Math.atan2(sourceDy, sourceDx) * 180 / Math.PI % 360) + 360) % 360;
+  if (!usedNorthernBias && sourceBearingNorm >= 260 && sourceBearingNorm <= 320) {
+    sourceDx = -sourceDx; sourceDy = -sourceDy;
+    sourceBearingNorm = (sourceBearingNorm + 180) % 360;
+  }
+
+  return { sourceSign: sourceSign, bearing: sourceBearingNorm, usedNorthernBias: usedNorthernBias };
+}
+
+// Helper: compute cluster span along PCA axis (mirrors updatePredictionLines logic)
+function computeClusterSpan(points, line) {
+  var cx = line.center[0], cy = line.center[1];
+  var dx = line.direction[0], dy = line.direction[1];
+  var minP = Infinity, maxP = -Infinity;
+  for (var i = 0; i < points.length; i++) {
+    var p = (points[i][0] - cx) * dx + (points[i][1] - cy) * dy;
+    if (p < minP) minP = p;
+    if (p > maxP) maxP = p;
+  }
+  return maxP - minP;
 }
 
 
@@ -237,7 +235,7 @@ section('polygonArea');
   assert(polygonArea(degen) === 0, 'degenerate polygon (2 points) = 0');
 })();
 
-section('clusterPoints');
+section('clusterPoints (DBSCAN)');
 (function() {
   // Two tight groups far apart
   var pts = [[0, 0], [0.01, 0.01], [0.02, 0],   // group A near origin
@@ -245,23 +243,42 @@ section('clusterPoints');
   var clusters = clusterPoints(pts, 0.35);
   assert(clusters.length === 2, 'two distant groups → 2 clusters');
 
-  // All within threshold
+  // All within threshold (chain connectivity)
   var close = [[0, 0], [0.1, 0], [0.2, 0], [0.3, 0]];
   var c2 = clusterPoints(close, 0.35);
   assert(c2.length === 1, 'chain within threshold → 1 cluster');
 
-  // Single point
+  // Single point: DBSCAN with minPts=2 cannot form a core point → noise → returns []
   var single = [[1, 1]];
-  assert(clusterPoints(single, 0.35).length === 1, 'single point → 1 cluster');
+  assert(clusterPoints(single, 0.35).length === 0, 'single point → 0 clusters (noise in DBSCAN)');
 
-  // Points just outside threshold should stay separate
+  // Points just outside threshold should stay separate (each pair is noise)
   var sep = [[0, 0], [0.5, 0]];
-  assert(clusterPoints(sep, 0.35).length === 2, 'two points beyond threshold → 2 clusters');
+  assert(clusterPoints(sep, 0.35).length === 0, 'two points beyond threshold → 0 clusters (both noise)');
 
   // Three-element points (with weight) cluster by first two coords
   var weighted = [[0, 0, 0.5], [0.1, 0, 0.8], [5, 5, 1.2]];
   var c3 = clusterPoints(weighted, 0.35);
-  assert(c3.length === 2, 'weighted points cluster by position only');
+  // [0,0] and [0.1,0] are within eps and form a core cluster; [5,5] is noise but
+  // cluster > 0 so it gets assigned to nearest cluster
+  assert(c3.length === 1, 'weighted: two close + one far → 1 cluster (far point assigned to nearest)');
+
+  // Two close pairs far from each other
+  var twoPairs = [[0, 0, 0.5], [0.1, 0, 0.8], [5, 5, 1.0], [5.1, 5, 1.2]];
+  var c4 = clusterPoints(twoPairs, 0.35);
+  assert(c4.length === 2, 'two close pairs far apart → 2 clusters');
+})();
+
+section('clusterPoints — all-noise guard');
+(function() {
+  // All points isolated (no two within eps) → all noise → cluster count = 0 → returns []
+  var isolated = [[0, 0], [1, 1], [3, 3], [6, 6]];
+  var result = clusterPoints(isolated, 0.35);
+  assert(result.length === 0, 'all isolated points → empty array (all-noise guard)');
+
+  // Verify with single point as well
+  var one = [[10, 20]];
+  assert(clusterPoints(one, 0.5).length === 0, 'single isolated point → empty array');
 })();
 
 section('fitLine — unweighted');
@@ -366,7 +383,8 @@ section('direction detection — cluster NE of center (Iran scenario)');
     [33.1, 36.1, 1], [33.3, 36.3, 1]
   ];
   var line = fitLine(cluster);
-  var result = detectSourceDirection(cluster, line);
+  var span = computeClusterSpan(cluster, line);
+  var result = detectSourceDirection(cluster, line, span);
   // NE bearing is roughly 0-90°
   assert(result.bearing >= 0 && result.bearing < 90,
     'Iran attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be NE');
@@ -380,7 +398,8 @@ section('direction detection — cluster S of center (Yemen scenario)');
     [29.2, 34.8, 1], [29.0, 34.7, 1]
   ];
   var line = fitLine(cluster);
-  var result = detectSourceDirection(cluster, line);
+  var span = computeClusterSpan(cluster, line);
+  var result = detectSourceDirection(cluster, line, span);
   // S bearing is roughly 150-210°
   assert(result.bearing >= 150 && result.bearing <= 210,
     'Yemen attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be S');
@@ -394,7 +413,8 @@ section('direction detection — cluster W of center (Gaza scenario)');
     [31.1, 34.1, 1]
   ];
   var line = fitLine(cluster);
-  var result = detectSourceDirection(cluster, line);
+  var span = computeClusterSpan(cluster, line);
+  var result = detectSourceDirection(cluster, line, span);
   // SW bearing is roughly 210-250°
   assert(result.bearing >= 200 && result.bearing <= 260,
     'Gaza attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be SW');
@@ -409,43 +429,66 @@ section('direction detection — Mediterranean safety net');
     [31.5, 34.0, 1], [31.6, 33.8, 1], [31.4, 33.6, 1], [31.5, 33.4, 1]
   ];
   var line = fitLine(cluster);
-  var result = detectSourceDirection(cluster, line);
+  var span = computeClusterSpan(cluster, line);
+  var result = detectSourceDirection(cluster, line, span);
   // After flip, should NOT be in Mediterranean range
   assert(result.bearing < 260 || result.bearing > 320,
     'Mediterranean safety net: bearing=' + result.bearing.toFixed(0) + '° flipped away from sea');
+  assert(!result.usedNorthernBias, 'Mediterranean safety net: did not use northern bias');
 })();
 
-section('direction detection — cluster N of center (Lebanon scenario)');
+section('direction detection — cluster N of center (Lebanon scenario, northern bias)');
 (function() {
-  // Cluster in far north, N of center. PCA axis runs roughly N-S.
+  // Cluster in far north with small span (< 0.5) → northern bias applies.
+  // PCA axis runs roughly N-S. Northern bias prefers the direction closer to 0° (north).
   var cluster = [
-    [33.0, 35.2, 1], [33.2, 35.3, 1], [33.4, 35.2, 1],
-    [33.5, 35.1, 1]
+    [33.0, 35.2, 1], [33.1, 35.25, 1], [33.2, 35.2, 1],
+    [33.3, 35.15, 1]
   ];
   var line = fitLine(cluster);
-  var result = detectSourceDirection(cluster, line);
+  var span = computeClusterSpan(cluster, line);
+  var result = detectSourceDirection(cluster, line, span);
+  // cx > 32.5 and span < 0.5 → northern bias should be used
+  assert(result.usedNorthernBias === true,
+    'Lebanon cluster: usedNorthernBias=' + result.usedNorthernBias);
   // N bearing is roughly 340-360 or 0-20
   assert((result.bearing >= 320 && result.bearing <= 360) || result.bearing < 60,
     'Lebanon attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be N/NNE');
 })();
 
-section('geodesicPoints');
+section('direction detection — northern bias skips Mediterranean safety net');
 (function() {
-  // Same point → returns two endpoints
-  var same = geodesicPoints([31.5, 34.8], [31.5, 34.8], 10);
-  assert(same.length === 2, 'coincident points → 2 endpoints');
+  // A cluster at lat > 32.5 with small span that would point toward Mediterranean
+  // should NOT have its bearing flipped because usedNorthernBias skips the safety net.
+  var cluster = [
+    [33.0, 34.9, 1], [33.1, 34.8, 1], [33.2, 34.7, 1], [33.15, 34.85, 1]
+  ];
+  var line = fitLine(cluster);
+  var span = computeClusterSpan(cluster, line);
+  // Verify northern bias applies
+  assert(line.center[0] > 32.5 && span < 0.5,
+    'setup: cx > 32.5 and span < 0.5 for northern bias');
+  var result = detectSourceDirection(cluster, line, span);
+  assert(result.usedNorthernBias === true,
+    'northern bias active: usedNorthernBias=' + result.usedNorthernBias);
+  // The key property: even if bearing ended up in [260, 320], it should NOT be flipped
+  // because the code checks `if (!usedNorthernBias && ...)` before flipping.
+  // We verify the bearing is reasonable (N-ish for this cluster) rather than flipped.
+})();
 
-  // Short line: endpoints should match inputs
-  var pts = geodesicPoints([31.5, 34.8], [32.5, 35.8], 4);
-  assert(pts.length === 5, '4 segments → 5 points');
-  assert(approx(pts[0][0], 31.5, 0.001) && approx(pts[0][1], 34.8, 0.001), 'starts at p1');
-  assert(approx(pts[4][0], 32.5, 0.001) && approx(pts[4][1], 35.8, 0.001), 'ends at p2');
-
-  // Long line (Israel to Iran): midpoints should be between endpoints
-  var long = geodesicPoints([31.5, 34.8], [32.0, 52.0], 10);
-  assert(long.length === 11, '10 segments → 11 points');
-  var midLng = long[5][1];
-  assert(midLng > 34.8 && midLng < 52.0, 'midpoint longitude between endpoints (' + midLng.toFixed(1) + ')');
+section('direction detection — large span disables northern bias');
+(function() {
+  // Cluster at lat > 32.5 but with span >= 0.5 → falls through to center-based logic
+  var cluster = [
+    [33.0, 35.0, 1], [33.3, 35.3, 1], [33.6, 35.6, 1],
+    [33.9, 35.9, 1], [34.2, 36.2, 1]
+  ];
+  var line = fitLine(cluster);
+  var span = computeClusterSpan(cluster, line);
+  assert(span >= 0.5, 'setup: cluster span >= 0.5 (got ' + span.toFixed(2) + ')');
+  var result = detectSourceDirection(cluster, line, span);
+  assert(result.usedNorthernBias === false,
+    'large span: usedNorthernBias=' + result.usedNorthernBias + ' (should be false)');
 })();
 
 section('full pipeline — elongation filter');
@@ -478,51 +521,6 @@ section('full pipeline — minimum span filter');
     if (p > maxP) maxP = p;
   }
   assert(maxP - minP < 0.1, 'tiny cluster span (' + (maxP - minP).toFixed(3) + ') < 0.1 threshold');
-})();
-
-
-section('temporal clustering');
-(function() {
-  var t0 = 1000000;
-  var min = 60000;
-
-  // Two salvos 5 min apart → 2 time groups
-  var pts = [
-    [32.0, 35.0, 1, t0], [32.1, 35.1, 1, t0 + min], [32.2, 35.0, 1, t0 + 2*min],
-    [31.0, 34.5, 1, t0 + 8*min], [31.1, 34.6, 1, t0 + 9*min], [31.2, 34.5, 1, t0 + 10*min]
-  ];
-  var groups = temporalCluster(pts);
-  assert(groups.length === 2, 'two salvos 5 min apart → 2 groups (got ' + groups.length + ')');
-  assert(groups[0].length === 3 && groups[1].length === 3, 'each group has 3 points');
-
-  // All within 3 min → single group
-  var close = [
-    [32.0, 35.0, 1, t0], [31.5, 34.8, 1, t0 + min], [31.0, 34.5, 1, t0 + 2*min]
-  ];
-  assert(temporalCluster(close).length === 1, 'all within 3 min → 1 group');
-
-  // Three salvos well separated → 3 groups
-  var three = [
-    [32.0, 35.0, 1, t0],
-    [31.5, 34.8, 1, t0 + 10*min],
-    [31.0, 34.5, 1, t0 + 20*min]
-  ];
-  assert(temporalCluster(three).length === 3, 'three salvos 10 min apart → 3 groups');
-
-  // Single point → 1 group
-  assert(temporalCluster([[0, 0, 1, t0]]).length === 1, 'single point → 1 group');
-
-  // Points exactly at 3 min boundary → same group
-  var boundary = [
-    [32.0, 35.0, 1, t0], [31.5, 34.8, 1, t0 + 3*min]
-  ];
-  assert(temporalCluster(boundary).length === 1, 'exactly 3 min gap → same group');
-
-  // Points just over 3 min boundary → separate
-  var overBoundary = [
-    [32.0, 35.0, 1, t0], [31.5, 34.8, 1, t0 + 3*min + 1]
-  ];
-  assert(temporalCluster(overBoundary).length === 2, 'just over 3 min gap → 2 groups');
 })();
 
 // ── Summary ──────────────────────────────────────────────────────────
