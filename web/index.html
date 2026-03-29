@@ -234,7 +234,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 /* Feature-flag-gated elements: hidden by default, shown when flag is active */
 .f-gated { display: none !important; }
-body.f-predict #menu-predict.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-row {
@@ -648,7 +647,7 @@ body.idle #right-panel {
         </button>
       </div>
       <div id="ext-menu">
-        <div id="menu-predict" class="menu-item f-gated">
+        <div id="menu-predict" class="menu-item">
           <button class="menu-item-row" type="button">
             <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
             <span class="menu-item-label">כיוון שיגור</span>

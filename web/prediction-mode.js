@@ -12,7 +12,6 @@
     var enabled = localStorage.getItem('oref-predict') === 'true';
     var predictionUpdateScheduled = false;
 
-    var PREDICTION_CLUSTER_THRESHOLD = 0.15;
     var PREDICTION_ELONGATION_MIN = 2.5;
     var PREDICTION_MIN_SPAN = 0.1;
     var ISRAEL_CENTER = [31.5, 34.8];
@@ -60,62 +59,6 @@
         area += (outer[j].lng + outer[i].lng) * (outer[j].lat - outer[i].lat);
       }
       return Math.abs(area / 2);
-    }
-
-    function clusterPoints(points, eps, minPts) {
-      if (!minPts) minPts = 2;
-      var n = points.length;
-      var eps2 = eps * eps;
-      var labels = [];
-      for (var i = 0; i < n; i++) labels[i] = -1;
-      function neighbors(i) {
-        var nb = [];
-        for (var j = 0; j < n; j++) {
-          var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-          if (dl * dl + dg * dg <= eps2) nb.push(j);
-        }
-        return nb;
-      }
-      var cluster = 0;
-      for (var i = 0; i < n; i++) {
-        if (labels[i] !== -1) continue;
-        var nb = neighbors(i);
-        if (nb.length < minPts) { labels[i] = -2; continue; }
-        labels[i] = cluster;
-        var queue = nb.slice(), qi = 0;
-        while (qi < queue.length) {
-          var j = queue[qi++];
-          if (labels[j] === -2) labels[j] = cluster;
-          if (labels[j] !== -1) continue;
-          labels[j] = cluster;
-          var jnb = neighbors(j);
-          if (jnb.length >= minPts) {
-            for (var k = 0; k < jnb.length; k++) queue.push(jnb[k]);
-          }
-        }
-        cluster++;
-      }
-      if (cluster === 0) return [];
-      for (var i = 0; i < n; i++) {
-        if (labels[i] >= 0) continue;
-        var best = Infinity, bestC = -1;
-        for (var j = 0; j < n; j++) {
-          if (labels[j] < 0) continue;
-          var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-          var d2 = dl * dl + dg * dg;
-          if (d2 < best) { best = d2; bestC = labels[j]; }
-        }
-        if (bestC < 0) continue;
-        labels[i] = bestC;
-      }
-      var groups = {};
-      for (var i = 0; i < n; i++) {
-        var c = labels[i];
-        if (c < 0) continue;
-        if (!groups[c]) groups[c] = [];
-        groups[c].push(points[i]);
-      }
-      return Object.keys(groups).map(function(k) { return groups[k]; });
     }
 
     function fitLine(points) {
@@ -239,6 +182,58 @@
       predictionLines = [];
     }
 
+    // Cluster alerted locations by polygon adjacency.
+    // Two alerted locations are in the same cluster if their Voronoi polygons
+    // share a vertex (i.e., are touching). Connected components via union-find.
+    function clusterByAdjacency(locPoints, locationPolygons) {
+      var n = locPoints.length;
+      if (n === 0) return [];
+      // Collect polygon vertices for each location
+      var locVerts = [];
+      for (var i = 0; i < n; i++) {
+        var poly = locationPolygons[locPoints[i][3]];
+        var verts = [];
+        if (poly) {
+          var rings = poly.getLatLngs();
+          var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+          for (var j = 0; j < outer.length; j++) verts.push([outer[j].lat, outer[j].lng]);
+        }
+        locVerts.push(verts);
+      }
+      // Union-find
+      var parent = [];
+      for (var i = 0; i < n; i++) parent[i] = i;
+      function find(i) {
+        while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+        return i;
+      }
+      // Adjacent = any vertex within tolerance (shared Voronoi edge)
+      var tol2 = 0.005 * 0.005; // ~500m
+      for (var i = 0; i < n; i++) {
+        for (var j = i + 1; j < n; j++) {
+          if (find(i) === find(j)) continue;
+          var found = false;
+          for (var vi = 0; vi < locVerts[i].length && !found; vi++) {
+            for (var vj = 0; vj < locVerts[j].length && !found; vj++) {
+              var dl = locVerts[i][vi][0] - locVerts[j][vj][0];
+              var dg = locVerts[i][vi][1] - locVerts[j][vj][1];
+              if (dl * dl + dg * dg < tol2) {
+                parent[find(i)] = find(j);
+                found = true;
+              }
+            }
+          }
+        }
+      }
+      var groups = {};
+      for (var i = 0; i < n; i++) {
+        var root = find(i);
+        if (!groups[root]) groups[root] = [];
+        groups[root].push(locPoints[i]);
+      }
+      return Object.keys(groups).map(function(k) { return groups[k]; });
+    }
+
     function updatePredictionLines() {
       clearPredictionLines();
       if (!enabled) return;
@@ -257,7 +252,7 @@
         }
         if (locPoints.length < 3) return;
 
-        var clusters = clusterPoints(locPoints, PREDICTION_CLUSTER_THRESHOLD);
+        var clusters = clusterByAdjacency(locPoints, locationPolygons);
         for (var ci = 0; ci < clusters.length; ci++) {
           var cluster = clusters[ci];
           if (cluster.length < 3) continue;
@@ -277,19 +272,16 @@
           var line = fitLine(vertices);
           if (!line) continue;
 
-          // Area-weighted centroid using orefPoints (canonical settlement coords)
-          // weighted by polygon area so larger areas contribute more.
+          // Area-weighted centroid using polygon vertex mean (visual center of the blob).
           var awLat = 0, awLng = 0, awTotal = 0;
           for (var i = 0; i < cluster.length; i++) {
             var locName = cluster[i][3];
-            var pt = orefPts[locName];
-            if (!pt) continue;
-            var poly = locationPolygons[locName];
-            var a = poly ? Math.max(polygonArea(poly), 1e-6) : 1e-6;
-            awLat += pt[0] * a; awLng += pt[1] * a; awTotal += a;
+            var polyForArea = locationPolygons[locName];
+            var a = polyForArea ? Math.max(polygonArea(polyForArea), 1e-6) : 1e-6;
+            var pc = polyForArea ? polygonCentroid(polyForArea) : null;
+            if (pc) { awLat += pc[0] * a; awLng += pc[1] * a; awTotal += a; }
           }
           if (awTotal < 1e-12) continue;
-
           var cx = awLat / awTotal, cy = awLng / awTotal;
           var elongation = line.lambda2 > 1e-12 ? line.lambda1 / line.lambda2 : Infinity;
           if (elongation < PREDICTION_ELONGATION_MIN) continue;
