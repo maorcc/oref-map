@@ -2732,8 +2732,11 @@ body.idle #right-panel {
     }
 
     // --- Play / Pause ---
+    var userWantsPlaying = false;
+
     function stopPlay() {
       isPlaying = false;
+      userWantsPlaying = false;
       playBtn.textContent = '▶';
       if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
       if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
@@ -2758,6 +2761,7 @@ body.idle #right-panel {
     function startPlay() {
 
       isPlaying = true;
+      userWantsPlaying = true;
       playBtn.textContent = '⏸';
       var lastFrame = performance.now();
       var gapEnterFrame = null;
@@ -2823,9 +2827,11 @@ body.idle #right-panel {
               map.off('moveend', playFlyHandler);
               playFlyHandler = null;
               isZoomingProgrammatically = false;
-              isPlaying = true;
-              lastFrame = performance.now();
-              playRAF = requestAnimationFrame(tick);
+              if (userWantsPlaying) {
+                isPlaying = true;
+                lastFrame = performance.now();
+                playRAF = requestAnimationFrame(tick);
+              }
             };
             map.on('moveend', playFlyHandler);
             map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
@@ -2839,7 +2845,7 @@ body.idle #right-panel {
     }
 
     playBtn.addEventListener('click', function() {
-      if (isPlaying) stopPlay(); else startPlay();
+      if (userWantsPlaying) stopPlay(); else startPlay();
     });
 
     // --- Prev / Next event peak ---
