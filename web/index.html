@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-<script src="https://t.contentsquare.net/uxa/1d8a4cde7672c.js"></script>
 <meta charset="utf-8">
 <link rel="icon" href="/icon-32.png" sizes="32x32">
 <link rel="icon" href="/icon-192.png" sizes="192x192">
@@ -29,7 +28,6 @@
 <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/ellipse-mode.js"></script>
 <script src="/prediction-mode.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -42,7 +40,7 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 .leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
-@keyframes toastFade { 0%,60% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes toastFade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
 
 #right-panel {
@@ -236,7 +234,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 /* Feature-flag-gated elements: hidden by default, shown when flag is active */
 .f-gated { display: none !important; }
-body.f-ellipse #menu-ellipse.f-gated { display: block !important; }
 body.f-predict #menu-predict.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
@@ -302,6 +299,15 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   direction: rtl;
 }
 #menu-sound.sound-open .menu-sub-panel { display: block; }
+#ext-section.ext-open > .menu-sub-panel { display: block; }
+/* "אזור ניסיוני" — footer footnote, visually outside the main menu */
+#ext-section { border-top: 1px solid #d1d5db; margin-top: 4px; }
+#ext-section > .menu-item-row { padding: 6px 16px; color: #9ca3af; }
+#ext-section > .menu-item-row .menu-item-label { font-size: 12px; font-weight: 400; }
+@media (hover: hover) { #ext-section > .menu-item-row:hover { background: transparent; } }
+/* Sub-items: indented + smaller font to signal secondary importance */
+#ext-section .menu-sub-panel .menu-item-row { padding-right: 28px; }
+#ext-section .menu-sub-panel .menu-item-label { font-size: 13px; color: #555; }
 .menu-select-wrap {
   padding: 10px 16px 14px;
   border-top: 1px solid #eee;
@@ -319,7 +325,7 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
 }
 
 /* --- Right-panel buttons (timeline, ellipse) --- */
-#timeline-btn, #ellipse-btn {
+#timeline-btn {
   max-height: 40px;
   max-width: 220px;
   background: rgba(255,255,255,0.92);
@@ -331,43 +337,10 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
 @media (hover: hover) {
-  #ellipse-btn:hover {
-    background: rgba(219, 234, 254, 0.92);
-    border-color: #93c5fd;
-  }
   #timeline-btn:not(.open):hover {
     background: rgba(253, 230, 138, 0.92);
     border-color: #f59e0b;
   }
-}
-
-#ellipse-btn {
-  display: none;
-  align-items: center;
-  font: inherit;
-  -webkit-appearance: none;
-  appearance: none;
-  color: #555;
-}
-body.ellipse-mode #ellipse-btn.active {
-  background: rgba(219, 234, 254, 0.92);
-  border-color: #93c5fd;
-  color: #1d4ed8;
-}
-body.ellipse-mode #ellipse-btn { display: flex; }
-#ellipse-btn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  height: 40px;
-  direction: rtl;
-  cursor: pointer;
-}
-body.ellipse-mode #ellipse-btn.extended {
-  background: rgba(219, 234, 254, 0.92);
-  border-color: #93c5fd;
-  color: #1d4ed8;
 }
 
 #timeline-btn {
@@ -543,8 +516,22 @@ body.ellipse-mode #ellipse-btn.extended {
     padding: 8px 12px;
     font-size: 13px;
     line-height: 1.6;
+    max-height: 140px;
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
   }
   #legend .dot { width: 12px; height: 12px; }
+  #legend.collapsed {
+    display: flex; padding: 0 14px;
+    align-items: center; justify-content: center; gap: 16px;
+    border-radius: 20px;
+    height: 36px; max-height: 36px;
+  }
+  #legend.collapsed .row { gap: 0; }
+  #legend.collapsed .row span { display: none; }
+  #legend.collapsed .dot { width: 14px; height: 14px; }
   #status {
     top: 80px;
     left: 10px;
@@ -555,7 +542,7 @@ body.ellipse-mode #ellipse-btn.extended {
     top: 110px;
     left: 8px;
   }
-  #timeline-btn, #ellipse-btn {
+  #timeline-btn {
     max-height: 36px;
   }
   #menu-btn { width: 36px; height: 36px; }
@@ -576,8 +563,7 @@ body.ellipse-mode #ellipse-btn.extended {
   body.idle #right-panel { bottom: 8px; }
 }
 /* Idle mode: hide buttons after inactivity */
-body.idle #timeline-btn,
-body.idle #ellipse-btn {
+body.idle #timeline-btn {
   opacity: 0;
   max-height: 0 !important;
   overflow: hidden;
@@ -618,31 +604,6 @@ body.idle #right-panel {
       <span class="menu-check"></span>
     </button>
   </div>
-  <div id="menu-sound" class="menu-item">
-    <button id="menu-sound-row" class="menu-item-row" type="button">
-      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
-      <span class="menu-item-label">מצב שקט</span>
-    </button>
-    <div class="menu-sub-panel">
-      <p style="margin:0 0 8px; font-weight:bold;">בחר מיקום לקבלת התרעות קוליות:</p>
-      <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
-             style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
-      <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
-      <div style="display:flex; gap:8px;">
-        <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
-      </div>
-    </div>
-  </div>
-  <div id="menu-ellipse" class="menu-item f-gated">
-    <div class="menu-select-wrap">
-      <select id="menu-ellipse-select" class="menu-select" aria-label="מצב אליפסה">
-        <option value="0">אליפסה כבויה</option>
-        <option value="1">אליפסה בסיסית</option>
-        <option value="2">אליפסה רגילה</option>
-        <option value="3">אליפסה מפורטת</option>
-      </select>
-    </div>
-  </div>
   <div id="menu-share" class="menu-item" style="display:none;">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon">
@@ -652,18 +613,50 @@ body.idle #right-panel {
       <span class="menu-item-label">שתף</span>
     </button>
   </div>
-  <div id="menu-predict" class="menu-item f-gated">
-    <button class="menu-item-row" type="button">
-      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
-      <span class="menu-item-label">כיוון שיגור</span>
-      <span class="menu-check"></span>
-    </button>
-  </div>
   <div id="menu-about" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg></span>
       <span class="menu-item-label">אודות</span>
     </button>
+  </div>
+  <div id="ext-section" class="menu-item">
+    <button class="menu-item-row" type="button" id="ext-section-btn">
+      <span class="menu-item-label">אזור ניסיוני</span>
+      <svg id="ext-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:auto;transition:transform 0.2s;opacity:0.5"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
+    <div class="menu-sub-panel" style="padding:0">
+      <div id="menu-sound" class="menu-item">
+        <button id="menu-sound-row" class="menu-item-row" type="button">
+          <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg></span>
+          <span class="menu-item-label">מצב שקט</span>
+        </button>
+        <div class="menu-sub-panel">
+          <p style="margin:0 0 8px; font-weight:bold;">בחר מיקום לקבלת התרעות קוליות:</p>
+          <input type="text" id="sound-search" placeholder="חפש יישוב..." dir="rtl"
+                 style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-bottom:8px; font-size:14px;">
+          <div id="sound-results" style="max-height:160px; overflow-y:auto; border:1px solid #eee; border-radius:6px; margin-bottom:8px;"></div>
+          <div style="display:flex; gap:8px;">
+            <button id="sound-all-btn" style="flex:1; padding:8px; border:none; background:#eee; border-radius:6px; cursor:pointer; font-weight:bold;">כל הארץ</button>
+          </div>
+        </div>
+      </div>
+      <div id="ellipse-stub" class="menu-item">
+        <button class="menu-item-row" type="button" id="ellipse-enable-btn">
+          <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="10" ry="6" transform="rotate(-15 12 12)"/></svg></span>
+          <span class="menu-item-label">אליפסה</span>
+          <span class="menu-check"></span>
+        </button>
+      </div>
+      <div id="ext-menu">
+        <div id="menu-predict" class="menu-item f-gated">
+          <button class="menu-item-row" type="button">
+            <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
+            <span class="menu-item-label">כיוון שיגור</span>
+            <span class="menu-check"></span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -698,11 +691,6 @@ body.idle #right-panel {
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
     <div class="row"><div class="dot dot-green"></div><span>האירוע הסתיים</span></div>
   </div>
-  <button id="ellipse-btn" type="button" title="סמן אליפסה">
-    <div id="ellipse-btn-row">
-      <span class="btn-icon">📝</span><span class="btn-text">אליפסה</span>
-    </div>
-  </button>
   <div id="timeline-btn" title="ציר זמן">
     <div id="timeline-btn-row">
       <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
@@ -745,8 +733,57 @@ body.idle #right-panel {
   });
   window.FF = FF;
 
-  var isEllipseMode = pageParams.get('mode') === 'ellipse';
-  if (isEllipseMode) document.body.classList.add('ellipse-mode');
+  // --- Extension loader: lazy-loads flag-gated extension scripts, then dispatches app:ready ---
+  var EXTENSIONS = [
+    // { flag: 'myfeature', src: '/my-extension.js' }
+  ];
+  var _extPending = 0, _extInitDone = false;
+  function _maybeDispatchReady() {
+    if (_extInitDone && _extPending === 0)
+      document.dispatchEvent(new CustomEvent('app:ready'));
+  }
+  EXTENSIONS.forEach(function(ext) {
+    if (FF[ext.flag]) {
+      _extPending++;
+      var s = document.createElement('script');
+      s.src = ext.src;
+      s.onload = s.onerror = function() { _extPending--; _maybeDispatchReady(); };
+      document.head.appendChild(s);
+    }
+  });
+
+  // Ellipse: auto-load at startup if previously enabled; otherwise lazy-load on first enable
+  (function() {
+    var savedMode = 0;
+    try { savedMode = Number(localStorage.getItem('oref-ellipse-mode')) || 0; } catch (e) {}
+    if (savedMode > 0) {
+      _extPending++;
+      var s = document.createElement('script');
+      s.src = '/ellipse-mode.js';
+      s.onload = s.onerror = function() { _extPending--; _maybeDispatchReady(); };
+      document.head.appendChild(s);
+    }
+  })();
+
+  // "אזור ניסיוני" section toggle
+  document.getElementById('ext-section-btn').addEventListener('click', function() {
+    var open = document.getElementById('ext-section').classList.toggle('ext-open');
+    document.getElementById('ext-chevron').style.transform = open ? 'rotate(180deg)' : '';
+  });
+
+  // Ellipse stub: first-time enable (extension not yet loaded)
+  document.getElementById('ellipse-enable-btn').addEventListener('click', function() {
+    if (window._ellipseLoading) return;
+    window._ellipseLoading = true;
+    try { localStorage.setItem('oref-ellipse-mode', '3'); } catch (e) {}
+    var s = document.createElement('script');
+    s.src = '/ellipse-mode.js';
+    s.onerror = function() {
+      window._ellipseLoading = false;
+      try { localStorage.removeItem('oref-ellipse-mode'); } catch (e) {}
+    };
+    document.head.appendChild(s);
+  });
 
   // --- Debug overlay (append console.warn/error to on-screen log when ?f-log) ---
   if (FF.log) {
@@ -821,9 +858,9 @@ body.idle #right-panel {
   function showToast(msg) {
     var el = document.createElement('div');
     el.textContent = msg;
-    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toastFade 3s forwards;pointer-events:none;';
+    el.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;z-index:1001;direction:rtl;text-align:center;animation:toastFade 4s forwards;pointer-events:none;';
     document.body.appendChild(el);
-    setTimeout(function() { el.remove(); }, 3000);
+    setTimeout(function() { el.remove(); }, 4000);
   }
 
   // --- User location ---
@@ -848,6 +885,8 @@ body.idle #right-panel {
     var menuGps = document.getElementById('menu-gps');
     var gpsLabel = menuGps.querySelector('.menu-item-label');
     if (!navigator.geolocation) { menuGps.style.display = 'none'; return; }
+    var LOCATION_PREF_KEY = 'oref-show-user-location';
+    var LOCATION_HIDDEN_KEY = 'oref-location-hidden';
 
     var icon = L.divIcon({
       html: '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>',
@@ -858,6 +897,25 @@ body.idle #right-panel {
 
     var watchId = null;
     var transientTimeout = null;
+
+    function shouldRestoreUserLocation() {
+      try {
+        var stored = localStorage.getItem(LOCATION_PREF_KEY);
+        if (stored === 'true') return true;
+        if (stored === 'false') return false;
+        return localStorage.getItem(LOCATION_HIDDEN_KEY) !== 'true';
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function saveUserLocationPreference(enabled) {
+      try {
+        localStorage.setItem(LOCATION_PREF_KEY, enabled ? 'true' : 'false');
+        if (enabled) localStorage.removeItem(LOCATION_HIDDEN_KEY);
+        else localStorage.setItem(LOCATION_HIDDEN_KEY, 'true');
+      } catch (e) {}
+    }
 
     function setIdle() {
       gpsLabel.textContent = 'הראה אותי';
@@ -880,9 +938,7 @@ body.idle #right-panel {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
       if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
       currentUserLatLng = null;
-      if (ellipseModeController && ellipseModeController.refreshExtendedVisual) {
-        ellipseModeController.refreshExtendedVisual();
-      }
+      document.dispatchEvent(new CustomEvent('app:locationChanged'));
     }
 
     function showUserLocation(latlng) {
@@ -902,9 +958,7 @@ body.idle #right-panel {
       }
       currentUserLatLng = { lat: latlng[0], lng: latlng[1] };
       setActive();
-      if (ellipseModeController && ellipseModeController.refreshExtendedVisual) {
-        ellipseModeController.refreshExtendedVisual();
-      }
+      document.dispatchEvent(new CustomEvent('app:locationChanged'));
       return true;
     }
 
@@ -922,12 +976,21 @@ body.idle #right-panel {
       }, { enableHighAccuracy: false, maximumAge: 30000 });
     }
 
-    if (navigator.permissions) {
-      navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
-        if (result.state === 'granted' && localStorage.getItem('oref-location-hidden') !== 'true') {
-          startWatching();
-        }
-      }).catch(function() {});
+    if (shouldRestoreUserLocation()) {
+      var urlPos = getUrlPosition();
+      if (urlPos) {
+        showUserLocation(urlPos);
+      } else if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+          if (result.state !== 'denied' && shouldRestoreUserLocation()) {
+            startWatching();
+          }
+        }).catch(function() {
+          if (shouldRestoreUserLocation()) startWatching();
+        });
+      } else {
+        startWatching();
+      }
     }
 
     menuGps.querySelector('.menu-item-row').addEventListener('click', function() {
@@ -935,18 +998,18 @@ body.idle #right-panel {
         stopWatching();
         showToast('מיקום הוסר מהמפה');
         setIdle();
-        localStorage.setItem('oref-location-hidden', 'true');
+        saveUserLocationPreference(false);
       } else {
         var urlPos = getUrlPosition();
         if (urlPos) {
-          localStorage.removeItem('oref-location-hidden');
+          saveUserLocationPreference(true);
           showUserLocation(urlPos);
           return;
         }
         if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
         gpsLabel.textContent = 'מאתר...';
         startWatching();
-        localStorage.removeItem('oref-location-hidden');
+        saveUserLocationPreference(true);
       }
     });
   }
@@ -954,7 +1017,7 @@ body.idle #right-panel {
   initUserLocation();
 
   // --- State ---
-  var autoZoomActive = localStorage.getItem('oref-auto-zoom') === 'true';
+  var autoZoomActive = localStorage.getItem('oref-auto-zoom') !== 'disabled';
   var isZoomingProgrammatically = false;
 
   if (autoZoomActive) {
@@ -967,7 +1030,7 @@ body.idle #right-panel {
 
   document.getElementById('menu-zoom').querySelector('.menu-item-row').addEventListener('click', function() {
     autoZoomActive = !autoZoomActive;
-    localStorage.setItem('oref-auto-zoom', autoZoomActive);
+    localStorage.setItem('oref-auto-zoom', autoZoomActive ? 'enabled' : 'disabled');
     document.getElementById('menu-zoom').classList.toggle('active', autoZoomActive);
     if (autoZoomActive) {
       showToast('זום אוטומטי מופעל');
@@ -1013,7 +1076,6 @@ body.idle #right-panel {
   var isPlaying = false;
   var playRAF = null;
   var playFlyHandler = null;
-  var pausedForFly = false;
   var currentViewTime = 0;
   var liveLocationStates = null; // shadow copy of live state
   var polygonHintInterval = null; // showPolygonHint animation interval
@@ -1071,7 +1133,6 @@ body.idle #right-panel {
   var menuOpen = false;
   var menuSoundItem = document.getElementById('menu-sound');
   var menuSoundRow = document.getElementById('menu-sound-row');
-  var menuEllipseSelect = document.getElementById('menu-ellipse-select');
   var soundSubPanelOpen = false;
   var searchInput = document.getElementById('search-input');
   var searchResults = document.getElementById('search-results');
@@ -1101,6 +1162,8 @@ body.idle #right-panel {
     menuBtn.setAttribute('aria-expanded', 'false');
     menuOpen = false;
     closeSoundSubPanel();
+    document.getElementById('ext-section').classList.remove('ext-open');
+    document.getElementById('ext-chevron').style.transform = '';
     clearSearch();
     updateOverlay();
   }
@@ -1123,6 +1186,18 @@ body.idle #right-panel {
 
   // --- Polygon state ---
   var locationPolygons = {};  // name → L.polygon
+
+  // --- Extension state API ---
+  window.AppState = {
+    map: map,
+    get locationStates() { return locationStates; },
+    get locationHistory() { return locationHistory; },
+    get locationPolygons() { return locationPolygons; },
+    get userPosition() { return currentUserLatLng || null; },
+    get isLiveMode() { return isLiveMode; },
+    get viewTime() { return currentViewTime; },
+    showToast: function(msg, opts) { showToast(msg, opts); }
+  };
 
   // --- Colors ---
   var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
@@ -1375,7 +1450,6 @@ body.idle #right-panel {
     };
 
     playSoundForState(state, name);
-    syncPredictionMode();
   }
 
   function removeLocation(name) {
@@ -1385,14 +1459,6 @@ body.idle #right-panel {
       entry.marker.closePopup();
     }
     delete locationStates[name];
-    syncPredictionMode();
-  }
-
-  // --- Launch source prediction (extension) ---
-  var predictionModeController = null;
-
-  function syncPredictionMode() {
-    if (predictionModeController) predictionModeController.sync();
   }
 
   // --- Alert history per location ---
@@ -1658,14 +1724,25 @@ body.idle #right-panel {
     if (autoZoomActive && isLiveMode && isNewAlert && !openPopupName) {
       maybeZoomToEvent();
     }
-    syncEllipseMode();
-    syncPredictionMode();
+    document.dispatchEvent(new CustomEvent('app:stateChanged'));
   }
 
   // Expose for debugging/external injection
   window.injectAlert = function(mockAlert) {
     console.log('Injecting mock alert:', mockAlert);
     processLiveAlert(mockAlert);
+  };
+
+  window.printActiveAlertLocations = function() {
+    var active = [];
+    for (var name in locationStates) {
+      if (locationStates[name] && locationStates[name].state !== 'green') {
+        active.push(name);
+      }
+    }
+    active.sort(function(a, b) { return a.localeCompare(b, 'he'); });
+    console.log(JSON.stringify(active));
+    return active;
   };
 
   function processHistoryEntry(entry) {
@@ -1735,8 +1812,7 @@ body.idle #right-panel {
     }
     if (toRemove.length > 0) {
       updateLiveStatus();
-      syncEllipseMode();
-      syncPredictionMode();
+      document.dispatchEvent(new CustomEvent('app:stateChanged'));
     }
   }
 
@@ -1901,8 +1977,7 @@ body.idle #right-panel {
 
     if (newEntries > 0) {
       console.log('History: processed', newEntries, 'new entries');
-      syncEllipseMode();
-      syncPredictionMode();
+      document.dispatchEvent(new CustomEvent('app:stateChanged'));
     }
   }
 
@@ -2098,8 +2173,7 @@ body.idle #right-panel {
       }
       locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
     }
-    syncEllipseMode();
-    syncPredictionMode();
+    document.dispatchEvent(new CustomEvent('app:stateChanged'));
   }
 
   function saveLiveState() {
@@ -2126,8 +2200,7 @@ body.idle #right-panel {
       }
     }
     liveLocationStates = null;
-    syncEllipseMode();
-    syncPredictionMode();
+    document.dispatchEvent(new CustomEvent('app:stateChanged'));
   }
 
   function updateShadowState(name, state, since) {
@@ -2215,7 +2288,7 @@ body.idle #right-panel {
       if (isOpen()) rebuildTimeline();
     };
 
-    function switchDate(newDate) {
+    function switchDate(newDate, onSwitched) {
       // Carry forward: when navigating backward, save entries from target day's
       // 23:00-23:59 window (they came from the current day's R2 file and would be
       // lost when we clear extendedHistory)
@@ -2264,6 +2337,7 @@ body.idle #right-panel {
           mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
+          if (onSwitched) onSwitched();
         });
       } else {
         // Stop history polling for past dates
@@ -2275,6 +2349,7 @@ body.idle #right-panel {
           mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
+          if (onSwitched) onSwitched();
         });
       }
     }
@@ -2368,6 +2443,60 @@ body.idle #right-panel {
       stopPlay();
       if (eventPeaks.length > 0) seekTo(eventPeaks[eventPeaks.length - 1]);
       else seekTo(timelineMax);
+    };
+
+    window.show_history = function(timestamp) {
+      var raw = timestamp;
+      if (raw instanceof Date) raw = raw.toISOString();
+      if (typeof raw !== 'string') {
+        throw new Error('show_history(timestamp) expects a timestamp string like 2026-03-27T14:28:00');
+      }
+      var normalized = raw.trim();
+      if (/^\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+        normalized = todayDateStr() + 'T' + normalized;
+      }
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(normalized)) {
+        throw new Error('Invalid timestamp. Use YYYY-MM-DDTHH:mm:ss, YYYY-MM-DDTHH:mm, or HH:mm:ss');
+      }
+      if (normalized.length === 16) normalized += ':00';
+
+      var targetTime = new Date(normalized).getTime();
+      if (isNaN(targetTime)) {
+        throw new Error('Invalid timestamp: ' + raw);
+      }
+
+      var targetDate = normalized.slice(0, 10);
+      if (targetDate < DAY_HISTORY_MIN_DATE) {
+        throw new Error('No history available before ' + DAY_HISTORY_MIN_DATE);
+      }
+      if (!isOpen()) openTimeline();
+
+      return new Promise(function(resolve) {
+        function finish() {
+          stopPlay();
+          seekTo(targetTime);
+          resolve({
+            timestamp: normalized,
+            viewingDate: targetDate,
+            appliedTime: new Date(currentViewTime).toISOString(),
+            isLiveMode: isLiveMode
+          });
+        }
+
+        var currentDate = timelineDate || todayDateStr();
+        if (currentDate !== targetDate) {
+          switchDate(targetDate, finish);
+        } else if (!dayHistoryReady) {
+          var prevReady = onDayHistoryReady;
+          onDayHistoryReady = function() {
+            onDayHistoryReady = null;
+            if (prevReady) prevReady();
+            finish();
+          };
+        } else {
+          finish();
+        }
+      });
     };
 
     // --- Date nav buttons ---
@@ -2612,7 +2741,6 @@ body.idle #right-panel {
     // --- Play / Pause ---
     function stopPlay() {
       isPlaying = false;
-      pausedForFly = false;
       playBtn.textContent = '▶';
       if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
       if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
@@ -2688,7 +2816,7 @@ body.idle #right-panel {
         document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
         reconstructStateAt(newTime);
 
-        // Auto-zoom: fly to event area when entering a new event group (respects auto-zoom toggle)
+        // Auto-zoom: fly to event area when entering a new event group
         var curIdx = findEventIdx(newTime);
         if (curIdx !== playEventIdx) {
           playEventIdx = curIdx;
@@ -2696,19 +2824,15 @@ body.idle #right-panel {
           if (bounds) {
             isZoomingProgrammatically = true;
             isPlaying = false;
-            pausedForFly = true;
             if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
             if (playFlyHandler) map.off('moveend', playFlyHandler);
             playFlyHandler = function() {
               map.off('moveend', playFlyHandler);
               playFlyHandler = null;
               isZoomingProgrammatically = false;
-              if (pausedForFly) {
-                pausedForFly = false;
-                isPlaying = true;
-                lastFrame = performance.now();
-                playRAF = requestAnimationFrame(tick);
-              }
+              isPlaying = true;
+              lastFrame = performance.now();
+              playRAF = requestAnimationFrame(tick);
             };
             map.on('moveend', playFlyHandler);
             map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
@@ -2722,7 +2846,6 @@ body.idle #right-panel {
     }
 
     playBtn.addEventListener('click', function() {
-      if (pausedForFly) { stopPlay(); return; }
       if (isPlaying) stopPlay(); else startPlay();
     });
 
@@ -2759,6 +2882,11 @@ body.idle #right-panel {
       // Load favorite markers
       Object.keys(favorites).forEach(function(name) {
         addFavoriteMarker(name, favorites[name]);
+      });
+
+      // Legend collapse toggle (mobile only)
+      document.getElementById('legend').addEventListener('click', function() {
+        if (window.innerWidth <= 480) this.classList.toggle('collapsed');
       });
 
       // Init timeline immediately (button always visible)
@@ -2824,87 +2952,6 @@ body.idle #right-panel {
   document.getElementById('about-backdrop').addEventListener('click', function(e) {
     if (e.target === this) closeAbout();
   });
-  var ellipseModeController = null;
-  var ellipseBtn = document.getElementById('ellipse-btn');
-  var ellipseDisplayMode = 0;
-  function updateEllipseButton() {
-    if (!ellipseModeController || !ellipseBtn) return;
-    ellipseBtn.classList.toggle('active', ellipseDisplayMode > 0);
-    ellipseBtn.classList.toggle('extended', ellipseDisplayMode === 2);
-    ellipseBtn.title = ellipseDisplayMode === 0 ? 'סמן אליפסה' : (ellipseDisplayMode === 1 ? 'אליפסה רגילה' : 'אליפסה מורחבת');
-    ellipseModeController.setDisplayMode(ellipseDisplayMode);
-  }
-  function applyEllipseDisplayMode(nextMode, opts) {
-    if (!ellipseModeController) return Promise.resolve();
-    ellipseDisplayMode = nextMode;
-    if (menuEllipseSelect) menuEllipseSelect.value = String(nextMode);
-    if (ellipseDisplayMode === 0) {
-      ellipseModeController.setDisplayMode(0);
-      return ellipseModeController.setEnabled(false, opts || {});
-    }
-    if (!ellipseModeController.isEnabled()) {
-      ellipseModeController.setDisplayMode(ellipseDisplayMode);
-      return ellipseModeController.setEnabled(true, opts || {});
-    }
-    return ellipseModeController.setDisplayMode(ellipseDisplayMode);
-  }
-  function syncEllipseMode(force) {
-    if (!ellipseModeController || !ellipseModeController.sync) return;
-    ellipseModeController.sync(!!force);
-    updateEllipseButton();
-    ellipseModeController.refreshExtendedVisual();
-  }
-  if ((isEllipseMode || FF.ellipse) && window.initEllipseMode) {
-    ellipseModeController = window.initEllipseMode({
-      map: map,
-      getLocationStates: function() { return locationStates; },
-      getLocationHistory: function() { return locationHistory; },
-      getLocationPolygons: function() { return locationPolygons; },
-      getCurrentUserPosition: getCurrentUserPosition,
-      getIsLiveMode: function() { return isLiveMode; },
-      getCurrentViewTime: function() { return currentViewTime; },
-      showToast: showToast
-    });
-    updateEllipseButton();
-    applyEllipseDisplayMode(0);
-    ellipseBtn.addEventListener('click', function() {
-      var previousMode = ellipseDisplayMode;
-      ellipseDisplayMode = (ellipseDisplayMode + 1) % 3;
-      if (ellipseDisplayMode === 0) {
-        ellipseModeController.setEnabled(false, { showToast: true });
-        updateEllipseButton();
-        return;
-      }
-      if (previousMode === 0) {
-        ellipseModeController.setEnabled(true, { showToast: true }).then(function() {
-          updateEllipseButton();
-        });
-        return;
-      }
-      ellipseModeController.sync(true).then(function() {
-        updateEllipseButton();
-      });
-    });
-    menuEllipseSelect.addEventListener('change', function() {
-      applyEllipseDisplayMode(Number(menuEllipseSelect.value), { showToast: true });
-    });
-  }
-  // Initialize prediction mode extension
-  if (FF.predict && window.initPredictionMode) {
-    predictionModeController = window.initPredictionMode({
-      map: map,
-      getLocationStates: function() { return locationStates; },
-      getLocationPolygons: function() { return locationPolygons; },
-      showToast: showToast
-    });
-    var predictMenuItem = document.getElementById('menu-predict');
-    if (predictionModeController.isEnabled()) predictMenuItem.classList.add('active');
-    predictMenuItem.querySelector('.menu-item-row').addEventListener('click', function() {
-      var next = !predictionModeController.isEnabled();
-      predictionModeController.setEnabled(next, { showToast: true });
-      predictMenuItem.classList.toggle('active', next);
-    });
-  }
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeAbout();
@@ -2916,10 +2963,7 @@ body.idle #right-panel {
           popPanelHistory();
         }
       }
-      if (ellipseModeController && ellipseModeController.clearExtendedVisual) {
-        ellipseModeController.clearExtendedVisual();
-      }
-      if (predictionModeController) predictionModeController.clear();
+      document.dispatchEvent(new CustomEvent('app:escape'));
       map.closePopup();
       document.getElementById('errorDetail').style.display = 'none';
     }
@@ -3124,6 +3168,8 @@ body.idle #right-panel {
   });
 
   init();
+  _extInitDone = true;
+  _maybeDispatchReady();
 })();
 </script>
 <script>

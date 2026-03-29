@@ -1,11 +1,10 @@
 (function() {
   'use strict';
 
-  window.initPredictionMode = function(options) {
-    var map = options.map;
-    var getLocationStates = options.getLocationStates;
-    var getLocationPolygons = options.getLocationPolygons;
-    var showToast = options.showToast;
+  function initPrediction() {
+    var A = window.AppState;
+    var map = A.map;
+    var showToast = A.showToast;
 
     var orefPoints = null;
     var orefPointsPromise = null;
@@ -245,8 +244,8 @@
       if (!enabled) return;
 
       ensureOrefPoints().then(function(orefPts) {
-        var locationStates = getLocationStates();
-        var locationPolygons = getLocationPolygons();
+        var locationStates = A.locationStates;
+        var locationPolygons = A.locationPolygons;
 
         var locPoints = [];
         for (var name in locationStates) {
@@ -278,14 +277,16 @@
           var line = fitLine(vertices);
           if (!line) continue;
 
+          // Area-weighted centroid using orefPoints (canonical settlement coords)
+          // weighted by polygon area so larger areas contribute more.
           var awLat = 0, awLng = 0, awTotal = 0;
           for (var i = 0; i < cluster.length; i++) {
-            var poly = locationPolygons[cluster[i][3]];
-            if (!poly) continue;
-            var c = polygonCentroid(poly);
-            if (!c) continue;
-            var a = Math.max(polygonArea(poly), 1e-6);
-            awLat += c[0] * a; awLng += c[1] * a; awTotal += a;
+            var locName = cluster[i][3];
+            var pt = orefPts[locName];
+            if (!pt) continue;
+            var poly = locationPolygons[locName];
+            var a = poly ? Math.max(polygonArea(poly), 1e-6) : 1e-6;
+            awLat += pt[0] * a; awLng += pt[1] * a; awTotal += a;
           }
           if (awTotal < 1e-12) continue;
 
@@ -424,11 +425,29 @@
       }
     }
 
-    return {
-      sync: sync,
-      setEnabled: setEnabled,
-      clear: clearPredictionLines,
-      isEnabled: function() { return enabled; }
-    };
-  };
+    // Wire up menu toggle in #ext-menu
+    var menuItem = document.getElementById('menu-predict');
+    if (menuItem) {
+      if (enabled) menuItem.classList.add('active');
+      menuItem.querySelector('.menu-item-row').addEventListener('click', function() {
+        var next = !enabled;
+        setEnabled(next, { showToast: true });
+        menuItem.classList.toggle('active', next);
+      });
+    }
+
+    // Listen for state changes and escape
+    document.addEventListener('app:stateChanged', function() { sync(); });
+    document.addEventListener('app:escape', function() { clearPredictionLines(); });
+
+    // Initial render if enabled
+    if (enabled) sync();
+  }
+
+  // Self-init: wait for AppState if needed
+  if (window.AppState) {
+    initPrediction();
+  } else {
+    document.addEventListener('app:ready', initPrediction);
+  }
 })();

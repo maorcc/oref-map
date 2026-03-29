@@ -108,8 +108,18 @@ const cache = {
 
 async function fetchOref(url) {
   const resp = await fetch(url, { headers: OREF_HEADERS });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${url}`);
+  if (!resp.ok) {
+    const err = new Error(`HTTP ${resp.status} from ${url}`);
+    err.code = String(resp.status);
+    throw err;
+  }
   return resp.text();
+}
+
+function logError(prefix, err) {
+  const code = err?.code ?? 'UNKNOWN';
+  const message = String(err?.message ?? err);
+  console.error(`[${new Date().toISOString()}] ${prefix}, code=${code}, error="${message}"`);
 }
 
 // --- Polling ---
@@ -122,7 +132,7 @@ async function pollAlerts() {
     cache.alerts.body = body;
     cache.alerts.updatedAt = Date.now();
   }).catch(err => {
-    console.error('[alerts] poll error:', err.message);
+    logError('[alerts] poll error:', err);
   }).finally(() => {
     alertsInFlight = null;
   });
@@ -140,7 +150,7 @@ async function pollHistory() {
       try { storeNewHistory(JSON.parse(body)); } catch { /* malformed response, skip */ }
     }
   }).catch(err => {
-    console.error('[history] poll error:', err.message);
+    logError('[history] poll error:', err);
   }).finally(() => {
     historyInFlight = null;
   });
@@ -209,7 +219,7 @@ app.get(['/api/alarms-history', '/api2/alarms-history'], async (req, res) => {
     try {
       await fetchExtended();
     } catch (err) {
-      console.error('[alarms-history] fetch error:', err.message);
+      logError('[alarms-history] fetch error:', err);
       // Return stale data if available, empty array otherwise
     }
   }

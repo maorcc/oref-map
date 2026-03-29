@@ -33,10 +33,16 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
+  // Let non-GET requests hit the network directly. They are not cacheable and
+  // `respondWith()` must always resolve to a real Response object.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   // Network-first: try network, fall back to cache
   event.respondWith(
     fetch(event.request).then(function(response) {
-      if (response.ok && event.request.method === 'GET' && url.origin === self.location.origin) {
+      if (response.ok && url.origin === self.location.origin) {
         var clone = response.clone();
         caches.open(CACHE_NAME).then(function(cache) {
           cache.put(event.request, clone);
@@ -44,7 +50,16 @@ self.addEventListener('fetch', function(event) {
       }
       return response;
     }).catch(function() {
-      return caches.match(event.request);
+      return caches.match(event.request).then(function(cached) {
+        if (cached) {
+          return cached;
+        }
+        return new Response('Offline', {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      });
     })
   );
 });

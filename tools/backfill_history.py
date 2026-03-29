@@ -155,14 +155,27 @@ async def main() -> None:
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     today_str = date.today().isoformat()
 
+    # The oref API only returns ~1 month of history. For dates older than 3 weeks,
+    # the remote R2 files are the only copy — do not touch them.
+    SAFE_WINDOW_DAYS = 21
+    safe_start = max(
+        date.fromisoformat(WAR_START),
+        date.today() - timedelta(days=SAFE_WINDOW_DAYS),
+    )
+
     all_dates = []
-    d = date.fromisoformat(WAR_START)
+    d = safe_start
     end = date.fromisoformat(yesterday)
     while d <= end:
         all_dates.append(d.isoformat())
         d += timedelta(days=1)
 
+    if not all_dates:
+        print("No eligible dates in selected range; exiting.")
+        return
+
     print(f"Date range: {all_dates[0]} .. {all_dates[-1]} ({len(all_dates)} dates)")
+    print(f"  (dates before {safe_start} skipped — API retention limit)")
     if update_today:
         print(f"--today: will also merge {today_str} (no prompt)")
     COMPARE_DIR.mkdir(parents=True, exist_ok=True)
