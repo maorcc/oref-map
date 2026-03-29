@@ -2570,7 +2570,7 @@ body.idle #right-panel {
       time = clampTime(time);
       slider.value = Math.min(sliderFromTime(time), 999);
       enterHistoryMode(time);
-      maybeZoomToEvent();
+      if (autoZoomActive) maybeZoomToEvent();
     }
 
     // --- Slider input ---
@@ -2579,7 +2579,7 @@ body.idle #right-panel {
       var time = clampTime(timeFromSlider(parseInt(slider.value)));
       slider.value = sliderFromTime(time);
       enterHistoryMode(time);
-      maybeZoomToEvent();
+      if (autoZoomActive) maybeZoomToEvent();
     });
 
     // --- Timeline bands (show duration of active alerts) ---
@@ -2810,7 +2810,7 @@ body.idle #right-panel {
         var curIdx = findEventIdx(newTime);
         if (curIdx !== playEventIdx) {
           playEventIdx = curIdx;
-          var bounds = curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+          var bounds = autoZoomActive && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
           if (bounds) {
             isZoomingProgrammatically = true;
             isPlaying = false;
