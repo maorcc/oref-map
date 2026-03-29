@@ -514,8 +514,22 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
     padding: 8px 12px;
     font-size: 13px;
     line-height: 1.6;
+    height: 110px;
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+    transition: height 0.3s ease;
   }
   #legend .dot { width: 12px; height: 12px; }
+  #legend.collapsed {
+    display: flex; padding: 0 14px;
+    align-items: center; justify-content: center; gap: 16px;
+    border-radius: 20px;
+    height: 36px;
+  }
+  #legend.collapsed .row { gap: 0; }
+  #legend.collapsed .row span { display: none; }
+  #legend.collapsed .dot { width: 14px; height: 14px; }
   #status {
     top: 80px;
     left: 10px;
@@ -2858,6 +2872,11 @@ body.idle #right-panel {
       // Load favorite markers
       Object.keys(favorites).forEach(function(name) {
         addFavoriteMarker(name, favorites[name]);
+      });
+
+      // Legend collapse toggle (mobile only)
+      document.getElementById('legend').addEventListener('click', function() {
+        if (window.innerWidth <= 480) this.classList.toggle('collapsed');
       });
 
       // Init timeline immediately (button always visible)
