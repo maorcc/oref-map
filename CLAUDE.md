@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project
 
-`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions choose a TLV or non-TLV proxy pool based on colo, then fetch/cache the selected proxy response server-side.
+`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
 
 **Public URL**: https://oref-map.org
 
@@ -24,8 +24,8 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
-- `functions/api/` — Pages Functions: choose proxy pool by colo, then fetch/cache proxy responses for both TLV and non-TLV users
-- `worker/src/index.js` — Cloudflare Worker: worker-backed proxy endpoint (placement: `azure:israelcentral`)
+- `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
+- `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
 - `worker/wrangler.toml` — Worker configuration with placement and `/api2/*` route
 - `ingestion/src/index.js` — Cloudflare Worker cron: ingests extended history API into R2 day-history files
 - `tools/backfill_history.py` — One-off script to rebuild R2 day-history files from the oref API (mode=3, city by city)
@@ -116,7 +116,7 @@ The live API is polled every 1s for immediate danger display. The history API is
 - `https://www.oref.org.il/districts/citiesNotes_heb.json` — per-city notes
 
 ### Geo-blocking
-The Oref APIs geo-block non-Israeli IPs with **HTTP 403**. Pages Functions at `/api/*` check the colo, choose the appropriate proxy pool, then fetch/cache the proxy response server-side. TLV requests use the dedicated TLV proxy pool; non-TLV requests use the shared non-TLV proxy pool. See `docs/architecture.md` for details.
+The Oref APIs geo-block non-Israeli IPs with **HTTP 403**. Pages Functions at `/api/*` check the colo — TLV users are proxied directly, non-TLV users get a 303 redirect to `/api2/*` which is handled by the placement-pinned Worker. See `docs/architecture.md` for details.
 
 **Cloudflare Worker cron triggers do not obey placement** — a cron worker always runs from a non-Israeli colo. Only fetch-triggered workers (including the placement-pinned Worker at `/api2/*`) reliably run from TLV.
 

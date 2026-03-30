@@ -2,14 +2,14 @@
 
 ## Overview
 
-A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions choose a proxy pool based on `request.cf.colo`, then fetch and cache proxy responses server-side for both TLV and non-TLV users.
+A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions handle TLV-routed users directly, non-TLV users are redirected to a placement-pinned Worker.
 
 ## Stack
 
 - **Map**: Leaflet.js (v1.9.4) + OpenStreetMap tiles
 - **Voronoi**: d3-delaunay (v6) for polygon computation, polygon-clipping (v0.15) for clipping to Israel border
-- **API proxy (tier 1)**: Cloudflare Pages Functions (`functions/api/`) — choose the TLV or non-TLV proxy pool, then fetch/cache the selected proxy response
-- **API proxy (tier 2)**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"` — worker-backed proxy endpoint used by the Pages Functions and by direct `/api2/*` access
+- **API proxy (tier 1)**: Cloudflare Pages Functions (`functions/api/`) — serves TLV users directly, redirects others
+- **API proxy (tier 2)**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"` — fallback for non-TLV users
 - **History storage**: Cloudflare R2 bucket (`oref-history`) with per-day JSONL files
 - **Ingestion**: Cloudflare Worker with cron trigger (`ingestion/`) — appends to R2 every 15 minutes
 - **No frameworks**: Vanilla JS, CSS
@@ -58,10 +58,10 @@ Previously, Pages Functions ran at the user's nearest Cloudflare edge. Users rou
 
 **Solution**: A two-tier proxy architecture:
 
-1. **Pages Functions (`/api/*`)**: Check `request.cf.colo`, choose the appropriate proxy pool, fetch that proxy server-side, and cache the response in `caches.default`.
-2. **Worker / external proxy layer**: The selected proxy endpoint then fetches Oref from an Israeli egress path. The Cloudflare Worker at `/api2/*` remains available as a worker-backed proxy endpoint and still runs with placement `region = "azure:israelcentral"`.
+1. **Pages Functions (`/api/*`)**: Check `request.cf.colo`. If TLV, proxy directly to Oref (free, no Worker invocation). If not TLV, return 303 redirect to `/api2/*`.
+2. **Worker (`/api2/*`)**: Runs with placement `region = "azure:israelcentral"`, forcing execution at TLV regardless of the user's edge location.
 
-TLV requests use the dedicated TLV proxy pool (`oreftest.kon40.com`). Non-TLV requests use the shared non-TLV proxy pool (`orefproxy*.oref-map.org`). The client normally stays on `/api/*`; proxy selection now happens inside the Pages Function rather than via browser-visible redirects.
+The client detects the redirect via `resp.url` and permanently switches to `/api2/` for the rest of the session. This way the Worker only serves the small minority of non-TLV users.
 
 #### Placement investigation notes
 
@@ -77,17 +77,17 @@ Several placement strategies were tested before finding a working solution:
 
 ### Edge caching
 
-The Pages Functions and the Worker both use the Cloudflare Cache API (`caches.default`) to cache successful upstream responses at the edge. In the current code, the Pages Functions cache the selected proxy response with `s-maxage=1` / `max-age=2`, while the Worker proxy caches its Oref response with `s-maxage=4` / `max-age=3`. This reduces redundant fetches when many clients poll simultaneously.
+Both the Pages Functions and the Worker use the Cloudflare Cache API (`caches.default`) with `s-maxage=1` to cache Oref responses at each edge for 1 second. This reduces redundant fetches when many clients poll simultaneously. The browser cache uses `max-age=2` (matching the previous behavior).
 
 ### Unknown title detection
 
-The Pages Functions proxy (`functions/api/_proxy.js`) monitors all successful alert responses passing through its shared cache path for unrecognized alert titles. When an unknown title is detected:
+The Pages Functions proxy (`functions/api/_proxy.js`) monitors all alert responses passing through the TLV path for unrecognized alert titles. When an unknown title is detected:
 
 1. Check a 1-hour dedup cache (via Cloudflare Cache API) to avoid repeat notifications
 2. Send a Pushover notification with the unknown title and API kind
 3. Notification failures are silently swallowed — must not affect proxy behavior
 
-This now runs for both TLV and non-TLV requests, because the Pages Functions inspect the response body after fetching the selected proxy upstream.
+This runs only on the TLV path since all Israeli traffic flows through it — the same titles are seen regardless of the user's colo.
 
 ## Alert Classification
 
@@ -299,7 +299,7 @@ GitHub Actions (`.github/workflows/deploy.yml`) deploys on push to `main`:
 | `deploy-workers` | proxy1, proxy2, proxy3 Workers | Per-proxy accounts |
 | `deploy-ingestion` | Ingestion cron Worker | Pages account |
 
-The Pages project serves static assets and Pages Functions (`/api/*`). The proxy Workers handle `/api2/*` via Workers routes on `oref-map.org`; Pages Functions can call the proxy layer server-side, and `/api2/*` remains available for direct worker-backed access where needed.
+The Pages project serves static assets and Pages Functions (`/api/*`). The proxy Workers handle `/api2/*` via Workers routes on `oref-map.org`, serving as fallback for non-TLV users.
 
 ### Cloudflare accounts
 

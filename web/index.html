@@ -812,7 +812,7 @@ body.idle #right-panel {
   // Set PROXY_BASE to the Cloudflare Worker URL for production, e.g.:
   //   var PROXY_BASE = 'https://oref-proxy.YOUR_ACCOUNT.workers.dev';
   var PROXY_BASE = '';
-  var apiPrefix = '/api'; // Pages Function entrypoint; normally handles both TLV and non-TLV via server-side proxy fetches
+  var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
 
   function resetProxy() {
     PROXY_BASE = '';
@@ -841,7 +841,7 @@ body.idle #right-panel {
     });
   }
 
-  // Legacy reset for explicit /api2 usage or older redirect-based flows
+  // Periodically reset proxy so client can re-check if direct /api works
   setInterval(resetProxy, 300000); // 5 min
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;

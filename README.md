@@ -38,13 +38,13 @@ The polygon data file (`locations_polygons.json`) is not in the repo — `./web-
 
 ## Deploy
 
-Deployed to [Cloudflare Pages](https://pages.cloudflare.com) (static assets + Pages Functions proxy entrypoint for both TLV and non-TLV clients):
+Deployed to [Cloudflare Pages](https://pages.cloudflare.com) (static assets + TLV proxy):
 
 ```sh
 ./deploy
 ```
 
-The worker-backed proxy endpoint is deployed separately:
+The fallback Worker (for non-TLV users) is deployed separately:
 
 ```sh
 cd worker && npx wrangler deploy
@@ -62,7 +62,7 @@ functions/
     history.js        # proxies history API
     alarms-history.js # proxies extended history API
 worker/
-  src/index.js        # worker-backed proxy endpoint (placement: azure:israelcentral)
+  src/index.js        # fallback proxy for non-TLV users (placement: azure:israelcentral)
   wrangler.toml       # Worker config with placement and /api2/* route
 ```
 
