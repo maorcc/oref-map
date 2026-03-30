@@ -935,6 +935,17 @@ body.idle #right-panel {
   var mapPopup = null;       
 
   // --- MapLibre Initialization ---
+      const map = new maplibregl.Map({
+      container: 'map',
+      
+      // PASTE YOUR MAPTILER API KEY AT THE END OF THIS URL:
+      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=YOUR_MAPTILER_KEY_HERE`, 
+      
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
+  });
+      
   map.on('load', function() {
       mapLoaded = true;
       map.addSource('alerts-source', {
