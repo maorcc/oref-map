@@ -41,7 +41,6 @@ async function fetchAndCache(context, { upstreamUrl, cacheKeyUrl, kind, colo, se
   if (cached) {
     const resp = new Response(cached.body, cached);
     resp.headers.set('X-CF-Colo', colo);
-    resp.headers.set('X-Proxy-Cache', 'HIT');
     if (upstreamProxyLabel) resp.headers.set('X-Upstream-Proxy', upstreamProxyLabel);
     return resp;
   }
@@ -57,7 +56,6 @@ async function fetchAndCache(context, { upstreamUrl, cacheKeyUrl, kind, colo, se
       'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
       'Cache-Control': 's-maxage=1, max-age=2',
       'X-CF-Colo': colo,
-      'X-Proxy-Cache': 'MISS',
       'X-Served-By': servedBy,
       ...(upstreamProxyLabel ? { 'X-Upstream-Proxy': upstreamProxyLabel } : {}),
     },
