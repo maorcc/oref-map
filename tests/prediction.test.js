@@ -10,6 +10,7 @@ function approx(a, b, tol) { return Math.abs(a - b) < (tol || 1e-6); }
 function section(name) { console.log('\n' + name); }
 
 // ── Extracted functions ──────────────────────────────────────────────
+// NOTE: Functions below are copied from web/prediction-mode.js. Keep in sync.
 
 function polygonArea(poly) {
   var rings = poly.getLatLngs();
@@ -36,58 +37,48 @@ function polygonCentroid(poly) {
   return [sumLat / outer.length, sumLng / outer.length];
 }
 
-function clusterPoints(points, eps, minPts) {
-  if (!minPts) minPts = 2;
-  var n = points.length;
-  var eps2 = eps * eps;
-  var labels = [];
-  for (var i = 0; i < n; i++) labels[i] = -1;
-  function neighbors(i) {
-    var nb = [];
-    for (var j = 0; j < n; j++) {
-      var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-      if (dl * dl + dg * dg <= eps2) nb.push(j);
-    }
-    return nb;
-  }
-  var cluster = 0;
+function clusterByAdjacency(locPoints, locationPolygons) {
+  var n = locPoints.length;
+  if (n === 0) return [];
+  var locVerts = [];
   for (var i = 0; i < n; i++) {
-    if (labels[i] !== -1) continue;
-    var nb = neighbors(i);
-    if (nb.length < minPts) { labels[i] = -2; continue; }
-    labels[i] = cluster;
-    var queue = nb.slice(), qi = 0;
-    while (qi < queue.length) {
-      var j = queue[qi++];
-      if (labels[j] === -2) labels[j] = cluster;
-      if (labels[j] !== -1) continue;
-      labels[j] = cluster;
-      var jnb = neighbors(j);
-      if (jnb.length >= minPts) {
-        for (var k = 0; k < jnb.length; k++) queue.push(jnb[k]);
+    var poly = locationPolygons[locPoints[i][3]];
+    var verts = [];
+    if (poly) {
+      var rings = poly.getLatLngs();
+      var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+      for (var j = 0; j < outer.length; j++) verts.push([outer[j].lat, outer[j].lng]);
+    }
+    locVerts.push(verts);
+  }
+  var parent = [];
+  for (var i = 0; i < n; i++) parent[i] = i;
+  function find(i) {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; }
+    return i;
+  }
+  var tol2 = 0.005 * 0.005;
+  for (var i = 0; i < n; i++) {
+    for (var j = i + 1; j < n; j++) {
+      if (find(i) === find(j)) continue;
+      var found = false;
+      for (var vi = 0; vi < locVerts[i].length && !found; vi++) {
+        for (var vj = 0; vj < locVerts[j].length && !found; vj++) {
+          var dl = locVerts[i][vi][0] - locVerts[j][vj][0];
+          var dg = locVerts[i][vi][1] - locVerts[j][vj][1];
+          if (dl * dl + dg * dg < tol2) {
+            parent[find(i)] = find(j);
+            found = true;
+          }
+        }
       }
     }
-    cluster++;
-  }
-  if (cluster === 0) return [];
-  for (var i = 0; i < n; i++) {
-    if (labels[i] >= 0) continue;
-    var best = Infinity, bestC = -1;
-    for (var j = 0; j < n; j++) {
-      if (labels[j] < 0) continue;
-      var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-      var d2 = dl * dl + dg * dg;
-      if (d2 < best) { best = d2; bestC = labels[j]; }
-    }
-    if (bestC < 0) continue;
-    labels[i] = bestC;
   }
   var groups = {};
   for (var i = 0; i < n; i++) {
-    var c = labels[i];
-    if (c < 0) continue;
-    if (!groups[c]) groups[c] = [];
-    groups[c].push(points[i]);
+    var root = find(i);
+    if (!groups[root]) groups[root] = [];
+    groups[root].push(locPoints[i]);
   }
   return Object.keys(groups).map(function(k) { return groups[k]; });
 }
@@ -235,50 +226,63 @@ section('polygonArea');
   assert(polygonArea(degen) === 0, 'degenerate polygon (2 points) = 0');
 })();
 
-section('clusterPoints (DBSCAN)');
+section('clusterByAdjacency — shared vertices');
 (function() {
-  // Two tight groups far apart
-  var pts = [[0, 0], [0.01, 0.01], [0.02, 0],   // group A near origin
-             [5, 5], [5.01, 5.01], [5.02, 5]];   // group B far away
-  var clusters = clusterPoints(pts, 0.35);
-  assert(clusters.length === 2, 'two distant groups → 2 clusters');
-
-  // All within threshold (chain connectivity)
-  var close = [[0, 0], [0.1, 0], [0.2, 0], [0.3, 0]];
-  var c2 = clusterPoints(close, 0.35);
-  assert(c2.length === 1, 'chain within threshold → 1 cluster');
-
-  // Single point: DBSCAN with minPts=2 cannot form a core point → noise → returns []
-  var single = [[1, 1]];
-  assert(clusterPoints(single, 0.35).length === 0, 'single point → 0 clusters (noise in DBSCAN)');
-
-  // Points just outside threshold should stay separate (each pair is noise)
-  var sep = [[0, 0], [0.5, 0]];
-  assert(clusterPoints(sep, 0.35).length === 0, 'two points beyond threshold → 0 clusters (both noise)');
-
-  // Three-element points (with weight) cluster by first two coords
-  var weighted = [[0, 0, 0.5], [0.1, 0, 0.8], [5, 5, 1.2]];
-  var c3 = clusterPoints(weighted, 0.35);
-  // [0,0] and [0.1,0] are within eps and form a core cluster; [5,5] is noise but
-  // cluster > 0 so it gets assigned to nearest cluster
-  assert(c3.length === 1, 'weighted: two close + one far → 1 cluster (far point assigned to nearest)');
-
-  // Two close pairs far from each other
-  var twoPairs = [[0, 0, 0.5], [0.1, 0, 0.8], [5, 5, 1.0], [5.1, 5, 1.2]];
-  var c4 = clusterPoints(twoPairs, 0.35);
-  assert(c4.length === 2, 'two close pairs far apart → 2 clusters');
+  // polyA and polyB share vertices at [30.1, 34.0] and [30.1, 34.1] → same cluster
+  var polyA = mockPoly([[30.0, 34.0], [30.1, 34.0], [30.1, 34.1], [30.0, 34.1]]);
+  var polyB = mockPoly([[30.1, 34.0], [30.2, 34.0], [30.2, 34.1], [30.1, 34.1]]);
+  var polyC = mockPoly([[31.0, 35.0], [31.1, 35.0], [31.1, 35.1], [31.0, 35.1]]);
+  var locPoints = [[30.05, 34.05, 1, 'A'], [30.15, 34.05, 1, 'B'], [31.05, 35.05, 1, 'C']];
+  var locationPolygons = { A: polyA, B: polyB, C: polyC };
+  var clusters = clusterByAdjacency(locPoints, locationPolygons);
+  assert(clusters.length === 2, 'adjacent pair + far one → 2 clusters (got ' + clusters.length + ')');
+  var sizes = clusters.map(function(c) { return c.length; }).sort(function(a, b) { return a - b; });
+  assert(sizes[0] === 1 && sizes[1] === 2, 'cluster sizes are [1, 2]');
 })();
 
-section('clusterPoints — all-noise guard');
+section('clusterByAdjacency — no shared vertices');
 (function() {
-  // All points isolated (no two within eps) → all noise → cluster count = 0 → returns []
-  var isolated = [[0, 0], [1, 1], [3, 3], [6, 6]];
-  var result = clusterPoints(isolated, 0.35);
-  assert(result.length === 0, 'all isolated points → empty array (all-noise guard)');
+  var polyA = mockPoly([[30.0, 34.0], [30.1, 34.0], [30.1, 34.1], [30.0, 34.1]]);
+  var polyB = mockPoly([[31.0, 35.0], [31.1, 35.0], [31.1, 35.1], [31.0, 35.1]]);
+  var locPoints = [[30.05, 34.05, 1, 'A'], [31.05, 35.05, 1, 'B']];
+  var clusters = clusterByAdjacency(locPoints, { A: polyA, B: polyB });
+  assert(clusters.length === 2, 'non-touching polygons → 2 clusters');
+})();
 
-  // Verify with single point as well
-  var one = [[10, 20]];
-  assert(clusterPoints(one, 0.5).length === 0, 'single isolated point → empty array');
+section('clusterByAdjacency — chain connectivity (transitive)');
+(function() {
+  // A touches B, B touches C → all three in one cluster
+  var polyA = mockPoly([[30.0, 34.0], [30.1, 34.0], [30.1, 34.1], [30.0, 34.1]]);
+  var polyB = mockPoly([[30.1, 34.0], [30.2, 34.0], [30.2, 34.1], [30.1, 34.1]]);
+  var polyC = mockPoly([[30.2, 34.0], [30.3, 34.0], [30.3, 34.1], [30.2, 34.1]]);
+  var locPoints = [[30.05, 34.05, 1, 'A'], [30.15, 34.05, 1, 'B'], [30.25, 34.05, 1, 'C']];
+  var clusters = clusterByAdjacency(locPoints, { A: polyA, B: polyB, C: polyC });
+  assert(clusters.length === 1, 'chain A→B→C → 1 cluster (got ' + clusters.length + ')');
+  assert(clusters[0].length === 3, 'cluster contains all 3 points');
+})();
+
+section('clusterByAdjacency — missing polygon');
+(function() {
+  // Location B has no polygon → B gets its own cluster (no shared vertices possible)
+  var polyA = mockPoly([[30.0, 34.0], [30.1, 34.0], [30.1, 34.1], [30.0, 34.1]]);
+  var locPoints = [[30.05, 34.05, 1, 'A'], [30.15, 34.05, 1, 'B']];
+  var clusters = clusterByAdjacency(locPoints, { A: polyA });
+  assert(clusters.length === 2, 'missing polygon → separate clusters');
+})();
+
+section('clusterByAdjacency — empty input');
+(function() {
+  assert(clusterByAdjacency([], {}).length === 0, 'empty input → empty output');
+})();
+
+section('clusterByAdjacency — near-miss tolerance');
+(function() {
+  // polyB's nearest vertex is 0.006° from polyA's vertex — just outside 0.005 tolerance
+  var polyA = mockPoly([[30.0, 34.0], [30.1, 34.0], [30.1, 34.1], [30.0, 34.1]]);
+  var polyB = mockPoly([[30.106, 34.0], [30.2, 34.0], [30.2, 34.1], [30.106, 34.1]]);
+  var locPoints = [[30.05, 34.05, 1, 'A'], [30.15, 34.05, 1, 'B']];
+  var clusters = clusterByAdjacency(locPoints, { A: polyA, B: polyB });
+  assert(clusters.length === 2, 'vertices 0.006° apart (> 0.005 tol) → separate clusters');
 })();
 
 section('fitLine — unweighted');

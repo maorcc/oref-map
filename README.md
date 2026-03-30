@@ -80,7 +80,7 @@ To run locally, see the [Development](#development) section above.
 
 ## Contributors
 
-Thanks to [@uripeer3](https://github.com/uripeer3), [@tomerkon](https://github.com/tomerkon), [@michalrymland](https://github.com/michalrymland), and [@ravitzm21](https://github.com/ravitzm21) for contributing to this project.
+Thanks to [@uripeer3](https://github.com/uripeer3), [@tomerkon](https://github.com/tomerkon), [@michalrymland](https://github.com/michalrymland), [@ravitzm21](https://github.com/ravitzm21), [@tomeras91](https://github.com/tomeras91), and [@talmiller2](https://github.com/talmiller2) for contributing to this project.
 
 ## Data
 

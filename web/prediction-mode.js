@@ -235,10 +235,13 @@
     }
 
     function updatePredictionLines() {
-      clearPredictionLines();
-      if (!enabled) return;
+      if (!enabled) {
+        clearPredictionLines();
+        return;
+      }
 
       ensureOrefPoints().then(function(orefPts) {
+        clearPredictionLines();
         var locationStates = A.locationStates;
         var locationPolygons = A.locationPolygons;
 
@@ -428,9 +431,8 @@
       });
     }
 
-    // Listen for state changes and escape
+    // Listen for state changes
     document.addEventListener('app:stateChanged', function() { sync(); });
-    document.addEventListener('app:escape', function() { clearPredictionLines(); });
 
     // Initial render if enabled
     if (enabled) sync();

@@ -43,7 +43,7 @@ Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?
 - **CSS-only** (e.g. hiding a menu item): add `class="f-gated"` to the element, then add a CSS rule `body.f-<name> #element.f-gated { display: block !important; }`.
 - **JS-only**: check `if (FF.myfeature) { ... }`.
 
-**Current flags:** `f-log` (on-screen console overlay), `f-debugapi` (force API proxy host).
+**Current flags:** `f-log` (on-screen console overlay), `f-debugapi` (force API proxy host), `f-predict` (launch source prediction lines, experimental).
 
 ## Oref API details
 
