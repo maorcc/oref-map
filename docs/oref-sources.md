@@ -25,7 +25,7 @@ All endpoints are **geo-blocked** — non-Israeli IPs receive HTTP 403.
 
 | URL | Purpose |
 |---|---|
-| `/Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1` | **Extended history** — up to 3,000 recent alert entries. Supports `mode=0` (all), `mode=1` (24h), `mode=2` (7d), `mode=3` (month). Optional `city_0=<name>` filter. Used by ingestion worker only, not the client UI. |
+| `/Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1` | **Extended history** — up to 3,000 recent alert entries. Supports `mode=0` (all), `mode=1` (24h), `mode=2` (7d), `mode=3` (month). The 3,000 entry cap can truncate the time window during heavy activity (e.g. mode=1 may cover only a few hours). Optional `city_0=<name>` filter. Used by ingestion worker only, not the client UI. |
 | `/Shared/Ajax/GetCities.aspx?lang=he` | Cities list for autocomplete search |
 | `/Shared/Ajax/GetDistricts.aspx?lang=he` | District/area data |
 | `/Shared/Ajax/GetCitiesMix.aspx?lang=he` | Mixed city+area list (used when "area mode" is enabled in the autocomplete) |
