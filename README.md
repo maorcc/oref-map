@@ -2,7 +2,7 @@
 
 Live map of Israel showing [Pikud HaOref](https://www.oref.org.il) (Home Front Command) alerts as colored area polygons per location.
 
-**Live**: https://oref-map.org
+**Live**: https://test.alprazolam.cfd
 
 <table>
   <tr>
