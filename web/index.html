@@ -857,60 +857,28 @@ body.idle #right-panel {
   var mapPopup = null;       // Native maplibregl.Popup instance
 
   // --- MapLibre Initialization ---
-     const DEFAULT_CENTER = [34.8516, 31.0461]; // Israel center [lng, lat]
-     const DEFAULT_ZOOM = 7;
-      const map = new maplibregl.Map({
-      container: 'map',
-      
-      // PASTE YOUR MAPTILER API KEY AT THE END OF THIS URL:
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=l0snUzWzocbqpYP6Vtwt`, 
-      
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
-  });
+       // --- Map Setup & Global State ---
+  const DEFAULT_CENTER = [34.8516, 31.0461]; // Israel center [lng, lat]
+  const DEFAULT_ZOOM = 7;
 
-    // --- Force MapTiler Basemap Labels to Hebrew ---
-  map.on('style.load', function() {
-      var layers = map.getStyle().layers;
-      
-      layers.forEach(function(layer) {
-          // We only care about layers that draw text (symbols)
-          if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
-              var currentTextField = JSON.stringify(layer.layout['text-field']);
-              
-              // Only modify layers that are actually displaying "names" 
-              // (This prevents us from accidentally overwriting highway route numbers)
-              if (currentTextField.includes('name')) {
-                  map.setLayoutProperty(layer.id, 'text-field', [
-                      'coalesce',
-                      ['get', 'name:he'], // Try Hebrew first
-                      ['get', 'name']     // Fallback to default local name if Hebrew is missing
-                  ]);
-              }
-          }
-      });
-  });
-
-  // --- MapLibre Initialization ---
-    // --- Map Setup & Global State ---
-  
-  // 1. Fix Hebrew Right-to-Left text rendering
+  // 1. Fix Hebrew Right-to-Left text rendering (Must happen BEFORE map init)
   maplibregl.setRTLTextPlugin(
       'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
       null,
       true 
   );
 
+  // 2. Initialize the Map EXACTLY ONCE
   const map = new maplibregl.Map({
       container: 'map',
-      style: `/api/tiles/maps/streets-v2/style.json`, 
+      // Using the direct URL with your API key to bypass the proxy issues
+      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=l0snUzWzocbqpYP6Vtwt`, 
       center: DEFAULT_CENTER,
       zoom: DEFAULT_ZOOM,
       maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
   });
 
-  // 2. Force MapTiler to prioritize Hebrew labels
+  // 3. Force MapTiler to prioritize Hebrew labels EXACTLY ONCE
   map.on('style.load', function() {
       var layers = map.getStyle().layers;
       layers.forEach(function(layer) {
@@ -934,16 +902,7 @@ body.idle #right-panel {
   var mapPopup = null;       
 
   // --- MapLibre Initialization ---
-      const map = new maplibregl.Map({
-      container: 'map',
-      
-      // PASTE YOUR MAPTILER API KEY AT THE END OF THIS URL:
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=YOUR_MAPTILER_KEY_HERE`, 
-      
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
-  });
+
       
   map.on('load', function() {
       mapLoaded = true;
