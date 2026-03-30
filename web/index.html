@@ -878,6 +878,7 @@ body.idle #right-panel {
           data: polygonsGeoJSON
       });
 
+            // Layer 1: Polygon fill colors
       map.addLayer({
           id: 'alerts-fill',
           type: 'fill',
@@ -888,6 +889,7 @@ body.idle #right-panel {
           }
       });
 
+      // Layer 2: Polygon outlines
       map.addLayer({
           id: 'alerts-outline',
           type: 'line',
@@ -898,6 +900,18 @@ body.idle #right-panel {
               'line-width': ['get', 'lineWidth']
           }
       });
+
+      // NEW Layer 3: Invisible interaction layer (always clickable)
+      map.addLayer({
+          id: 'alerts-interactive',
+          type: 'fill',
+          source: 'alerts-source',
+          paint: {
+              'fill-color': 'transparent', // Transparent pixels still catch clicks
+              'fill-opacity': 1
+          }
+      });
+
 
       map.on('click', 'alerts-fill', function(e) {
           if (document.body.classList.contains('has-overlay')) return;
