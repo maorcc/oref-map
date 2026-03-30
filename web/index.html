@@ -871,12 +871,33 @@ body.idle #right-panel {
   var mapPopup = null;       // Native maplibregl.Popup instance
 
   // --- MapLibre Initialization ---
-  map.on('load', function() {
-      mapLoaded = true;
-      map.addSource('alerts-source', {
-          type: 'geojson',
-          data: polygonsGeoJSON
+    // --- Force MapTiler Basemap Labels to Hebrew ---
+  map.on('style.load', function() {
+      var layers = map.getStyle().layers;
+      
+      layers.forEach(function(layer) {
+          // We only care about layers that draw text (symbols)
+          if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+              var currentTextField = JSON.stringify(layer.layout['text-field']);
+              
+              // Only modify layers that are actually displaying "names" 
+              // (This prevents us from accidentally overwriting highway route numbers)
+              if (currentTextField.includes('name')) {
+                  map.setLayoutProperty(layer.id, 'text-field', [
+                      'coalesce',
+                      ['get', 'name:he'], // Try Hebrew first
+                      ['get', 'name']     // Fallback to default local name if Hebrew is missing
+                  ]);
+              }
+          }
       });
+  });
+
+  // --- MapLibre Initialization ---
+  map.on('load', function() {
+      // (Your existing map.addSource and map.addLayer code stays exactly the same here)
+      // ...
+
 
             // Layer 1: Polygon fill colors
       map.addLayer({
