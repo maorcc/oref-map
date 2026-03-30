@@ -872,6 +872,12 @@ body.idle #right-panel {
 
   // --- MapLibre Initialization ---
     // --- Force MapTiler Basemap Labels to Hebrew ---
+      // Load the RTL plugin to fix Hebrew text rendering
+  maplibregl.setRTLTextPlugin(
+      'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+      null,
+      true // Lazy loads the plugin only when text is encountered
+  );
   map.on('style.load', function() {
       var layers = map.getStyle().layers;
       
