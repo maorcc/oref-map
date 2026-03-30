@@ -912,16 +912,17 @@ body.idle #right-panel {
           }
       });
 
-
-      map.on('click', 'alerts-fill', function(e) {
+      // Change 'alerts-fill' to 'alerts-interactive'
+      map.on('click', 'alerts-interactive', function(e) {
           if (document.body.classList.contains('has-overlay')) return;
           var feature = e.features[0];
           showPopup(feature.properties.name, feature, e.lngLat);
       });
       
-      map.on('mouseenter', 'alerts-fill', function() { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'alerts-fill', function() { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'alerts-interactive', function() { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'alerts-interactive', function() { map.getCanvas().style.cursor = ''; });
 
+      
       updateMapLibreSource();
   });
 
