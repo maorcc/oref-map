@@ -894,12 +894,54 @@ body.idle #right-panel {
   });
 
   // --- MapLibre Initialization ---
+    // --- Map Setup & Global State ---
+  
+  // 1. Fix Hebrew Right-to-Left text rendering
+  maplibregl.setRTLTextPlugin(
+      'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+      null,
+      true 
+  );
+
+  const map = new maplibregl.Map({
+      container: 'map',
+      style: `/api/tiles/maps/streets-v2/style.json`, 
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
+  });
+
+  // 2. Force MapTiler to prioritize Hebrew labels
+  map.on('style.load', function() {
+      var layers = map.getStyle().layers;
+      layers.forEach(function(layer) {
+          if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+              var currentTextField = JSON.stringify(layer.layout['text-field']);
+              if (currentTextField.includes('name')) {
+                  map.setLayoutProperty(layer.id, 'text-field', [
+                      'coalesce',
+                      ['get', 'name:he'], // Try Hebrew first
+                      ['get', 'name']     // Fallback if missing
+                  ]);
+              }
+          }
+      });
+  });
+
+  var polygonsGeoJSON = { type: "FeatureCollection", features: [] };
+  var featureMap = {};       
+  var locationPolygons = {}; 
+  var mapLoaded = false;
+  var mapPopup = null;       
+
+  // --- MapLibre Initialization ---
   map.on('load', function() {
-      // (Your existing map.addSource and map.addLayer code stays exactly the same here)
-      // ...
+      mapLoaded = true;
+      map.addSource('alerts-source', {
+          type: 'geojson',
+          data: polygonsGeoJSON
+      });
 
-
-            // Layer 1: Polygon fill colors
       map.addLayer({
           id: 'alerts-fill',
           type: 'fill',
@@ -910,7 +952,6 @@ body.idle #right-panel {
           }
       });
 
-      // Layer 2: Polygon outlines
       map.addLayer({
           id: 'alerts-outline',
           type: 'line',
@@ -922,33 +963,23 @@ body.idle #right-panel {
           }
       });
 
-      // NEW Layer 3: Invisible interaction layer (always clickable)
-      map.addLayer({
-          id: 'alerts-interactive',
-          type: 'fill',
-          source: 'alerts-source',
-          paint: {
-              'fill-color': 'transparent', // Transparent pixels still catch clicks
-              'fill-opacity': 1
+      // 3. Fix the Click Bug
+      map.on('click', 'alerts-fill', function(e) {
+          if (document.body.classList.contains('has-overlay')) return;
+          
+          // MapLibre gives us a copy. We MUST look up the real feature by name
+          // so the popup highlight function modifies the actual source data.
+          var cityName = e.features[0].properties.name;
+          var realFeature = featureMap[cityName];
+          
+          if (realFeature) {
+              showPopup(cityName, realFeature, e.lngLat);
           }
       });
-
-      // Change 'alerts-fill' to 'alerts-interactive'
-      map.on('click', 'alerts-interactive', function(e) {
-          if (document.body.classList.contains('has-overlay')) return;
-          var feature = e.features[0];
-          showPopup(feature.properties.name, feature, e.lngLat);
-      });
       
-      map.on('mouseenter', 'alerts-interactive', function() { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', 'alerts-interactive', function() { map.getCanvas().style.cursor = ''; });
+      map.on('mouseenter', 'alerts-fill', function() { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'alerts-fill', function() { map.getCanvas().style.cursor = ''; });
 
-        // Load the RTL plugin to fix Hebrew text rendering
-      maplibregl.setRTLTextPlugin(
-      'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
-      null,
-      true // Lazy loads the plugin only when text is encountered
-  );    
       updateMapLibreSource();
   });
 
@@ -957,6 +988,7 @@ body.idle #right-panel {
       var source = map.getSource('alerts-source');
       if (source) source.setData(polygonsGeoJSON);
   }
+
   
   // --- Toast ---
   function showToast(msg) {
