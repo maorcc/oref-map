@@ -848,16 +848,68 @@ body.idle #right-panel {
   var GREEN_FADE_MS = 120000; // 2 minutes
   var ALERT_MAX_AGE_MS = 3600000; // 1 hour — safety net for stuck alerts
   var FADE_TICK_MS = 1000;
-
+  
+// --- Map setup ---
   // --- Map setup ---
-const map = new maplibregl.Map({
-const map = new maplibregl.Map({
-    container: 'map',
-    // Point this to your new Cloudflare Worker proxy route
-    style: `/api/tiles/maps/streets-v2/style.json`, 
-    center: [34.8516, 31.0461],
-    zoom: 7
-});
+  const map = new maplibregl.Map({
+      container: 'map',
+      style: `/api/tiles/maps/streets-v2/style.json`, 
+      center: [34.8516, 31.0461],
+      zoom: 7
+  });
+
+  // Global GeoJSON object to hold all our polygons
+  var polygonsGeoJSON = {
+      type: "FeatureCollection",
+      features: []
+  };
+  var featureMap = {}; // Fast lookup for updating specific cities
+  
+  // Add MapLibre sources and layers once the map style loads
+  map.on('load', function() {
+      map.addSource('alerts-source', {
+          type: 'geojson',
+          data: polygonsGeoJSON
+      });
+
+      map.addLayer({
+          id: 'alerts-fill',
+          type: 'fill',
+          source: 'alerts-source',
+          paint: {
+              'fill-color': ['get', 'fillColor'],
+              'fill-opacity': ['get', 'fillOpacity']
+          }
+      });
+
+      map.addLayer({
+          id: 'alerts-outline',
+          type: 'line',
+          source: 'alerts-source',
+          paint: {
+              'line-color': ['get', 'lineColor'],
+              'line-opacity': ['get', 'lineOpacity'],
+              'line-width': ['get', 'lineWidth']
+          }
+      });
+
+      // MapLibre click event for popups
+      map.on('click', 'alerts-fill', function(e) {
+          if (document.body.classList.contains('has-overlay')) return;
+          var feature = e.features[0];
+          showPopup(feature.properties.name, feature, e.lngLat);
+      });
+      
+      // Change cursor on hover
+      map.on('mouseenter', 'alerts-fill', function() { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', 'alerts-fill', function() { map.getCanvas().style.cursor = ''; });
+  });
+
+  function updateMapLibreSource() {
+      var source = map.getSource('alerts-source');
+      if (source) source.setData(polygonsGeoJSON);
+  }
+
   
   // --- Toast ---
   function showToast(msg) {
