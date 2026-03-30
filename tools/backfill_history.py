@@ -51,6 +51,11 @@ def r2_date_key(alert_date: str) -> str:
     return d.isoformat()
 
 
+def ascii_to_geresh(name: str) -> str:
+    """Convert ASCII apostrophes to Hebrew geresh/gershayim (oref API migration)."""
+    return name.replace("''", "\u05F4").replace("'", "\u05F3")
+
+
 RETRIES = 3
 RETRY_DELAYS = [2, 5, 15]
 WAR_START = "2026-02-28"
@@ -183,7 +188,9 @@ async def main() -> None:
     async with aiohttp.ClientSession() as session:
         print("Fetching city list...")
         cities = await fetch_cities(session)
-        print(f"  {len(cities)} cities")
+        extra = [ascii_to_geresh(c) for c in cities if "'" in c]
+        cities = cities + extra
+        print(f"  {len(cities)} cities ({len(extra)} geresh variants)")
 
         print(f"Fetching history for all cities (concurrency={CONCURRENCY})...")
         semaphore = asyncio.Semaphore(CONCURRENCY)
