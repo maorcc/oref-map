@@ -808,16 +808,16 @@ body.idle #right-panel {
   }
 
   // --- Config ---
-    // --- Config ---
-  var PROXY_BASE = 'https://oref-map.org';
+  // Set PROXY_BASE to the Cloudflare Worker URL for production, e.g.:
+  //   var PROXY_BASE = 'https://oref-proxy.YOUR_ACCOUNT.workers.dev';
+  var PROXY_BASE = '';
   var apiPrefix = '/api2'; // Pages Function; switches to '/api2' (Worker) if non-TLV
 
   function resetProxy() {
-    PROXY_BASE = 'https://oref-map.org'; // Make sure to update it here too so it doesn't reset!
+    PROXY_BASE = '';
     apiPrefix = '/api';
   }
-
-
+      
   function apiFetch(endpoint) {
     var url = PROXY_BASE + apiPrefix + '/' + endpoint;
     if (FF.debugapi) url += '?debugapi=' + encodeURIComponent(FF.debugapi);
