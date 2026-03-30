@@ -851,44 +851,14 @@ body.idle #right-panel {
 
   // --- Map setup ---
 const map = new maplibregl.Map({
-    container: 'map', // ID of your map div
-    style: `https://api.maptiler.com/maps/streets-v2/style.json?key=YOUR_MAPTILER_KEY`,
-    center: [34.8516, 31.0461], // Israel center [lng, lat]
-    zoom: 7,
-    maxBounds: [[33.5, 29.4], [36.3, 33.4]] // Rough bounding box for Israel [SW lng,lat, NE lng,lat]
+const map = new maplibregl.Map({
+    container: 'map',
+    // Point this to your new Cloudflare Worker proxy route
+    style: `/api/tiles/maps/streets-v2/style.json`, 
+    center: [34.8516, 31.0461],
+    zoom: 7
 });
-map.on('load', () => {
-    // Add an empty GeoJSON source for the alerts
-    map.addSource('alerts-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] }
-    });
-
-    // Add a layer to fill the polygons with color
-    map.addLayer({
-        id: 'alerts-fill',
-        type: 'fill',
-        source: 'alerts-source',
-        paint: {
-            // Use data-driven styling based on a 'color' property in your GeoJSON
-            'fill-color': ['get', 'color'], 
-            'fill-opacity': 0.6
-        }
-    });
-
-    // Optional: Add a layer for polygon outlines
-    map.addLayer({
-        id: 'alerts-outline',
-        type: 'line',
-        source: 'alerts-source',
-        paint: {
-            'line-color': '#ffffff',
-            'line-width': 2
-        }
-    });
-});
-
-
+  
   // --- Toast ---
   function showToast(msg) {
     var el = document.createElement('div');
