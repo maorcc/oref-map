@@ -1482,12 +1482,15 @@ body.idle #right-panel {
 
   var openPopupName = null;
 
-  function updateOverlay() {
+    function updateOverlay() {
     var tlBtn = document.getElementById('timeline-btn');
     var panelOpen = menuOpen || (tlBtn && tlBtn.classList.contains('open'));
-    var popupOpen = openPopupName !== null;
-    document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
+    
+    // We removed the 'popupOpen' check here. 
+    // Now, opening a city popup will NOT lock the map canvas!
+    document.body.classList.toggle('has-overlay', panelOpen);
   }
+
 
   function recordHistory(name, title, alertDate, state) {
     if (!locationHistory[name]) locationHistory[name] = [];
