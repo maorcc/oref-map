@@ -845,20 +845,6 @@ body.idle #right-panel {
   var ALERT_MAX_AGE_MS = 3600000; // 1 hour
   var FADE_TICK_MS = 1000;
 
-  // --- Map Setup & Global State ---
-  const DEFAULT_CENTER = [34.8516, 31.0461];
-  const DEFAULT_ZOOM = 7;
-  
-    const map = new maplibregl.Map({
-      container: 'map',
-      // Temporarily bypass the Cloudflare proxy to test if rendering works
-      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=l0snUzWzocbqpYP6Vtwt`, 
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
-  });
-
-
   // MapLibre requires all polygons to be in a single GeoJSON FeatureCollection
   var polygonsGeoJSON = {
       type: "FeatureCollection",
@@ -871,6 +857,19 @@ body.idle #right-panel {
   var mapPopup = null;       // Native maplibregl.Popup instance
 
   // --- MapLibre Initialization ---
+     const DEFAULT_CENTER = [34.8516, 31.0461]; // Israel center [lng, lat]
+     const DEFAULT_ZOOM = 7;
+      const map = new maplibregl.Map({
+      container: 'map',
+      
+      // PASTE YOUR MAPTILER API KEY AT THE END OF THIS URL:
+      style: `https://api.maptiler.com/maps/streets-v2/style.json?key=l0snUzWzocbqpYP6Vtwt`, 
+      
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      maxBounds: [[33.5, 29.4], [36.3, 33.4]] 
+  });
+
     // --- Force MapTiler Basemap Labels to Hebrew ---
   map.on('style.load', function() {
       var layers = map.getStyle().layers;
