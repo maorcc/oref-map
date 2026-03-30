@@ -808,13 +808,15 @@ body.idle #right-panel {
   }
 
   // --- Config ---
-  var PROXY_BASE = 'http://test.alprazolam.cfd;
-  var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
+    // --- Config ---
+  var PROXY_BASE = 'https://oref-map.org';
+  var apiPrefix = '/api2'; // Pages Function; switches to '/api2' (Worker) if non-TLV
 
   function resetProxy() {
-    PROXY_BASE = 'http://test.alprazolam.cfd;
+    PROXY_BASE = 'https://oref-map.org'; // Make sure to update it here too so it doesn't reset!
     apiPrefix = '/api';
   }
+
 
   function apiFetch(endpoint) {
     var url = PROXY_BASE + apiPrefix + '/' + endpoint;
