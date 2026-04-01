@@ -100,7 +100,7 @@ async function cleanupOldMarkers(env) {
 
 export default {
   async scheduled(event, env, ctx) {
-    const window = computeWindow(Date.now());
+    const window = computeWindow(event.scheduledTime);
     if (!window) {
       console.log('Dead zone — skipping');
       return;
@@ -114,20 +114,25 @@ export default {
 
     // Check if this timeslot was already processed
     const marker = await env.HISTORY_BUCKET.head(`meta/${timeslot}`);
-    if (marker) {
-      console.log(`Timeslot ${timeslot} already processed`);
+
+    // Alert-check run: notify if missed, always clean up old markers
+    if (isAlertCheck) {
+      if (!marker) {
+        console.log(`Alert check: timeslot ${timeslot} was NOT processed after all attempts`);
+        ctx.waitUntil(sendPushover(
+          env,
+          'oref-map ingestion: missed window',
+          `Window ${timeslot} [${windowStartStr}, ${windowEndStr}) was not processed after all attempts.`
+        ));
+      } else {
+        console.log(`Alert check: timeslot ${timeslot} OK`);
+      }
+      ctx.waitUntil(cleanupOldMarkers(env));
       return;
     }
 
-    // Alert-check run: don't fetch, just notify and clean up
-    if (isAlertCheck) {
-      console.log(`Alert check: timeslot ${timeslot} was NOT processed after all attempts`);
-      ctx.waitUntil(sendPushover(
-        env,
-        'oref-map ingestion: missed window',
-        `Window ${timeslot} [${windowStartStr}, ${windowEndStr}) was not processed after all attempts.`
-      ));
-      ctx.waitUntil(cleanupOldMarkers(env));
+    if (marker) {
+      console.log(`Timeslot ${timeslot} already processed`);
       return;
     }
 
