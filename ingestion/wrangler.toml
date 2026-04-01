@@ -6,7 +6,7 @@ compatibility_date = "2024-01-01"
 HISTORY_PROXY_URL = "https://proxy1.oref-proxy1.workers.dev"
 
 [triggers]
-crons = ["3/15 * * * *"]
+crons = ["1/2 * * * *"]
 
 [observability]
 enabled = true
