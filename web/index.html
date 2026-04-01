@@ -1711,7 +1711,19 @@ body.idle #right-panel {
     console.log('Injecting mock alert:', mockAlert);
     processLiveAlert(mockAlert);
   };
-
+      
+  window.printRedAlertLocations = function() {
+    var red = [];
+    for (var name in locationStates) {
+      if (locationStates[name] && locationStates[name].state === 'red') {
+        red.push(name);
+      }
+    }
+    red.sort(function(a, b) { return a.localeCompare(b, 'he'); });
+    console.log(JSON.stringify(red));
+    return red;
+  };
+      
   function processHistoryEntry(entry) {
     if (!entry || !entry.data || !entry.title) return;
     var title = entry.title.replace(/\s+/g, ' ').trim();
