@@ -3227,6 +3227,7 @@ body.idle #right-panel {
   try { _wakeLockEnabled = localStorage.getItem('oref-wake-lock') !== 'disabled'; } catch(e) {}
   var _menuWakeLock = document.getElementById('menu-wakelock');
   var _isMobileDevice = (navigator.userAgentData ? navigator.userAgentData.mobile : (('ontouchstart' in window) || navigator.maxTouchPoints > 0));
+  if (!_isMobileDevice) _wakeLockEnabled = false;
   if (!('wakeLock' in navigator) || !_isMobileDevice) {
     if (_menuWakeLock) _menuWakeLock.style.display = 'none';
   } else if (_menuWakeLock) {
