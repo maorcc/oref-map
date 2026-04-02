@@ -688,7 +688,7 @@ body.idle #right-panel {
   <div id="about-modal" class="modal-content">
     <button id="about-close" class="modal-close">&times;</button>
     <h2>אודות מפת העורף</h2>
-    <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
+    <p>הצגת אזורי ההתרעות של פיקוד העורף על גבי מפה בזמן אמת.</p>
     <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
     <p>אין להסתמך על המידע והתכנים המוצגים באתר זה, ובכל מקרה יש לנהוג בהתאם להנחיות פיקוד העורף.</p>
     <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.</p>
@@ -3226,7 +3226,8 @@ body.idle #right-panel {
   var _wakeLockEnabled = true;
   try { _wakeLockEnabled = localStorage.getItem('oref-wake-lock') !== 'disabled'; } catch(e) {}
   var _menuWakeLock = document.getElementById('menu-wakelock');
-  if (!('wakeLock' in navigator)) {
+  var _isMobileDevice = (navigator.userAgentData ? navigator.userAgentData.mobile : (('ontouchstart' in window) || navigator.maxTouchPoints > 0));
+  if (!('wakeLock' in navigator) || !_isMobileDevice) {
     if (_menuWakeLock) _menuWakeLock.style.display = 'none';
   } else if (_menuWakeLock) {
     if (_wakeLockEnabled) _menuWakeLock.classList.add('active');
