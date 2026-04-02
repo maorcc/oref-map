@@ -3224,15 +3224,16 @@ body.idle #right-panel {
 
   // --- Wake lock: prevent screen from turning off ---
   var _wakeLock = null;
-  var _wakeLockEnabled = localStorage.getItem('oref-wake-lock') !== 'disabled';
+  var _wakeLockEnabled = true;
+  try { _wakeLockEnabled = localStorage.getItem('oref-wake-lock') !== 'disabled'; } catch(e) {}
   var _menuWakeLock = document.getElementById('menu-wakelock');
   if (!('wakeLock' in navigator)) {
-    _menuWakeLock.style.display = 'none';
-  } else {
+    if (_menuWakeLock) _menuWakeLock.style.display = 'none';
+  } else if (_menuWakeLock) {
     if (_wakeLockEnabled) _menuWakeLock.classList.add('active');
     _menuWakeLock.querySelector('.menu-item-row').addEventListener('click', function() {
       _wakeLockEnabled = !_wakeLockEnabled;
-      localStorage.setItem('oref-wake-lock', _wakeLockEnabled ? 'enabled' : 'disabled');
+      try { localStorage.setItem('oref-wake-lock', _wakeLockEnabled ? 'enabled' : 'disabled'); } catch(e) {}
       _menuWakeLock.classList.toggle('active', _wakeLockEnabled);
       if (_wakeLockEnabled) {
         _acquireWakeLock();
