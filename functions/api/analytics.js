@@ -3,14 +3,29 @@ const SITE_TAG = '8ef04aca8dff4804be044bbbd8f2da66';
 export async function onRequestGet({ env }) {
   const { CF_ACCOUNT_TAG, CF_API_TOKEN } = env;
   if (!CF_ACCOUNT_TAG || !CF_API_TOKEN) {
-    return new Response('Missing CF_ACCOUNT_TAG or CF_API_TOKEN', { status: 500 });
+    return new Response(JSON.stringify({ error: 'Analytics is not configured' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': 'https://oref-map.org',
+      },
+    });
   }
 
   let result;
   try {
     result = await fetchVisitorCounts(CF_ACCOUNT_TAG, CF_API_TOKEN);
   } catch (err) {
-    return new Response(err.message, { status: 502, headers: { 'Cache-Control': 'no-store' } });
+    console.error('analytics fetch failed', err);
+    return new Response(JSON.stringify({ error: 'Failed to fetch analytics' }), {
+      status: 502,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': 'https://oref-map.org',
+      },
+    });
   }
 
   return new Response(JSON.stringify(result), {
