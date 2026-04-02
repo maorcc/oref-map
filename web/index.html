@@ -3215,9 +3215,18 @@ body.idle #right-panel {
     }
   });
 
+  // --- Wake lock: prevent screen from turning off ---
+  var _wakeLock = null;
+  function _acquireWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function(wl) { _wakeLock = wl; }).catch(function() {});
+  }
+  _acquireWakeLock();
+
   // --- Mobile resume: reload if data is stale ---
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState !== 'visible') return;
+    _acquireWakeLock();
     try {
       var lastPoll = Number(sessionStorage.getItem('oref-last-poll')) || 0;
       if (Date.now() - lastPoll < 30000) return;
