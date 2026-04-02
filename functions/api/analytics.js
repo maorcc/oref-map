@@ -65,7 +65,10 @@ async function fetchVisitorCounts(accountTag, apiToken) {
     throw new Error(json.errors.map(e => e.message).join('; '));
   }
 
-  const account = json.data.viewer.accounts[0];
+  const account = json.data?.viewer?.accounts?.[0];
+  if (!account) {
+    throw new Error('No account data returned — check CF_ACCOUNT_TAG');
+  }
   return {
     visitors_1h: account.last1h[0]?.count ?? 0,
     visitors_24h: account.last24h[0]?.count ?? 0,
