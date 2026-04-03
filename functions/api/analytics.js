@@ -31,7 +31,7 @@ export async function onRequestGet({ env }) {
   return new Response(JSON.stringify(result), {
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=60',
+      'Cache-Control': 'public, max-age=30',
       'Access-Control-Allow-Origin': 'https://oref-map.org',
     },
   });
