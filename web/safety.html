@@ -113,6 +113,34 @@ html, body { height: 100%; font-family: Arial, sans-serif; background: #1a1a2e; 
   user-select: none;
 }
 
+#mode-control {
+  background: rgba(26, 26, 46, 0.95);
+  border-radius: 10px;
+  padding: 14px 18px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  direction: rtl;
+  font-size: 13px;
+}
+#mode-control h4 {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.mode-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  cursor: pointer;
+}
+.mode-option input[type="radio"] {
+  cursor: pointer;
+}
+.mode-option label {
+  cursor: pointer;
+  user-select: none;
+}
+
 #stats-box {
   position: fixed;
   bottom: 20px;
@@ -251,6 +279,17 @@ html, body { height: 100%; font-family: Arial, sans-serif; background: #1a1a2e; 
       <label for="filter-green">🟢 התרעות ירוקות (סיום אירוע)</label>
     </div>
   </div>
+  <div id="mode-control">
+    <h4>תצוגה</h4>
+    <div class="mode-option">
+      <input type="radio" id="mode-total" name="display-mode" value="total" checked>
+      <label for="mode-total">סה״כ התרעות</label>
+    </div>
+    <div class="mode-option">
+      <input type="radio" id="mode-perday" name="display-mode" value="perday">
+      <label for="mode-perday">ממוצע התרעות ליום</label>
+    </div>
+  </div>
   <div id="legend-box">
     <div class="row"><div class="bar" style="background:#1b5e20"></div> בטוח מאוד (0-5 התרעות)</div>
     <div class="row"><div class="bar" style="background:#4caf50"></div> בטוח (6-15)</div>
@@ -293,19 +332,30 @@ let alertData = {};
 let currentDays = 7;
 let filters = { red: true, yellow: true, green: true };
 let currentRequestId = 0;
+let displayMode = 'total'; // 'total' or 'perday'
 
-function getColor(count, maxCount) {
-  if (count <= 5) return '#1b5e20';
-  if (count <= 15) return '#4caf50';
-  if (count <= 30) return '#8bc34a';
-  if (count <= 50) return '#ffeb3b';
-  if (count < 80) return '#ff9800';
+const thresholds = {
+  total:  [5, 15, 30, 50, 80],
+  perday: [0.1, 0.3, 0.7, 1.5, 3],
+};
+const legendLabels = {
+  total:  ['0-5', '6-15', '16-30', '31-50', '51-80', '80+'],
+  perday: ['0-0.1', '0.1-0.3', '0.3-0.7', '0.7-1.5', '1.5-3', '3+'],
+};
+
+function getColor(value) {
+  const t = thresholds[displayMode];
+  if (value <= t[0]) return '#1b5e20';
+  if (value <= t[1]) return '#4caf50';
+  if (value <= t[2]) return '#8bc34a';
+  if (value <= t[3]) return '#ffeb3b';
+  if (value < t[4]) return '#ff9800';
   return '#f44336';
 }
 
-function getRadius(count, maxCount) {
+function getRadius(value, maxValue) {
   const base = window.innerWidth < 600 ? 6 : 8;
-  const scale = Math.min(count / Math.max(maxCount * 0.3, 1), 1);
+  const scale = Math.min(value / Math.max(maxValue * 0.3, 1), 1);
   return base + scale * 10;
 }
 
@@ -334,18 +384,25 @@ function renderMap(data) {
   markers.forEach(m => map.removeLayer(m));
   markers = [];
 
-  const counts = Object.values(data);
-  const maxCount = Math.max(...counts, 1);
-  const sorted = Object.entries(data).sort((a, b) => a[1] - b[1]);
+  const isPerDay = displayMode === 'perday';
+  // Build display values: either raw counts or per-day averages
+  const displayData = {};
+  for (const [name, count] of Object.entries(data)) {
+    displayData[name] = isPerDay ? count / Math.max(currentDays, 1) : count;
+  }
+
+  const values = Object.values(displayData);
+  const maxValue = Math.max(...values, 1);
+  const sorted = Object.entries(displayData).sort((a, b) => a[1] - b[1]);
 
   // Render circles — draw high-alert first (bottom), safe on top
   const reverseSorted = [...sorted].reverse();
-  for (const [name, count] of reverseSorted) {
+  for (const [name, value] of reverseSorted) {
     const coords = locationPoints[name];
     if (!coords) continue;
 
-    const color = getColor(count, maxCount);
-    const radius = getRadius(count, maxCount);
+    const color = getColor(value);
+    const radius = getRadius(value, maxValue);
     const circle = L.circleMarker(coords, {
       radius,
       fillColor: color,
@@ -355,10 +412,12 @@ function renderMap(data) {
       opacity: 0.9,
     }).addTo(map);
 
+    const displayValue = isPerDay ? value.toFixed(1) : data[name];
+    const unit = isPerDay ? 'התרעות/יום' : 'התרעות';
     circle.bindPopup(`
       <div class="popup-content">
         <h3>${name}</h3>
-        <div class="alert-count">${count} התרעות</div>
+        <div class="alert-count">${displayValue} ${unit}</div>
         <div class="category">ב-${currentDays} הימים האחרונים</div>
       </div>
     `);
@@ -368,27 +427,45 @@ function renderMap(data) {
 
   // Stats — top 10 safest
   const statsList = document.getElementById('stats-list');
-  statsList.innerHTML = sorted.slice(0, 10).map(([name, count]) =>
-    `<li><span class="stat-name">${name}</span><span class="stat-count" style="color:${getColor(count, maxCount)}">${count}</span></li>`
-  ).join('');
+  statsList.innerHTML = sorted.slice(0, 10).map(([name, value]) => {
+    const label = isPerDay ? value.toFixed(1) : Math.round(value);
+    return `<li><span class="stat-name">${name}</span><span class="stat-count" style="color:${getColor(value)}">${label}</span></li>`;
+  }).join('');
+
+  // Update legend
+  const labels = legendLabels[displayMode];
+  const unit = isPerDay ? '' : ' התרעות';
+  const legendRows = document.querySelectorAll('#legend-box .row');
+  const legendTexts = [
+    `בטוח מאוד (${labels[0]}${unit})`,
+    `בטוח (${labels[1]})`,
+    `בטוח יחסית (${labels[2]})`,
+    `בינוני (${labels[3]})`,
+    `רב התרעות (${labels[4]})`,
+    `סכנה גבוהה (${labels[5]})`,
+  ];
+  legendRows.forEach((row, i) => {
+    row.lastChild.textContent = ' ' + legendTexts[i];
+  });
 
   // Distribution chart
+  const t = thresholds[displayMode];
   const buckets = [0, 0, 0, 0, 0, 0];
-  for (const count of counts) {
-    if (count <= 5) buckets[0]++;
-    else if (count <= 15) buckets[1]++;
-    else if (count <= 30) buckets[2]++;
-    else if (count <= 50) buckets[3]++;
-    else if (count < 80) buckets[4]++;
+  for (const value of values) {
+    if (value <= t[0]) buckets[0]++;
+    else if (value <= t[1]) buckets[1]++;
+    else if (value <= t[2]) buckets[2]++;
+    else if (value <= t[3]) buckets[3]++;
+    else if (value < t[4]) buckets[4]++;
     else buckets[5]++;
   }
   const bucketMax = Math.max(...buckets, 1);
   const bucketColors = ['#1b5e20', '#4caf50', '#8bc34a', '#ffeb3b', '#ff9800', '#f44336'];
-  const bucketLabels = ['0-5', '6-15', '16-30', '31-50', '51-80', '80+'];
   const chartEl = document.getElementById('distribution-chart');
   chartEl.innerHTML = buckets.map((b, i) =>
-    `<div class="chart-bar" style="height:${(b / bucketMax) * 100}%;background:${bucketColors[i]}" title="${bucketLabels[i]}: ${b} אזורים"></div>`
+    `<div class="chart-bar" style="height:${(b / bucketMax) * 100}%;background:${bucketColors[i]}" title="${labels[i]}: ${b} אזורים"></div>`
   ).join('');
+  document.getElementById('chart-max-label').textContent = labels[5];
 
   const activeFilters = [];
   if (filters.red) activeFilters.push('אדומות');
@@ -396,8 +473,10 @@ function renderMap(data) {
   if (filters.green) activeFilters.push('ירוקות');
   const filterText = activeFilters.length === 3 ? 'כל ההתרעות' : activeFilters.join(', ');
 
+  const totalAlerts = Object.values(data).reduce((a, b) => a + b, 0);
+  const modeText = isPerDay ? 'ממוצע ליום' : 'סה״כ';
   document.getElementById('subtitle').textContent =
-    `${Object.keys(data).length} אזורים · ${counts.reduce((a, b) => a + b, 0).toLocaleString()} התרעות · ${currentDays} ימים · ${filterText}`;
+    `${Object.keys(data).length} אזורים · ${totalAlerts.toLocaleString()} התרעות (${modeText}) · ${currentDays} ימים · ${filterText}`;
 }
 
 async function fetchDayHistory(date) {
@@ -507,6 +586,16 @@ function updateFilters() {
 filterRed.addEventListener('change', updateFilters);
 filterYellow.addEventListener('change', updateFilters);
 filterGreen.addEventListener('change', updateFilters);
+
+// Display mode toggle
+document.getElementById('mode-total').addEventListener('change', () => {
+  displayMode = 'total';
+  renderMap(alertData);
+});
+document.getElementById('mode-perday').addEventListener('change', () => {
+  displayMode = 'perday';
+  renderMap(alertData);
+});
 </script>
 </body>
 </html>
