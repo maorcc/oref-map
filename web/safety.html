@@ -13,7 +13,10 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; background: #1a1a2e; color: #eee; }
 #map { width: 100%; height: 100%; direction: ltr; }
-.leaflet-interactive:focus { outline: none; }
+.leaflet-interactive:focus, .leaflet-interactive:focus-visible {
+  outline: 2px solid #7eb8ff;
+  outline-offset: 2px;
+}
 
 #controls {
   position: fixed;
@@ -80,6 +83,34 @@ html, body { height: 100%; font-family: Arial, sans-serif; background: #1a1a2e; 
 #days-slider {
   width: 100%;
   accent-color: #4caf50;
+}
+
+#filter-control {
+  background: rgba(26, 26, 46, 0.95);
+  border-radius: 10px;
+  padding: 14px 18px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  direction: rtl;
+  font-size: 13px;
+}
+#filter-control h4 {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  cursor: pointer;
+}
+.filter-option input[type="checkbox"] {
+  cursor: pointer;
+}
+.filter-option label {
+  cursor: pointer;
+  user-select: none;
 }
 
 #stats-box {
@@ -176,6 +207,19 @@ html, body { height: 100%; font-family: Arial, sans-serif; background: #1a1a2e; 
   color: #888;
   margin-top: 4px;
 }
+
+@media (max-width: 768px) {
+  #controls {
+    max-width: calc(100% - 24px);
+    gap: 6px;
+  }
+  #stats-box, #chart-box {
+    max-width: calc(100% - 24px);
+  }
+  #map {
+    height: calc(100% - 60px);
+  }
+}
 </style>
 </head>
 <body>
@@ -191,6 +235,21 @@ html, body { height: 100%; font-family: Arial, sans-serif; background: #1a1a2e; 
   <div id="days-control">
     <label>טווח: <span id="days-label">7</span> ימים</label>
     <input type="range" id="days-slider" min="1" max="30" value="7">
+  </div>
+  <div id="filter-control">
+    <h4>סוגי התרעות</h4>
+    <div class="filter-option">
+      <input type="checkbox" id="filter-red" checked>
+      <label for="filter-red">🔴 התרעות אדומות (רקטות, מל"טים, חדירות)</label>
+    </div>
+    <div class="filter-option">
+      <input type="checkbox" id="filter-yellow" checked>
+      <label for="filter-yellow">🟡 התרעות צהובות (הכנה מוקדמת)</label>
+    </div>
+    <div class="filter-option">
+      <input type="checkbox" id="filter-green" checked>
+      <label for="filter-green">🟢 התרעות ירוקות (סיום אירוע)</label>
+    </div>
   </div>
   <div id="legend-box">
     <div class="row"><div class="bar" style="background:#1b5e20"></div> בטוח מאוד (0-5 התרעות)</div>
@@ -232,13 +291,15 @@ let markers = [];
 let locationPoints = {};
 let alertData = {};
 let currentDays = 7;
+let filters = { red: true, yellow: true, green: true };
+let currentRequestId = 0;
 
 function getColor(count, maxCount) {
   if (count <= 5) return '#1b5e20';
   if (count <= 15) return '#4caf50';
   if (count <= 30) return '#8bc34a';
   if (count <= 50) return '#ffeb3b';
-  if (count <= 80) return '#ff9800';
+  if (count < 80) return '#ff9800';
   return '#f44336';
 }
 
@@ -246,6 +307,27 @@ function getRadius(count, maxCount) {
   const base = window.innerWidth < 600 ? 6 : 8;
   const scale = Math.min(count / Math.max(maxCount * 0.3, 1), 1);
   return base + scale * 10;
+}
+
+function classifyAlertTitle(title) {
+  const normalized = title.replace(/\s+/g, ' ').trim();
+
+  // Green (all-clear) — check first to avoid conflicts
+  if (normalized.includes('האירוע הסתיים')) return 'green';
+  if (normalized.includes('החשש הוסר')) return 'green';
+  if (normalized.includes('יכולים לצאת')) return 'green';
+  if (normalized.includes('אינם צריכים לשהות')) return 'green';
+  if (normalized.includes('סיום שהייה בסמיכות')) return 'green';
+  if (normalized.includes('ניתן לצאת') && !normalized.includes('להישאר בקרבתו')) return 'green';
+
+  // Yellow (preparedness/preliminary)
+  if (normalized.includes('בדקות הקרובות צפויות להתקבל התרעות')) return 'yellow';
+  if (normalized.includes('לשפר את המיקום למיגון המיטבי')) return 'yellow';
+  if (normalized.includes('יש לשהות בסמיכות למרחב המוגן')) return 'yellow';
+  if (normalized.includes('להישאר בקרבתו')) return 'yellow';
+
+  // Red (danger) — default for most alerts
+  return 'red';
 }
 
 function renderMap(data) {
@@ -297,7 +379,7 @@ function renderMap(data) {
     else if (count <= 15) buckets[1]++;
     else if (count <= 30) buckets[2]++;
     else if (count <= 50) buckets[3]++;
-    else if (count <= 80) buckets[4]++;
+    else if (count < 80) buckets[4]++;
     else buckets[5]++;
   }
   const bucketMax = Math.max(...buckets, 1);
@@ -308,8 +390,14 @@ function renderMap(data) {
     `<div class="chart-bar" style="height:${(b / bucketMax) * 100}%;background:${bucketColors[i]}" title="${bucketLabels[i]}: ${b} אזורים"></div>`
   ).join('');
 
+  const activeFilters = [];
+  if (filters.red) activeFilters.push('אדומות');
+  if (filters.yellow) activeFilters.push('צהובות');
+  if (filters.green) activeFilters.push('ירוקות');
+  const filterText = activeFilters.length === 3 ? 'כל ההתרעות' : activeFilters.join(', ');
+
   document.getElementById('subtitle').textContent =
-    `${Object.keys(data).length} אזורים · ${counts.reduce((a, b) => a + b, 0).toLocaleString()} התרעות · ${currentDays} ימים`;
+    `${Object.keys(data).length} אזורים · ${counts.reduce((a, b) => a + b, 0).toLocaleString()} התרעות · ${currentDays} ימים · ${filterText}`;
 }
 
 async function fetchDayHistory(date) {
@@ -325,6 +413,9 @@ async function fetchDayHistory(date) {
 async function loadData(days) {
   document.getElementById('loading').style.display = 'block';
   currentDays = days;
+
+  // Generate request ID to prevent race conditions
+  const requestId = ++currentRequestId;
 
   const now = new Date();
   // Use Israel timezone
@@ -345,11 +436,19 @@ async function loadData(days) {
   }
 
   const results = await Promise.all(fetches);
+
+  // Only apply results if this is still the most recent request
+  if (requestId !== currentRequestId) return;
+
   for (const dayData of results) {
     for (const alert of dayData) {
       const loc = alert.data;
       if (loc in counts) {
-        counts[loc]++;
+        // Filter by alert type
+        const alertType = classifyAlertTitle(alert.title || alert.category_desc || '');
+        if (filters[alertType]) {
+          counts[loc]++;
+        }
       }
     }
   }
@@ -361,13 +460,24 @@ async function loadData(days) {
 
 // Load location points then start
 fetch('/oref_points.json')
-  .then(r => r.json())
+  .then(r => {
+    if (!r.ok) throw new Error('Failed to load location points');
+    return r.json();
+  })
   .then(points => {
     locationPoints = {};
     for (const [name, coords] of Object.entries(points)) {
       locationPoints[name] = [coords[0], coords[1]];
     }
     return loadData(7);
+  })
+  .catch(err => {
+    console.error('Failed to initialize map:', err);
+    locationPoints = {};
+    document.getElementById('loading').textContent = 'שגיאה בטעינת נתוני מיקומים';
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+    }, 3000);
   });
 
 // Days slider
@@ -381,6 +491,22 @@ slider.addEventListener('change', () => {
   clearTimeout(sliderTimeout);
   sliderTimeout = setTimeout(() => loadData(parseInt(slider.value)), 300);
 });
+
+// Filter checkboxes
+const filterRed = document.getElementById('filter-red');
+const filterYellow = document.getElementById('filter-yellow');
+const filterGreen = document.getElementById('filter-green');
+
+function updateFilters() {
+  filters.red = filterRed.checked;
+  filters.yellow = filterYellow.checked;
+  filters.green = filterGreen.checked;
+  loadData(currentDays);
+}
+
+filterRed.addEventListener('change', updateFilters);
+filterYellow.addEventListener('change', updateFilters);
+filterGreen.addEventListener('change', updateFilters);
 </script>
 </body>
 </html>
