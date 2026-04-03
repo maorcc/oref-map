@@ -1016,7 +1016,9 @@ body.idle #right-panel {
   function getCurrentUserPosition() {
     if (currentUserLatLng) return currentUserLatLng;
     var urlPos = getUrlPosition();
-    return urlPos ? { lat: urlPos[0], lng: urlPos[1] } : null;
+    if (urlPos) return { lat: urlPos[0], lng: urlPos[1] };
+    var storedPos = getStoredPosition();
+    return storedPos ? { lat: storedPos[0], lng: storedPos[1] } : null;
   }
 
   function initUserLocation() {
