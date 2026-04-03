@@ -626,7 +626,7 @@ body.idle #right-panel {
       <span class="menu-check"></span>
     </button>
   </div>
-  <div id="menu-presence" class="menu-item">
+  <div id="menu-visitors" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
       <span class="menu-item-label">מס' משתמשים</span>
@@ -871,9 +871,9 @@ body.idle #right-panel {
   //   var PROXY_BASE = 'https://oref-proxy.YOUR_ACCOUNT.workers.dev';
   var PROXY_BASE = '';
   var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
-  var PRESENCE_POLL_MS = 600000;
-  var PRESENCE_LABEL = 'מבקרים בשעה האחרונה';
-  var PRESENCE_URL = 'https://presence.oref-map.org/presence';
+  var ANALYTICS_POLL_MS = 60000;
+  var ANALYTICS_LABEL = 'מבקרים בשעה האחרונה';
+  var ANALYTICS_URL = '/api/analytics';
 
   function resetProxy() {
     PROXY_BASE = '';
@@ -903,61 +903,46 @@ body.idle #right-panel {
   }
 
   var visitorCountEl = document.getElementById('visitorCount');
-  var presenceSessionId = null;
-  var presenceEnabled = (function() {
-    try { return localStorage.getItem('oref-presence') !== 'disabled'; } catch(e) { return true; }
+  var visitorsEnabled = (function() {
+    try { return localStorage.getItem('oref-visitors') !== 'disabled'; } catch(e) { return true; }
   })();
-
-  function createPresenceSessionId() {
-    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-      return window.crypto.randomUUID();
-    }
-    return 'v-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
-  }
-
-  function getPresenceSessionId() {
-    if (presenceSessionId) return presenceSessionId;
-    try {
-      presenceSessionId = sessionStorage.getItem('oref-presence-session');
-      if (!presenceSessionId) {
-        presenceSessionId = createPresenceSessionId();
-        sessionStorage.setItem('oref-presence-session', presenceSessionId);
-      }
-    } catch (e) {
-      presenceSessionId = createPresenceSessionId();
-    }
-    return presenceSessionId;
-  }
 
   function renderVisitorCount(count) {
     if (!visitorCountEl || !Number.isFinite(count)) return;
-    visitorCountEl.textContent = count + ' ' + PRESENCE_LABEL;
+    visitorCountEl.textContent = count + ' ' + ANALYTICS_LABEL;
     visitorCountEl.style.display = 'block';
   }
 
-  function sendPresenceHeartbeat() {
-    if (!PRESENCE_URL) return Promise.resolve();
-    return fetch(PRESENCE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: getPresenceSessionId() }),
-    }).then(function(resp) {
-      if (!resp.ok) throw new Error('presence request failed');
+  function fetchAnalytics() {
+    return fetch(ANALYTICS_URL).then(function(resp) {
+      if (!resp.ok) throw new Error('analytics request failed');
       return resp.json();
     }).then(function(data) {
-      if (presenceEnabled && data && typeof data.count === 'number') {
-        renderVisitorCount(data.count);
+      if (visitorsEnabled && data && typeof data.visitors_1h === 'number') {
+        renderVisitorCount(data.visitors_1h);
       }
     }).catch(function(err) {
-      console.warn('Presence heartbeat failed:', err);
+      console.warn('Analytics fetch failed:', err);
     });
+  }
+
+  var analyticsTimer = null;
+  function startAnalyticsPolling() {
+    if (analyticsTimer) return;
+    fetchAnalytics();
+    analyticsTimer = setInterval(fetchAnalytics, ANALYTICS_POLL_MS);
+  }
+  function stopAnalyticsPolling() {
+    if (analyticsTimer) {
+      clearInterval(analyticsTimer);
+      analyticsTimer = null;
+    }
   }
 
   // Periodically reset proxy so client can re-check if direct /api works
   setInterval(resetProxy, 300000); // 5 min
-  if (PRESENCE_URL) {
-    sendPresenceHeartbeat();
-    setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
+  if (visitorsEnabled) {
+    startAnalyticsPolling();
   }
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;
@@ -1490,18 +1475,19 @@ body.idle #right-panel {
       applySelectedZoomMode(true);
     });
   }
-  var menuPresenceEl = document.getElementById('menu-presence');
-  if (menuPresenceEl) {
-    if (presenceEnabled) menuPresenceEl.classList.add('active');
-    menuPresenceEl.querySelector('.menu-item-row').addEventListener('click', function() {
-      presenceEnabled = !presenceEnabled;
-      try { localStorage.setItem('oref-presence', presenceEnabled ? 'enabled' : 'disabled'); } catch(e) {}
-      menuPresenceEl.classList.toggle('active', presenceEnabled);
-      if (presenceEnabled) {
+  var menuVisitorsEl = document.getElementById('menu-visitors');
+  if (menuVisitorsEl) {
+    if (visitorsEnabled) menuVisitorsEl.classList.add('active');
+    menuVisitorsEl.querySelector('.menu-item-row').addEventListener('click', function() {
+      visitorsEnabled = !visitorsEnabled;
+      try { localStorage.setItem('oref-visitors', visitorsEnabled ? 'enabled' : 'disabled'); } catch(e) {}
+      menuVisitorsEl.classList.toggle('active', visitorsEnabled);
+      if (visitorsEnabled) {
         showToast('מספר משתמשים מופעל');
-        sendPresenceHeartbeat();
+        startAnalyticsPolling();
       } else {
         showToast('מספר משתמשים כובה');
+        stopAnalyticsPolling();
         if (visitorCountEl) visitorCountEl.style.display = 'none';
       }
     });
