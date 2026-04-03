@@ -619,6 +619,13 @@ body.idle #right-panel {
       <span class="menu-check"></span>
     </button>
   </div>
+  <div id="menu-presence" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span class="menu-item-label">סטטיסטיקת נוכחות</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
   <div id="menu-share" class="menu-item" style="display:none;">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon">
@@ -883,6 +890,10 @@ body.idle #right-panel {
 
   var visitorCountEl = document.getElementById('visitorCount');
   var presenceSessionId = null;
+  var presenceEnabled = (function() {
+    try { return localStorage.getItem('oref-presence') === 'enabled'; } catch(e) { return false; }
+  })();
+  var presenceIntervalId = null;
 
   function createPresenceSessionId() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -931,9 +942,9 @@ body.idle #right-panel {
 
   // Periodically reset proxy so client can re-check if direct /api works
   setInterval(resetProxy, 300000); // 5 min
-  if (PRESENCE_URL) {
+  if (presenceEnabled && PRESENCE_URL) {
     sendPresenceHeartbeat();
-    setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
+    presenceIntervalId = setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
   }
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;
@@ -1136,6 +1147,25 @@ body.idle #right-panel {
       map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
     }
   });
+  var menuPresenceEl = document.getElementById('menu-presence');
+  if (menuPresenceEl) {
+    if (presenceEnabled) menuPresenceEl.classList.add('active');
+    menuPresenceEl.querySelector('.menu-item-row').addEventListener('click', function() {
+      presenceEnabled = !presenceEnabled;
+      try { localStorage.setItem('oref-presence', presenceEnabled ? 'enabled' : 'disabled'); } catch(e) {}
+      menuPresenceEl.classList.toggle('active', presenceEnabled);
+      if (presenceEnabled) {
+        showToast('סטטיסטיקת נוכחות מופעלת');
+        sendPresenceHeartbeat();
+        if (!presenceIntervalId) presenceIntervalId = setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
+      } else {
+        showToast('סטטיסטיקת נוכחות כובתה');
+        if (presenceIntervalId) { clearInterval(presenceIntervalId); presenceIntervalId = null; }
+        if (visitorCountEl) visitorCountEl.style.display = 'none';
+      }
+    });
+  }
+
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
   var favorites = {};            // {name: {lat, lng}}
