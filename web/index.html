@@ -629,7 +629,7 @@ body.idle #right-panel {
   <div id="menu-presence" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-      <span class="menu-item-label">מס' משתמשים</span>
+      <span class="menu-item-label">מספר משתמשים</span>
       <span class="menu-check"></span>
     </button>
   </div>
@@ -905,9 +905,8 @@ body.idle #right-panel {
   var visitorCountEl = document.getElementById('visitorCount');
   var presenceSessionId = null;
   var presenceEnabled = (function() {
-    try { return localStorage.getItem('oref-presence') === 'enabled'; } catch(e) { return false; }
+    try { return localStorage.getItem('oref-presence') !== 'disabled'; } catch(e) { return true; }
   })();
-  var presenceIntervalId = null;
 
   function createPresenceSessionId() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -1501,10 +1500,8 @@ body.idle #right-panel {
       if (presenceEnabled) {
         showToast('מספר משתמשים מופעל');
         sendPresenceHeartbeat();
-        if (!presenceIntervalId && PRESENCE_URL) presenceIntervalId = setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
       } else {
         showToast('מספר משתמשים כובה');
-        if (presenceIntervalId) { clearInterval(presenceIntervalId); presenceIntervalId = null; }
         if (visitorCountEl) visitorCountEl.style.display = 'none';
       }
     });
