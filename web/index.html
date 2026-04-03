@@ -932,7 +932,7 @@ body.idle #right-panel {
       if (!resp.ok) throw new Error('presence request failed');
       return resp.json();
     }).then(function(data) {
-      if (data && typeof data.count === 'number') {
+      if (presenceEnabled && data && typeof data.count === 'number') {
         renderVisitorCount(data.count);
       }
     }).catch(function(err) {
@@ -1157,7 +1157,7 @@ body.idle #right-panel {
       if (presenceEnabled) {
         showToast('מספר משתמשים מופעל');
         sendPresenceHeartbeat();
-        if (!presenceIntervalId) presenceIntervalId = setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
+        if (!presenceIntervalId && PRESENCE_URL) presenceIntervalId = setInterval(sendPresenceHeartbeat, PRESENCE_POLL_MS);
       } else {
         showToast('מספר משתמשים כובה');
         if (presenceIntervalId) { clearInterval(presenceIntervalId); presenceIntervalId = null; }
