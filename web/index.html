@@ -136,6 +136,18 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   filter: drop-shadow(0 1px 3px rgba(255,255,255,0.8));
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .leaflet-popup-close-button {
   right: auto !important;
   left: 5px !important;
@@ -610,6 +622,7 @@ body.idle #right-panel {
 <div id="map"></div>
 
 <div id="page-title">
+  <h1 class="sr-only">מפת העורף</h1>
   <img src="/logo.png" alt="מפת העורף" height="72">
 </div>
 <button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
