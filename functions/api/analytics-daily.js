@@ -45,7 +45,7 @@ async function fetchAnalyticsDaily(accountTag, apiToken) {
   const now = new Date();
   const minus1h = new Date(now - 60 * 60 * 1000).toISOString();
   const minus24h = new Date(now - 24 * 60 * 60 * 1000).toISOString();
-  const today = toDateStr(now);
+  const yesterday = toDateStr(new Date(now - 24 * 60 * 60 * 1000));
   const minus30d = toDateStr(new Date(now - 30 * 24 * 60 * 60 * 1000));
 
   const query = `{
@@ -60,9 +60,9 @@ async function fetchAnalyticsDaily(accountTag, apiToken) {
           limit: 1
         ) { sum { visits } }
         daily: rumPageloadEventsAdaptiveGroups(
-          filter: { siteTag: "${SITE_TAG}", date_geq: "${minus30d}", date_leq: "${today}" }
+          filter: { siteTag: "${SITE_TAG}", date_geq: "${minus30d}", date_leq: "${yesterday}" }
           orderBy: [date_ASC]
-          limit: 31
+          limit: 30
         ) {
           dimensions { date }
           sum { visits }
@@ -101,8 +101,8 @@ async function fetchAnalyticsDaily(accountTag, apiToken) {
   }));
 
   return {
-    visitors_1h: account.last1h[0]?.sum?.visits ?? 0,
-    visitors_24h: account.last24h[0]?.sum?.visits ?? 0,
+    visitors_1h: account.last1h?.[0]?.sum?.visits ?? 0,
+    visitors_24h: account.last24h?.[0]?.sum?.visits ?? 0,
     daily,
   };
 }
