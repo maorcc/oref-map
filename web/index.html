@@ -131,15 +131,9 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   top: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(255,255,255,0.92);
-  border-radius: 6px;
-  padding: 6px 16px;
-  font-size: 16px;
-  font-weight: bold;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   z-index: 1000;
-  direction: rtl;
-  white-space: nowrap;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 3px rgba(255,255,255,0.8));
 }
 
 .leaflet-popup-close-button {
@@ -615,7 +609,9 @@ body.idle #right-panel {
 <body>
 <div id="map"></div>
 
-<h1 id="page-title">מפת העורף</h1>
+<div id="page-title">
+  <img src="/logo.png" alt="מפת העורף" height="72">
+</div>
 <button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
 </button>
