@@ -1149,7 +1149,7 @@
       return controller.setEnabled(on, opts || {});
     }
 
-    window.printElippsesInfos = function() {
+    window.printEllipsesInfos = function() {
       return controller.printEllipsesInfos();
     };
 
