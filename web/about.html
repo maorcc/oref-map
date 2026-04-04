@@ -288,6 +288,7 @@ body {
     </div>
     <div class="chart-wrap">
       <h3>מספר משתמשים ביום במהלך החודש האחרון</h3>
+      <div id="chart-dates" style="font-size:11px;color:#aaa;margin-bottom:4px"></div>
       <div id="chart-area">
         <div class="chart-error">טוען...</div>
       </div>
@@ -337,6 +338,13 @@ body {
     var data = days.map(function(date) {
       return { date: date, visitors: lookup[date] || 0 };
     });
+
+    // Show date range (DD.M.YY)
+    function fmtDate(s) {
+      var p = s.split('-');
+      return parseInt(p[2]) + '.' + parseInt(p[1]) + '.' + p[0].slice(2);
+    }
+    document.getElementById('chart-dates').textContent = fmtDate(days[0]) + ' - ' + fmtDate(days[days.length - 1]);
 
     // 3-day moving average
     var ma = data.map(function(_, i, arr) {
