@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="/icon-32.png" sizes="32x32">
+<link rel="icon" href="/icon-192.png" sizes="192x192">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<title>אודות - מפת העורף</title>
+<link rel="canonical" href="https://oref-map.org/about">
+<meta name="description" content="אודות מפת העורף - מפת התרעות פיקוד העורף בזמן אמת">
+<meta property="og:title" content="אודות מפת העורף">
+<meta property="og:description" content="מפת התרעות פיקוד העורף בזמן אמת">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="he_IL">
+<meta property="og:image" content="https://oref-map.org/og-image.jpg">
+<meta property="og:url" content="https://oref-map.org/about">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { height: 100%; }
+body {
+  font-family: Arial, sans-serif;
+  background: #eee8dd;
+  color: #333;
+  min-height: 100%;
+}
+
+/* --- Back button --- */
+.back-btn {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 100;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: Arial, sans-serif;
+  color: #555;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.back-btn:hover {
+  background: rgba(219,234,254,0.92);
+  border-color: #93c5fd;
+}
+
+/* --- Logo banner --- */
+.logo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 16px 8px;
+  margin-top: 48px;
+}
+.logo-banner svg {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+}
+.logo-banner .logo-text {
+  font-size: 44px;
+  font-weight: 900;
+  color: #1F3A5F;
+  line-height: 1.1;
+}
+.logo-sub {
+  max-width: 900px;
+  margin: 0 auto 8px;
+  padding: 0 16px;
+  text-align: right;
+  font-size: 15px;
+  color: #888;
+}
+@media (max-width: 700px) {
+  .logo-banner svg { width: 68px; height: 68px; }
+  .logo-banner .logo-text { font-size: 34px; }
+  .logo-banner { margin-top: 40px; }
+}
+
+/* --- Content --- */
+.content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px 16px 32px;
+}
+
+/* --- Row: card + screenshot side by side --- */
+.row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: stretch;
+}
+.row-reverse { flex-direction: row-reverse; }
+
+/* --- Card (like main site panels) --- */
+.card {
+  background: rgba(255,255,255,0.92);
+  border-radius: 12px;
+  padding: 18px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  font-size: 14px;
+  line-height: 1.7;
+  color: #333;
+  flex: 1;
+  min-width: 0;
+}
+.card h2 {
+  font-size: 17px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+.card p { margin-bottom: 8px; color: #444; }
+.card p:last-child { margin-bottom: 0; }
+.card a { color: #0066cc; }
+.card-full { margin-bottom: 16px; }
+
+/* --- Screenshot panel --- */
+.shot {
+  flex: 0 0 200px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  background: #fff;
+}
+.shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* --- Chart (sparkline) --- */
+.chart-wrap {
+  flex: 0 0 200px;
+  background: rgba(255,255,255,0.92);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.chart-wrap h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 6px;
+}
+.chart-wrap svg { width: 100%; height: auto; display: block; }
+.chart-desc { font-size: 12px; color: #555; margin-top: 8px; line-height: 1.5; }
+.chart-error { text-align: center; color: #aaa; padding: 20px 0; font-size: 12px; }
+
+/* --- GitHub pill button --- */
+.gh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ccc;
+  color: #333;
+  text-decoration: none;
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: background 0.2s, border-color 0.2s;
+}
+.gh-btn:hover {
+  background: rgba(219,234,254,0.92);
+  border-color: #93c5fd;
+}
+.gh-btn svg { flex-shrink: 0; }
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+/* --- Disclaimer --- */
+.card-warn {
+  background: rgba(254,252,232,0.92);
+  border: 1px solid #fcd34d;
+  font-size: 12px;
+  color: #713f12;
+  line-height: 1.6;
+}
+
+/* --- Desktop vs mobile screenshots --- */
+.shot-desktop { display: block; }
+.shot-mobile { display: none; }
+
+/* --- Mobile layout --- */
+@media (max-width: 700px) {
+  .row, .row-reverse { flex-direction: column; }
+  .shot { flex: none; max-width: 200px; margin: 0 auto; }
+  .shot img { object-fit: contain; }
+  .shot-desktop { display: none; }
+  .shot-mobile { display: block; }
+  .chart-wrap { flex: none; }
+}
+</style>
+</head>
+<body>
+
+<a href="/" class="back-btn">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+  חזרה למפה
+</a>
+
+<div class="logo-banner">
+  <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+    <path d="M128 20 C80 20 44 56 44 104 C44 164 128 236 128 236 C128 236 212 164 212 104 C212 56 176 20 128 20Z" fill="#1F3A5F"/>
+    <circle cx="128" cy="104" r="50" fill="white"/>
+    <polygon points="128,70 160,130 96,130" fill="#F26A21"/>
+    <g transform="rotate(-25 128 104)">
+      <rect x="124" y="80" width="8" height="50" fill="#333"/>
+      <polygon points="128,65 120,80 136,80" fill="#333"/>
+      <polygon points="124,130 118,140 124,138" fill="#F26A21"/>
+      <polygon points="132,130 138,140 132,138" fill="#F26A21"/>
+    </g>
+  </svg>
+  <div class="logo-text">מפת<br>העורף</div>
+</div>
+<div class="logo-sub">אודות</div>
+
+<div class="content">
+
+  <!-- Story + alerts screenshot -->
+  <div class="row">
+    <div class="card">
+      <h2>הסיפור</h2>
+      <p>כשהמלחמה פרצה ב-28 בפברואר 2026 ומערכת ההתרעות המוקדמות של פיקוד העורף נכנסה לפעולה, ציפיתי שהאפליקציות הקיימות (צבע אדום, צופר ודומיהן) יציגו את ההתרעות על גבי מפה. אחרי כמה ימים שבהם זה לא קרה, החלטתי לבנות את הכלי בעצמי.</p>
+      <p>הרגע המכונן היה אחרי חצות. קיבלתי התרעה מוקדמת וניסיתי להחליט אם לקום למרחב המוגן או לחכות לאזעקה. גללתי ברשימה ארוכה של יישובים וניסיתי לנחש מה הסיכוי שתהיה אזעקה אצלי בזכרון יעקב. זה היה מתסכל. היה ברור שצריך כלי שמציג את המידע ויזואלית, מפה שמאפשרת להבין את המצב תוך שניות.</p>
+      <p>תוך ימים ספורים הגרסה הראשונה הייתה באוויר. כשהמשפחה ראתה, גיסתי התלהבה וביקשה לשתף עם חברים. המשובים שחזרו מהקבוצות היו חד-משמעיים, אנשים חיכו לכלי כזה. תוך שבוע המפה כבר התפשטה מפה לאוזן, ונדרשה כתיבה מחדש כדי לעמוד בעומס הגדל.</p>
+      <p>אני מאור קונפורטי, מנהל ומפתח תוכנה עם למעלה מ-15 שנות ניסיון, אב לשני צעירים בוגרים, וגר בזכרון יעקב. מפת העורף היא פרויקט קוד פתוח שנוצר מתוך צורך אמיתי, ומתפתח בעזרת הקהילה.</p>
+    </div>
+    <div class="shot shot-desktop">
+      <img src="/about/alerts-desktop.jpeg" alt="מפת העורף - התרעות פעילות">
+    </div>
+    <div class="shot shot-mobile">
+      <img src="/about/alerts-mobile.png" alt="מפת העורף - התרעות פעילות">
+    </div>
+  </div>
+
+  <!-- How it works + timeline screenshot (reversed) -->
+  <div class="row row-reverse">
+    <div class="card">
+      <h2>איך זה עובד</h2>
+      <p>המפה מציגה התרעות פיקוד העורף בזמן אמת. הנתונים מגיעים ישירות מממשק ה-API הציבורי של פיקוד העורף, ומוצגים על גבי מפה אינטראקטיבית.</p>
+      <p>כל אזור מקבל צבע לפי סוג ההתרעה: אדום לירי רקטות וטילים, סגול לחדירת כטב"מ, צהוב להתרעה מוקדמת, וירוק כשהאירוע הסתיים.</p>
+      <p>ניתן לצפות בהיסטוריית התרעות קודמות באמצעות ציר הזמן, ולהתקרב לכל אזור במפה.</p>
+    </div>
+    <div class="shot shot-desktop">
+      <img src="/about/timeline-mobile.png" alt="ציר זמן - התרעות קודמות">
+    </div>
+    <div class="shot shot-mobile">
+      <img src="/about/alerts-mobile-2.jpeg" alt="מפת העורף - תצוגת מובייל">
+    </div>
+  </div>
+
+  <!-- Open source + prediction screenshot + chart -->
+  <div class="row">
+    <div class="card">
+      <h2>קוד פתוח</h2>
+      <p>מפת העורף הוא פרויקט קוד פתוח. קוד המקור זמין ב-GitHub, וכל אחד מוזמן לתרום, לדווח על באגים, או להציע שיפורים.</p>
+      <p>האתר מאוחסן על תשתית <a href="https://www.cloudflare.com/" target="_blank" rel="noopener">Cloudflare</a>, מה שמבטיח זמינות גבוהה וביצועים מהירים.</p>
+      <div class="btn-row">
+        <a class="gh-btn" href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="#333"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          קוד המקור ב-GitHub
+        </a>
+        <a class="gh-btn" href="https://github.com/maorcc/oref-map/issues/new" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          דיווח על בעיה
+        </a>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <h3>מספר משתמשים ביום במהלך החודש האחרון</h3>
+      <div id="chart-area">
+        <div class="chart-error">טוען...</div>
+      </div>
+      <p class="chart-desc" id="chart-desc" style="display:none">מפת העורף משמשת עשרות אלפי אנשים מדי יום כמקור מידע מהיר ואמין בזמן אירועי חירום.</p>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="card card-full card-warn">
+    מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף. אין להסתמך על המידע והתכנים המוצגים באתר זה, ובכל מקרה יש לנהוג בהתאם להנחיות פיקוד העורף.
+  </div>
+
+</div>
+
+<script>
+(function() {
+  fetch('/api/analytics-daily').then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(data) {
+    if (data.daily && data.daily.length) {
+      renderChart(data.daily);
+    } else {
+      showChartError('אין נתונים');
+    }
+  }).catch(function() {
+    showChartError('לא ניתן לטעון');
+  });
+
+  function showChartError(msg) {
+    document.getElementById('chart-area').innerHTML = '<div class="chart-error">' + msg + '</div>';
+  }
+
+  function renderChart(rawDaily) {
+    // 30 days excluding today (partial)
+    var now = new Date();
+    var days = [];
+    for (var i = 30; i >= 1; i--) {
+      var d = new Date(now);
+      d.setDate(d.getDate() - i);
+      days.push(d.toISOString().slice(0, 10));
+    }
+
+    var lookup = {};
+    rawDaily.forEach(function(e) { lookup[e.date] = e.visitors; });
+
+    var data = days.map(function(date) {
+      return { date: date, visitors: lookup[date] || 0 };
+    });
+
+    // 3-day moving average
+    var ma = data.map(function(_, i, arr) {
+      var start = Math.max(0, i - 2);
+      var slice = arr.slice(start, i + 1);
+      var sum = slice.reduce(function(s, e) { return s + e.visitors; }, 0);
+      return sum / slice.length;
+    });
+
+    var W = 220, H = 100;
+    var ml = 36, mr = 4, mt = 6, mb = 4;
+    var cw = W - ml - mr;
+    var ch = H - mt - mb;
+    var n = ma.length;
+    var maxV = Math.max.apply(null, ma);
+    if (maxV === 0) maxV = 1;
+    // Round up to nice number
+    var mag = Math.pow(10, Math.floor(Math.log10(maxV)));
+    maxV = Math.ceil(maxV / mag) * mag;
+
+    function x(i) { return ml + i * (cw / (n - 1)); }
+    function y(v) { return mt + ch - (v / maxV) * ch; }
+
+    var pts = ma.map(function(v, i) { return x(i) + ',' + y(v); });
+
+    var areaPath = 'M' + pts[0];
+    for (var i = 1; i < pts.length; i++) areaPath += ' L' + pts[i];
+    areaPath += ' L' + x(n - 1) + ',' + (mt + ch) + ' L' + x(0) + ',' + (mt + ch) + ' Z';
+
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
+
+    // Y-axis scale: 3 ticks (0, mid, max)
+    var ticks = [0, Math.round(maxV / 2), maxV];
+    ticks.forEach(function(val) {
+      var yy = y(val);
+      svg += '<line x1="' + ml + '" y1="' + yy + '" x2="' + (W - mr) + '" y2="' + yy + '" stroke="#e0ddd8" stroke-width="0.5"/>';
+      var label = val >= 1000 ? Math.round(val / 1000) + 'K' : val;
+      svg += '<text x="' + (ml - 4) + '" y="' + (yy + 3) + '" text-anchor="end" fill="#aaa" font-size="9" font-family="Arial">' + label + '</text>';
+    });
+
+    svg += '<path d="' + areaPath + '" fill="rgba(59,130,246,0.10)"/>';
+    svg += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    svg += '</svg>';
+
+    document.getElementById('chart-area').innerHTML = svg;
+    document.getElementById('chart-desc').style.display = 'block';
+  }
+})();
+</script>
+</body>
+</html>
