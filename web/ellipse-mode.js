@@ -909,7 +909,7 @@
         majorAxisLength: formatMeters(geometry.semiMajor * 2),
         minorAxisLength: formatMeters(geometry.semiMinor * 2),
         angleWithHorizonDegrees: normalizeHorizonAngleDegrees(
-          -(Math.atan2(geometry.majorAxis.y, geometry.majorAxis.x) * 180 / Math.PI)
+          Math.atan2(geometry.majorAxis.y, geometry.majorAxis.x) * 180 / Math.PI
         )
       };
     }
