@@ -63,14 +63,6 @@ body {
   height: 130px;
   width: auto;
 }
-.logo-sub {
-  max-width: 900px;
-  margin: 0 auto 8px;
-  padding: 0 16px;
-  text-align: right;
-  font-size: 15px;
-  color: #888;
-}
 @media (max-width: 700px) {
   .logo-banner img { height: 100px; }
   .logo-banner { margin-top: 40px; }
@@ -105,9 +97,10 @@ body {
   min-width: 0;
 }
 .card h2 {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  color: #1a1a2e;
 }
 .card p { margin-bottom: 8px; color: #444; }
 .card p:last-child { margin-bottom: 0; }
@@ -129,26 +122,17 @@ body {
   display: block;
 }
 
-/* --- Chart (sparkline) --- */
-.chart-wrap {
-  flex: 0 0 200px;
-  background: rgba(255,255,255,0.92);
-  border-radius: 12px;
-  padding: 14px 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-.chart-wrap h3 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 6px;
-}
-.chart-wrap svg { width: 100%; height: auto; display: block; }
-.chart-desc { font-size: 12px; color: #555; margin-top: 8px; line-height: 1.5; }
-.chart-error { text-align: center; color: #aaa; padding: 20px 0; font-size: 12px; }
+/* --- Chart (sparkline) — inline inside card --- */
+.chart-inline { margin-top: 18px; }
+.chart-col-header { margin-bottom: 4px; }
+.chart-col-header h3 { font-size: 13px; font-weight: 600; color: #555; margin: 0 0 2px; }
+.chart-inline-dates { font-size: 12px; color: #777; display: block; }
+.chart-inline svg { width: 100%; height: auto; display: block; max-width: 380px; }
+.chart-desc { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.chart-error { text-align: center; color: #aaa; padding: 16px 0; font-size: 12px; }
+
+/* --- Data source footnote --- */
+.data-source { color: #888; font-size: 13px; }
 
 /* --- GitHub pill button --- */
 .gh-btn {
@@ -181,7 +165,7 @@ body {
 .card-warn {
   background: rgba(254,252,232,0.92);
   border: 1px solid #fcd34d;
-  font-size: 12px;
+  font-size: 14px;
   color: #713f12;
   line-height: 1.6;
 }
@@ -197,7 +181,7 @@ body {
   .shot img { object-fit: contain; }
   .shot-desktop { display: none; }
   .shot-mobile { display: block; }
-  .chart-wrap { flex: none; }
+  .chart-inline svg { max-width: 100%; }
 }
 </style>
 </head>
@@ -211,26 +195,8 @@ body {
 <div class="logo-banner">
   <img src="/logo.png" alt="מפת העורף">
 </div>
-<div class="logo-sub">אודות</div>
 
 <div class="content">
-
-  <!-- Story + alerts screenshot -->
-  <div class="row">
-    <div class="card">
-      <h2>הסיפור</h2>
-      <p>כשהמלחמה פרצה ב-28 בפברואר 2026 ומערכת ההתרעות המוקדמות של פיקוד העורף נכנסה לפעולה, ציפיתי שהאפליקציות הקיימות (צבע אדום, פיקוד העורף) יציגו את ההתרעות על גבי מפה בצורה פשוטה וברורה. אחרי כמה ימים שבהם זה לא קרה, החלטתי לבנות את הכלי בעצמי.</p>
-      <p>הרגע המכונן היה אחרי חצות. קיבלתי התרעה מוקדמת וניסיתי להחליט אם לקום למרחב המוגן או לחכות לאזעקה. גללתי ברשימה ארוכה של יישובים וניסיתי לנחש מה הסיכוי שתהיה אזעקה אצלי בזכרון יעקב. זה היה מתסכל. היה ברור שצריך כלי שמציג את המידע ויזואלית, מפה שמאפשרת להבין את המצב תוך שניות.</p>
-      <p>תוך ימים ספורים הגרסה הראשונה הייתה באוויר. המשובים היו חד-משמעיים, אנשים חיכו לכלי כזה.</p>
-      <p>אני מאור קונפורטי, מנהל ומפתח תוכנה. מפת העורף היא פרויקט קוד פתוח שנוצר מתוך צורך אמיתי. במהלך הדרך תרמו לפרויקט אנשים רבים, בקוד, בדיווח על בעיות, וברעיונות לשיפור. תודה לכולם.</p>
-    </div>
-    <div class="shot shot-desktop">
-      <img src="/about/alerts-desktop.jpeg" alt="מפת העורף - התרעות פעילות">
-    </div>
-    <div class="shot shot-mobile">
-      <img src="/about/alerts-mobile.png" alt="מפת העורף - התרעות פעילות">
-    </div>
-  </div>
 
   <!-- How it works + timeline screenshot (reversed) -->
   <div class="row row-reverse">
@@ -239,6 +205,7 @@ body {
       <p>המפה מציגה התרעות פיקוד העורף בזמן אמת. הנתונים מגיעים ישירות מממשק ה-API הציבורי של פיקוד העורף, ומוצגים על גבי מפה אינטראקטיבית.</p>
       <p>כל אזור מקבל צבע לפי סוג ההתרעה: אדום לירי רקטות וטילים, סגול לחדירת כטב"מ, צהוב להתרעה מוקדמת, וירוק כשהאירוע הסתיים.</p>
       <p>ניתן לצפות בהיסטוריית התרעות קודמות באמצעות ציר הזמן, ולהתקרב לכל אזור במפה.</p>
+      <p class="data-source">מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
     </div>
     <div class="shot shot-desktop">
       <img src="/about/timeline-mobile.png" alt="ציר זמן - התרעות קודמות">
@@ -248,7 +215,7 @@ body {
     </div>
   </div>
 
-  <!-- Open source + prediction screenshot + chart -->
+  <!-- Open source -->
   <div class="row">
     <div class="card">
       <h2>קוד פתוח</h2>
@@ -264,20 +231,29 @@ body {
           דיווח על בעיה
         </a>
       </div>
-    </div>
-    <div class="chart-wrap">
-      <h3>מספר משתמשים ביום במהלך החודש האחרון</h3>
-      <div id="chart-dates" style="font-size:11px;color:#aaa;margin-bottom:4px"></div>
-      <div id="chart-area">
-        <div class="chart-error">טוען...</div>
+      <div class="chart-inline">
+        <div class="chart-col-header">
+          <h3>מספר המשתמשים ביום</h3>
+          <span class="chart-inline-dates">החודש האחרון · <span id="chart-dates"></span></span>
+        </div>
+        <div id="chart-area"><div class="chart-error">טוען...</div></div>
+        <p class="chart-desc">מפת העורף משמשת עשרות אלפי אנשים מדי יום כמקור מידע מהיר ואמין בזמן אירועי חירום.</p>
       </div>
-      <p class="chart-desc" id="chart-desc" style="display:none">מפת העורף משמשת עשרות אלפי אנשים מדי יום כמקור מידע מהיר ואמין בזמן אירועי חירום.</p>
     </div>
+  </div>
+
+  <!-- Story — full width -->
+  <div class="card card-full">
+    <h2>הסיפור</h2>
+    <p>כשהמלחמה פרצה ב-28 בפברואר 2026 ומערכת ההתרעות המוקדמות של פיקוד העורף נכנסה לפעולה, ציפיתי שהאפליקציות הקיימות (צבע אדום, פיקוד העורף) יציגו את ההתרעות על גבי מפה בצורה פשוטה וברורה. אחרי כמה ימים שבהם זה לא קרה, החלטתי לבנות את הכלי בעצמי.</p>
+    <p>הרגע המכונן היה אחרי חצות. קיבלתי התרעה מוקדמת וניסיתי להחליט אם לקום למרחב המוגן או לחכות לאזעקה. גללתי ברשימה ארוכה של יישובים וניסיתי לנחש מה הסיכוי שתהיה אזעקה אצלי בזכרון יעקב. זה היה מתסכל. היה ברור שצריך כלי שמציג את המידע ויזואלית, מפה שמאפשרת להבין את המצב תוך שניות.</p>
+    <p>תוך ימים ספורים הגרסה הראשונה הייתה באוויר. המשובים היו חד-משמעיים, אנשים חיכו לכלי כזה.</p>
+    <p>אני מאור קונפורטי, מנהל ומפתח תוכנה. מפת העורף היא פרויקט קוד פתוח שנוצר מתוך צורך אמיתי. במהלך הדרך תרמו לפרויקט אנשים רבים, בקוד, בדיווח על בעיות, וברעיונות לשיפור. תודה לכולם.</p>
   </div>
 
   <!-- Disclaimer -->
   <div class="card card-full card-warn">
-    מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף. אין להסתמך על המידע והתכנים המוצגים באתר זה, ובכל מקרה יש לנהוג בהתאם להנחיות פיקוד העורף.
+    אין להסתמך על המידע והתכנים המוצגים באתר זה. <strong>בכל מקרה יש לנהוג בהתאם להנחיות פיקוד העורף.</strong>
   </div>
 
 </div>
@@ -323,7 +299,7 @@ body {
       var p = s.split('-');
       return parseInt(p[2]) + '.' + parseInt(p[1]) + '.' + p[0].slice(2);
     }
-    document.getElementById('chart-dates').textContent = fmtDate(days[0]) + ' - ' + fmtDate(days[days.length - 1]);
+    document.getElementById('chart-dates').textContent = fmtDate(days[0]) + ' עד ' + fmtDate(days[days.length - 1]);
 
     // 3-day moving average
     var ma = data.map(function(_, i, arr) {
@@ -333,8 +309,8 @@ body {
       return sum / slice.length;
     });
 
-    var W = 220, H = 100;
-    var ml = 36, mr = 4, mt = 6, mb = 4;
+    var W = 220, H = 90;
+    var ml = 36, mr = 4, mt = 12, mb = 4;
     var cw = W - ml - mr;
     var ch = H - mt - mb;
     var n = ma.length;
@@ -355,13 +331,13 @@ body {
 
     var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">';
 
-    // Y-axis scale: 3 ticks (0, mid, max)
+    // Y-axis: gridlines + labels in Hebrew
     var ticks = [0, Math.round(maxV / 2), maxV];
     ticks.forEach(function(val) {
       var yy = y(val);
       svg += '<line x1="' + ml + '" y1="' + yy + '" x2="' + (W - mr) + '" y2="' + yy + '" stroke="#e0ddd8" stroke-width="0.5"/>';
-      var label = val >= 1000 ? Math.round(val / 1000) + 'K' : val;
-      svg += '<text x="' + (ml - 4) + '" y="' + (yy + 3) + '" text-anchor="end" fill="#aaa" font-size="9" font-family="Arial">' + label + '</text>';
+      var label = val >= 1000 ? Math.round(val / 1000) + ' אלף' : val;
+      svg += '<text x="' + (ml - 4) + '" y="' + (yy - 2) + '" text-anchor="end" fill="#aaa" font-size="8" font-family="Arial">' + label + '</text>';
     });
 
     svg += '<path d="' + areaPath + '" fill="rgba(59,130,246,0.10)"/>';
@@ -369,7 +345,6 @@ body {
     svg += '</svg>';
 
     document.getElementById('chart-area').innerHTML = svg;
-    document.getElementById('chart-desc').style.display = 'block';
   }
 })();
 </script>
