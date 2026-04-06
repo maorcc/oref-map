@@ -33,3 +33,5 @@ wheels/
 # Generated locally from oref-polygons; served via Pages Function in production
 /web/locations_polygons.json
 /history_full.json
+/web/logo-canvas.html
+/web/map-bg.png

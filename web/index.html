@@ -38,6 +38,15 @@ html, body { height: 100%; font-family: Arial, sans-serif; }
 .leaflet-control-zoom a:first-child { border-radius: 6px 6px 0 0 !important; }
 .leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
 body.has-overlay .leaflet-interactive { pointer-events: none !important; }
+
+#site-logo {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  pointer-events: none;
+}
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes toastFade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
@@ -123,17 +132,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   z-index: 1001;
   direction: ltr;
   color: #333;
-}
-
-#page-title {
-  margin: 0;
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  pointer-events: none;
-  filter: drop-shadow(0 1px 3px rgba(255,255,255,0.8));
 }
 
 .sr-only {
@@ -619,12 +617,13 @@ body.idle #right-panel {
 </style>
 </head>
 <body>
+
+<div id="site-logo">
+  <img src="/logo-text.png" srcset="/logo-text.png 1x, /logo-text@2x.png 2x" alt="מפת העורף">
+</div>
+
 <div id="map"></div>
 
-<div id="page-title">
-  <h1 class="sr-only">מפת העורף</h1>
-  <img src="/logo.png" alt="מפת העורף" height="72">
-</div>
 <button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
 </button>
