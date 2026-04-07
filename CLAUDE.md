@@ -50,8 +50,9 @@ Read the relevant doc before making changes in that area:
 
 When the user asks to change or extend the PMTiles coverage:
 
-1. **Ask the user to download a new file from the Protomaps dashboard** — Claude Code cannot browse it.
-   Instruct them: go to https://app.protomaps.com, draw a bounding box covering the desired region, and download the `.pmtiles` file.
+1. **Download a new PMTiles file** using the browser tool to navigate to https://slice.openstreetmap.us:
+   - Paste the desired bbox (e.g. `32,10,65,42`) into the "Paste bbox or GeoJSON" field
+   - Click **Load**, enter a name, click **Generate Slice**, then download the `.pmtiles` file
 
 2. **Once the user has the file**, upload it to R2 with:
    ```bash

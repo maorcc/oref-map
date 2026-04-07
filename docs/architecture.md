@@ -150,12 +150,12 @@ npx pmtiles show https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east
 
 #### Regenerating with a larger bounding box
 
-The current file was generated with **Planetiler**. For a one-off bbox change (e.g. adding Yemen), **the Protomaps dashboard is the easier option** — no local tooling required.
+The current file was generated with **Planetiler** (v0.10.1, run locally).
 
-**Option A — Protomaps dashboard (recommended for one-off changes):**
-1. Go to [app.protomaps.com](https://app.protomaps.com), draw a bounding box covering the desired region, and download the `.pmtiles` file.
+**Option A — slice.openstreetmap.us (easiest for one-off changes):**
+1. Go to [slice.openstreetmap.us](https://slice.openstreetmap.us), paste the desired bbox (e.g. `32,10,65,42`) into the "Paste bbox or GeoJSON" field, click **Load**, name the area, then click **Generate Slice** and download the resulting `.pmtiles` file. This site is automatable via browser tools.
 
-**Option B — Planetiler (for automation or fresh OSM data):**
+**Option B — Planetiler (used to generate the original file; best for full control or automation):**
 1. ```bash
    java -jar planetiler.jar \
      --download \
