@@ -32,6 +32,20 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 - `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
 - `docs/map-requirements.md` — Feature requirements doc
 
+## Docs — when to read which file
+
+Read the relevant doc before making changes in that area:
+
+| Task | Read |
+|------|------|
+| Map rendering, basemap tiles, polygon source, API proxy architecture, Cloudflare setup | `docs/architecture.md` |
+| Changing map bounds, replacing or extending PMTiles on R2, understanding tile coverage | `docs/architecture.md` § "Basemap Tiles (PMTiles on R2)" |
+| Ellipse mode behavior, geometry math, cluster algorithm | `docs/ellipse-feature.md` |
+| Alg-C ellipse service (Python backend), request/response format | `docs/ellipse-alg-C.md` |
+| Ellipse probability window metric | `docs/ellipse-probability-window.md` |
+| Feature requirements, UX decisions | `docs/map-requirements.md` |
+| Oref API endpoints, response shapes, geo-blocking | `docs/oref-sources.md` (and this file) |
+
 ## Feature flags
 
 Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?f-log`). On page load, a single block of JS parses all `f-*` params and:
