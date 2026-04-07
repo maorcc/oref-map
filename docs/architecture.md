@@ -10,8 +10,8 @@ hour and last 24 hours. The client polls this endpoint once per minute.
 
 ## Stack
 
-- **Map**: Leaflet.js (v1.9.4) + OpenStreetMap tiles
-- **Voronoi**: d3-delaunay (v6) for polygon computation, polygon-clipping (v0.15) for clipping to Israel border
+- **Map**: MapLibre GL JS + PMTiles (self-hosted Middle East extract on Cloudflare R2, Protomaps basemap with Hebrew labels)
+- **Polygons**: Pre-computed GeoJSON in `web/locations_polygons.json` loaded at startup into a MapLibre `alerts-source`
 - **API proxy (tier 1)**: Cloudflare Pages Functions (`functions/api/`) — serves TLV users directly, redirects others
 - **API proxy (tier 2)**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"` — fallback for non-TLV users
 - **History storage**: Cloudflare R2 bucket (`oref-history`) with per-day JSONL files
@@ -115,13 +115,13 @@ Unknown titles default to red and log a console warning.
 
 ## Map Rendering
 
-### Voronoi Polygons
+### Polygons
 
-All ~1,430 location coordinates from `cities_geo.json` are tessellated at startup using d3-delaunay into Voronoi cells. Cells are clipped to Israel's border polygon using polygon-clipping. Each location owns one polygon cell.
+Location polygons are pre-computed offline and shipped as `web/locations_polygons.json`. On startup the page fetches this file and loads all ~1,450 features into the MapLibre `alerts-source` GeoJSON source. Each feature's `fillColor`, `fillOpacity`, `lineColor`, and `lineOpacity` properties are updated in place via `setData()` whenever alert state changes — no layer recreation needed.
 
-- Computed once at startup, not on every alert update.
-- Only fill color and opacity change per alert event.
 - Adjacent polygons of the same color visually merge into contiguous threat zones (shared borders become invisible due to matching stroke color).
+- Per-feature state is driven by data properties, not Leaflet `setStyle`.
+- The `featureMap` lookup (`name → GeoJSON Feature`) is exposed on `AppState` for use by extensions (e.g. ellipse mode).
 
 ### Geocoding
 
@@ -137,7 +137,7 @@ All ~1,430 location coordinates from `cities_geo.json` are tessellated at startu
 - **Legend**: Bottom-right — color key
 - **Timeline panel**: Bottom-center — date navigation + slider to scrub through any day's history
 - **About modal**: Triggered by ⓘ button or title click. Closes on backdrop click or Escape.
-- **Popups**: Click a polygon to see alert history for that location (newest first).
+- **Location panel**: Click a polygon to open a slide-in panel with alert history for that location (bottom-sheet on mobile, sidebar on desktop).
 
 All overlays use `position: fixed`, `z-index: 1000`, semi-transparent white backgrounds with `border-radius` and `box-shadow`. RTL layout throughout.
 

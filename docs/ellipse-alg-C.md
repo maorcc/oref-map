@@ -74,7 +74,7 @@ On success the server returns:
 }
 ```
 
-The browser converts that response into a renderable Leaflet geometry in [`buildAlgCServiceRenderable(...)`](/home/tomer/projects/oref-map/web/ellipse-mode.js#L1710).
+The browser converts that response into a renderable geometry in `buildAlgCServiceRenderable()` in `web/ellipse-mode.js`, using inline Web Mercator projection math (no Leaflet dependency). The result is pushed to the `algc-overlay` MapLibre GeoJSON source.
 
 ### Error responses
 

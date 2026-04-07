@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project
 
-`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
+`oref-map` is a live alert map of Israel ("מפת העורף") showing colored area polygons for alert statuses per location. It uses MapLibre GL JS + self-hosted PMTiles (Protomaps, Cloudflare R2). Polygons are pre-computed GeoJSON (`locations_polygons.json`). Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
 
 **Public URL**: https://oref-map.org
 

@@ -46,7 +46,7 @@ Ellipse mode uses the following app state inputs:
 
 - `locationStates`: current displayed state per location
 - `locationHistory`: recent alert history per location
-- `locationPolygons`: Leaflet polygons for each location
+- `featureMap`: GeoJSON Feature objects for each location (keyed by location name)
 - `userPosition`: current user geolocation if available
 
 It also lazily loads `oref_points.json`, which maps alert location names to `[lat, lng]` points used for ellipse fitting and marker placement.
@@ -136,7 +136,7 @@ If the cluster has exactly one usable point, the geometry becomes:
 
 For clusters with two or more usable points:
 
-1. points are projected into the map CRS
+1. points are projected into Web Mercator (EPSG:3857) using inline math (no map CRS dependency)
 2. a major axis is estimated
 3. the point spread is measured in the major-axis and minor-axis basis
 4. padded semi-axes are produced
