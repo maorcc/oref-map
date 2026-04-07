@@ -61,6 +61,14 @@ const ALG_C_DEFAULT_OPTIONS = {
   minMinorRatio: 0.32,
 };
 
+const ALG_D_DEFAULT_OPTIONS = {
+  ...ALG_C_DEFAULT_OPTIONS,
+  robustFitMaxTrials: 90,
+  robustFitSampleRatio: 0.6,
+  robustFitInlierThreshold: 0.28,
+  robustFitRefinePasses: 3,
+};
+
 function degToRad(value) {
   return (value * Math.PI) / 180;
 }
@@ -354,6 +362,11 @@ function filterPointsAwayFromCoast(projectedPoints, projection, options) {
 }
 
 function fitProjectedEllipseFromBoundaryApprox(projectedPoints, options) {
+  const raw = fitProjectedEllipseCore(projectedPoints);
+  return finalizeEllipseCandidate(raw, options);
+}
+
+function fitProjectedEllipseCore(projectedPoints) {
   let centerX = 0;
   let centerY = 0;
   for (const point of projectedPoints) {
@@ -395,17 +408,29 @@ function fitProjectedEllipseFromBoundaryApprox(projectedPoints, options) {
 
   const offsetU = (minU + maxU) / 2;
   const offsetV = (minV + maxV) / 2;
-  let semiMajor = Math.max((maxU - minU) / 2, options.minSemiMajorMeters);
-  let semiMinor = Math.max((maxV - minV) / 2, options.minSemiMinorMeters);
-  semiMajor += options.majorPaddingMeters;
-  semiMinor = Math.max(semiMinor + options.minorPaddingMeters, semiMajor * options.minMinorRatio);
 
   return normalizeAxes({
     centerX: centerX + (offsetU * cos) - (offsetV * sin),
     centerY: centerY + (offsetU * sin) + (offsetV * cos),
+    semiMajor: Math.max((maxU - minU) / 2, 1),
+    semiMinor: Math.max((maxV - minV) / 2, 1),
+    angle,
+  });
+}
+
+function finalizeEllipseCandidate(candidate, options) {
+  const normalized = normalizeAxes(candidate);
+  let semiMajor = Math.max(normalized.semiMajor, options.minSemiMajorMeters);
+  let semiMinor = Math.max(normalized.semiMinor, options.minSemiMinorMeters);
+  semiMajor += options.majorPaddingMeters;
+  semiMinor = Math.max(semiMinor + options.minorPaddingMeters, semiMajor * options.minMinorRatio);
+
+  return normalizeAxes({
+    centerX: normalized.centerX,
+    centerY: normalized.centerY,
     semiMajor,
     semiMinor,
-    angle,
+    angle: normalized.angle,
   });
 }
 
@@ -467,6 +492,138 @@ process.exit(0);
     heightDegrees: ellipse.size.height,
     angleDegrees: ellipse.angle,
     angle: degToRad(ellipse.angle),
+  };
+}
+
+function createDeterministicRandom(seed) {
+  let state = (seed >>> 0) || 1;
+  return function nextRandom() {
+    state = (1664525 * state + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function pickRandomSubset(points, count, nextRandom) {
+  const chosen = new Set();
+  while (chosen.size < count) {
+    chosen.add(Math.floor(nextRandom() * points.length));
+  }
+  return Array.from(chosen, (index) => points[index]);
+}
+
+function percentile(sortedValues, ratio) {
+  if (!sortedValues.length) return Number.POSITIVE_INFINITY;
+  const index = Math.max(0, Math.min(sortedValues.length - 1, Math.round((sortedValues.length - 1) * ratio)));
+  return sortedValues[index];
+}
+
+function evaluateBoundaryCandidate(candidate, projectedPoints, options) {
+  const residuals = [];
+  const inliers = [];
+  const bins = new Set();
+  const threshold = options.robustFitInlierThreshold;
+
+  for (const point of projectedPoints) {
+    const local = projectToEllipse(candidate, point);
+    const radius = Math.sqrt(ellipseValue(candidate, point));
+    const residual = Math.abs(radius - 1);
+    residuals.push(residual);
+
+    if (residual <= threshold) {
+      inliers.push(point);
+      let theta = Math.atan2(local.v / candidate.semiMinor, local.u / candidate.semiMajor);
+      if (theta < 0) theta += Math.PI * 2;
+      bins.add(Math.floor((theta / (Math.PI * 2)) * 12));
+    }
+  }
+
+  residuals.sort((a, b) => a - b);
+  return {
+    candidate,
+    inliers,
+    inlierCount: inliers.length,
+    coverage: bins.size,
+    medianResidual: percentile(residuals, 0.5),
+    p85Residual: percentile(residuals, 0.85),
+  };
+}
+
+function isBoundaryScoreBetter(candidateScore, bestScore) {
+  if (!bestScore) return true;
+  if (candidateScore.inlierCount !== bestScore.inlierCount) {
+    return candidateScore.inlierCount > bestScore.inlierCount;
+  }
+  if (candidateScore.coverage !== bestScore.coverage) {
+    return candidateScore.coverage > bestScore.coverage;
+  }
+  if (Math.abs(candidateScore.p85Residual - bestScore.p85Residual) > 1e-9) {
+    return candidateScore.p85Residual < bestScore.p85Residual;
+  }
+  return candidateScore.medianResidual < bestScore.medianResidual;
+}
+
+function fitRobustProjectedEllipseFromBoundary(projectedPoints, options) {
+  if (projectedPoints.length < 5) {
+    return finalizeEllipseCandidate(fitProjectedEllipseCore(projectedPoints), options);
+  }
+
+  const trials = Math.max(12, options.robustFitMaxTrials | 0);
+  const sampleCount = Math.max(
+    5,
+    Math.min(projectedPoints.length, Math.round(projectedPoints.length * options.robustFitSampleRatio))
+  );
+  const nextRandom = createDeterministicRandom(projectedPoints.length * 2654435761);
+
+  let bestScore = evaluateBoundaryCandidate(
+    fitProjectedEllipseCore(projectedPoints),
+    projectedPoints,
+    options,
+  );
+
+  for (let trial = 0; trial < trials; trial += 1) {
+    const sample = pickRandomSubset(projectedPoints, sampleCount, nextRandom);
+    let candidate = fitProjectedEllipseCore(sample);
+    let score = evaluateBoundaryCandidate(candidate, projectedPoints, options);
+
+    for (let pass = 0; pass < options.robustFitRefinePasses; pass += 1) {
+      if (score.inliers.length < 5) break;
+      candidate = fitProjectedEllipseCore(score.inliers);
+      const refined = evaluateBoundaryCandidate(candidate, projectedPoints, options);
+      if (!isBoundaryScoreBetter(refined, score)) break;
+      score = refined;
+    }
+
+    if (isBoundaryScoreBetter(score, bestScore)) {
+      bestScore = score;
+    }
+  }
+
+  return finalizeEllipseCandidate(bestScore.candidate, options);
+}
+
+async function fitRobustEllipseFromBoundary(projectedPoints, options) {
+  if (projectedPoints.length < 5 || projectedPoints.some((point) => !point.source)) {
+    const approx = fitProjectedEllipseFromBoundaryApprox(projectedPoints, options);
+    return {
+      coordinateSpace: 'projected',
+      centerX: approx.centerX,
+      centerY: approx.centerY,
+      semiMajor: approx.semiMajor,
+      semiMinor: approx.semiMinor,
+      angle: approx.angle,
+      fitSource: 'approx',
+    };
+  }
+
+  const robust = fitRobustProjectedEllipseFromBoundary(projectedPoints, options);
+  return {
+    coordinateSpace: 'projected',
+    centerX: robust.centerX,
+    centerY: robust.centerY,
+    semiMajor: robust.semiMajor,
+    semiMinor: robust.semiMinor,
+    angle: robust.angle,
+    fitSource: 'robust-js',
   };
 }
 
@@ -998,9 +1155,59 @@ async function fitAlgC(alertedPoints, options = ALG_C_DEFAULT_OPTIONS) {
   };
 }
 
+async function fitAlgD(alertedPoints, options = ALG_D_DEFAULT_OPTIONS) {
+  const projection = buildProjection(alertedPoints);
+  const projectedPoints = alertedPoints.map((point) => ({
+    ...projection.project(point),
+    source: point,
+  }));
+
+  const clusteredPoints = detectMainCluster(projectedPoints, options);
+  if (clusteredPoints.length < options.minBoundaryPoints) {
+    return {
+      projection,
+      clusteredPoints,
+      boundaryPoints: clusteredPoints,
+      filteredBoundaryPoints: clusteredPoints,
+      candidate: await fitRobustEllipseFromBoundary(clusteredPoints, options),
+      metrics: {
+        clusteredCount: clusteredPoints.length,
+        boundaryCount: clusteredPoints.length,
+        filteredBoundaryCount: clusteredPoints.length,
+        coastRejectedCount: 0,
+        minCoastDistanceMeters: null,
+      },
+    };
+  }
+
+  const boundaryPoints = buildAlphaShapeBoundaryPoints(clusteredPoints, options);
+  const coastFilter = filterPointsAwayFromCoast(boundaryPoints, projection, options);
+  const filteredBoundaryPoints = coastFilter.filtered.length >= options.minBoundaryPoints
+    ? coastFilter.filtered
+    : boundaryPoints;
+  const candidate = await fitRobustEllipseFromBoundary(filteredBoundaryPoints, options);
+  const usableDistances = coastFilter.minDistances.filter(Number.isFinite);
+
+  return {
+    projection,
+    clusteredPoints,
+    boundaryPoints,
+    filteredBoundaryPoints,
+    candidate,
+    metrics: {
+      clusteredCount: clusteredPoints.length,
+      boundaryCount: boundaryPoints.length,
+      filteredBoundaryCount: filteredBoundaryPoints.length,
+      coastRejectedCount: Math.max(boundaryPoints.length - filteredBoundaryPoints.length, 0),
+      minCoastDistanceMeters: usableDistances.length ? Math.min(...usableDistances) : null,
+    },
+  };
+}
+
 export {
   ALG_A_DEFAULT_OPTIONS,
   ALG_C_DEFAULT_OPTIONS,
+  ALG_D_DEFAULT_OPTIONS,
   ALG_B_SEARCH_CONFIG,
   ALG_B_SEMI_MAJOR_METERS,
   ALG_B_SEMI_MINOR_METERS,
@@ -1009,6 +1216,7 @@ export {
   buildMercatorEllipseLatLngs,
   buildProjection,
   fitAlgC,
+  fitAlgD,
   fitEllipse,
   fitFixedLeftmostEllipse,
   normalizeAxes,

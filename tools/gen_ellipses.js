@@ -14,6 +14,7 @@ import {
   buildMercatorEllipseLatLngs,
   buildProjection,
   fitAlgC,
+  fitAlgD,
   fitEllipse,
   fitFixedLeftmostEllipse,
   radToDeg,
@@ -160,6 +161,106 @@ function buildRenderableGeometry(result, projection, style) {
   };
 }
 
+function buildAlgCRenderableInput(fitResult) {
+  if (fitResult.candidate.coordinateSpace === 'raw-degrees') {
+    return {
+      type: 'ellipse',
+      coordinateSpace: fitResult.candidate.coordinateSpace,
+      rawCandidate: fitResult.candidate,
+      metrics: fitResult.metrics,
+    };
+  }
+
+  return {
+    type: 'ellipse',
+    center: fitResult.projection.unproject({
+      x: fitResult.candidate.centerX,
+      y: fitResult.candidate.centerY,
+    }),
+    semiMajor: fitResult.candidate.semiMajor,
+    semiMinor: fitResult.candidate.semiMinor,
+    angle: fitResult.candidate.angle,
+    projectionCenterX: fitResult.candidate.centerX,
+    projectionCenterY: fitResult.candidate.centerY,
+    metrics: fitResult.metrics,
+  };
+}
+
+function toLatLngStagePoints(points) {
+  return points.map((point) => {
+    if (point && point.source && Number.isFinite(point.source.lat) && Number.isFinite(point.source.lng)) {
+      return {
+        lat: point.source.lat,
+        lng: point.source.lng,
+        name: point.source.name || null,
+      };
+    }
+    return {
+      lat: point.lat,
+      lng: point.lng,
+      name: point.name || null,
+    };
+  });
+}
+
+function withAlpha(color, alpha) {
+  const normalized = String(color || '').trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) return color;
+  const clamped = Math.max(0, Math.min(255, Math.round(alpha * 255)));
+  return normalized + clamped.toString(16).padStart(2, '0');
+}
+
+function buildAlgorithmDebugStages(geometryLabel, color, fitResult) {
+  if (!fitResult) return null;
+
+  const fitInputPoints = fitResult.filteredBoundaryPoints.length >= 6
+    ? fitResult.filteredBoundaryPoints
+    : fitResult.boundaryPoints;
+
+  return [
+    {
+      id: `${geometryLabel}-clustered`,
+      label: 'clustered',
+      points: toLatLngStagePoints(fitResult.clusteredPoints),
+      style: {
+        color,
+        fillColor: withAlpha(color, 0.18),
+        radius: 2.5,
+      },
+    },
+    {
+      id: `${geometryLabel}-boundary`,
+      label: 'boundary',
+      points: toLatLngStagePoints(fitResult.boundaryPoints),
+      style: {
+        color,
+        fillColor: withAlpha(color, 0.28),
+        radius: 3.25,
+      },
+    },
+    {
+      id: `${geometryLabel}-filtered`,
+      label: 'filtered',
+      points: toLatLngStagePoints(fitResult.filteredBoundaryPoints),
+      style: {
+        color,
+        fillColor: withAlpha(color, 0.42),
+        radius: 4,
+      },
+    },
+    {
+      id: `${geometryLabel}-fit-input`,
+      label: 'fit input',
+      points: toLatLngStagePoints(fitInputPoints),
+      style: {
+        color,
+        fillColor: withAlpha(color, 0.58),
+        radius: 4.75,
+      },
+    },
+  ];
+}
+
 function buildRawDegreeEllipseLatLngs(candidate, sampleCount = 180) {
   const points = [];
   const angleRad = candidate.angleDegrees * Math.PI / 180;
@@ -264,7 +365,7 @@ function buildMetricLines(geometry) {
     lines.push(`outside=${geometry.metrics.outsideCount}`);
   }
 
-  if (geometry.label === 'Alg-C' && geometry.metrics) {
+  if ((geometry.label === 'Alg-C' || geometry.label === 'Alg-D') && geometry.metrics) {
     lines.push(`clustered=${geometry.metrics.clusteredCount}`);
     lines.push(`boundary=${geometry.metrics.boundaryCount}`);
     lines.push(`coastRejected=${geometry.metrics.coastRejectedCount}`);
@@ -338,9 +439,24 @@ function buildHtml(payload) {
       margin: 10px 0;
       font-size: 14px;
     }
+    .legend-subitem {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 6px 0 6px 26px;
+      font-size: 12px;
+      color: rgba(23, 33, 38, 0.86);
+    }
     .legend-toggle {
       width: 16px;
       height: 16px;
+      margin: 0;
+      accent-color: var(--ink);
+      flex: 0 0 auto;
+    }
+    .legend-subtoggle {
+      width: 14px;
+      height: 14px;
       margin: 0;
       accent-color: var(--ink);
       flex: 0 0 auto;
@@ -351,6 +467,14 @@ function buildHtml(payload) {
       border-radius: 999px;
       flex: 0 0 auto;
       border: 2px solid transparent;
+      box-sizing: border-box;
+    }
+    .stage-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      border: 1px solid transparent;
       box-sizing: border-box;
     }
     #map {
@@ -374,7 +498,7 @@ function buildHtml(payload) {
   <div class="layout">
     <aside class="sidebar">
       <h1>${escapeHtml(title)}</h1>
-      <p>Comparison map for <code>alg-basic</code>, <code>alg-A</code>, <code>alg-B</code>, and <code>alg-C</code>, built from a JSON file of alerted settlement names.</p>
+      <p>Comparison map for <code>alg-basic</code>, <code>alg-A</code>, <code>alg-B</code>, <code>alg-C</code>, and <code>alg-D</code>, built from a JSON file of alerted settlement names.</p>
       <div class="meta">Input: ${escapeHtml(path.basename(payload.inputPath))}</div>
       <div class="meta">Alerted settlements: ${payload.alertedPoints.length}</div>
       ${payload.geometries.map((geometry) => `
@@ -383,6 +507,13 @@ function buildHtml(payload) {
           <span class="swatch" style="background:${geometry.style.color}; border-color:${geometry.style.color}"></span>
           <span>${escapeHtml(buildSummary(geometry))}</span>
         </div>
+        ${(geometry.debugStages || []).map((stage) => `
+          <div class="legend-subitem">
+            <input class="legend-subtoggle" type="checkbox" data-stage-id="${escapeHtml(stage.id)}">
+            <span class="stage-swatch" style="background:${stage.style.fillColor}; border-color:${stage.style.color}"></span>
+            <span>${escapeHtml(stage.label)} (${stage.points.length})</span>
+          </div>
+        `).join('')}
       `).join('')}
       <div class="legend-item">
         <span class="swatch" style="background:var(--point); border-color:var(--point)"></span>
@@ -404,6 +535,7 @@ function buildHtml(payload) {
       const payload = window.__ELLIPSE_COMPARE__;
       const map = L.map('map', { zoomControl: true, preferCanvas: true });
       const geometryLayersByLabel = new Map();
+      const stageLayersById = new Map();
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 18,
@@ -452,11 +584,39 @@ function buildHtml(payload) {
 
         layerGroup.addTo(map);
         geometryLayersByLabel.set(geometry.label, layerGroup);
+
+        for (const stage of (geometry.debugStages || [])) {
+          const stageLayer = L.layerGroup();
+          for (const point of stage.points) {
+            L.circleMarker([point.lat, point.lng], {
+              radius: stage.style.radius,
+              color: stage.style.color,
+              weight: 1,
+              fillColor: stage.style.fillColor,
+              fillOpacity: 0.9
+            }).addTo(stageLayer).bindPopup(
+              geometry.label + ' ' + stage.label + (point.name ? ': ' + point.name : '')
+            );
+          }
+          stageLayersById.set(stage.id, stageLayer);
+        }
       }
 
       for (const checkbox of document.querySelectorAll('[data-geometry-label]')) {
         checkbox.addEventListener('change', () => {
           const layerGroup = geometryLayersByLabel.get(checkbox.dataset.geometryLabel);
+          if (!layerGroup) return;
+          if (checkbox.checked) {
+            layerGroup.addTo(map);
+          } else {
+            layerGroup.remove();
+          }
+        });
+      }
+
+      for (const checkbox of document.querySelectorAll('[data-stage-id]')) {
+        checkbox.addEventListener('change', () => {
+          const layerGroup = stageLayersById.get(checkbox.dataset.stageId);
           if (!layerGroup) return;
           if (checkbox.checked) {
             layerGroup.addTo(map);
@@ -510,12 +670,14 @@ async function main() {
   const algAFit = fitEllipse(alertedPoints, allEntries, ALG_A_DEFAULT_OPTIONS);
   const algBFit = fitFixedLeftmostEllipse(alertedPoints);
   const algCFit = await fitAlgC(alertedPoints);
+  const algDFit = await fitAlgD(alertedPoints);
 
   const styles = [
     { label: 'alg-basic', color: '#8e1b1b', fillOpacity: 0.05, weight: 8 },
     { label: 'Alg-A', color: '#1b5e20', fillOpacity: 0.05 },
     { label: 'Alg-B', color: '#1839b7', fillOpacity: 0.04 },
     { label: 'Alg-C', color: '#8a3ffc', fillOpacity: 0.04 },
+    { label: 'Alg-D', color: '#d97706', fillOpacity: 0.04 },
   ];
 
   const geometries = [
@@ -548,16 +710,15 @@ async function main() {
         farthestOutside: algBFit.best.farthestOutside,
       },
     }, projection, styles[2]),
-    buildRenderableGeometry({
-      type: 'ellipse',
-      coordinateSpace: algCFit.candidate.coordinateSpace,
-      rawCandidate: algCFit.candidate,
-      metrics: algCFit.metrics,
-    }, projection, styles[3]),
+    buildRenderableGeometry(buildAlgCRenderableInput(algCFit), projection, styles[3]),
+    buildRenderableGeometry(buildAlgCRenderableInput(algDFit), projection, styles[4]),
   ].map((geometry) => ({
     ...geometry,
     metricLines: buildMetricLines(geometry),
   }));
+
+  geometries[3].debugStages = buildAlgorithmDebugStages('Alg-C', styles[3].color, algCFit);
+  geometries[4].debugStages = buildAlgorithmDebugStages('Alg-D', styles[4].color, algDFit);
 
   const payload = {
     inputPath,
