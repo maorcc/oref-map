@@ -46,6 +46,25 @@ Read the relevant doc before making changes in that area:
 | Feature requirements, UX decisions | `docs/map-requirements.md` |
 | Oref API endpoints, response shapes, geo-blocking | `docs/oref-sources.md` (and this file) |
 
+## Replacing the basemap tiles (one-time)
+
+When the user asks to change or extend the PMTiles coverage:
+
+1. **Ask the user to download a new file from the Protomaps dashboard** — Claude Code cannot browse it.
+   Instruct them: go to https://app.protomaps.com, draw a bounding box covering the desired region, and download the `.pmtiles` file.
+
+2. **Once the user has the file**, upload it to R2 with:
+   ```bash
+   wrangler r2 object put <bucket-name>/middle-east.pmtiles \
+     --file=<path-to-downloaded-file>.pmtiles \
+     --content-type=application/vnd.mapbox-vector-tile
+   ```
+   The bucket name is visible in Cloudflare dashboard → R2. The public URL does not change.
+
+3. **Update `maxBounds` in `web/index.html`** (search for `maxBounds`) to match the new bounding box.
+
+4. **Verify** by running `npx pmtiles show <url>` to confirm the new bounds.
+
 ## Feature flags
 
 Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?f-log`). On page load, a single block of JS parses all `f-*` params and:
