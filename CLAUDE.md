@@ -50,11 +50,15 @@ Read the relevant doc before making changes in that area:
 
 When the user asks to change or extend the PMTiles coverage:
 
-1. **Download a new PMTiles file** using the browser tool to navigate to https://slice.openstreetmap.us:
-   - Paste the desired bbox (e.g. `32,10,65,42`) into the "Paste bbox or GeoJSON" field
-   - Click **Load**, enter a name, click **Generate Slice**, then download the `.pmtiles` file
+1. **Download a new PMTiles file** using the `pmtiles` CLI (install: `brew install protomaps/homebrew-go-pmtiles/go-pmtiles`). It extracts only the needed bbox via HTTP range requests — no full 120 GB download:
+   ```bash
+   pmtiles extract https://build.protomaps.com/20260404.pmtiles middle-east.pmtiles \
+     --bbox=32,10,65,42 --maxzoom=15 --download-threads=4
+   ```
+   Replace `20260404` with a recent date from https://maps.protomaps.com/builds/.
+   The bbox format is `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`.
 
-2. **Once the user has the file**, upload it to R2 with:
+2. **Upload to R2** with:
    ```bash
    wrangler r2 object put <bucket-name>/middle-east.pmtiles \
      --file=<path-to-downloaded-file>.pmtiles \

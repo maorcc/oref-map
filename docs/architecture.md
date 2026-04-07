@@ -136,11 +136,11 @@ https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east.pmtiles
 |----------|-------|
 | File | `middle-east.pmtiles` |
 | Bounds (lng) | 32.0 – 65.0 |
-| Bounds (lat) | 24.0 – 42.0 |
+| Bounds (lat) | 11.0 – 39.0 |
 | Zoom | 0 – 10 |
-| Built | 2026-03-10 (Planetiler 0.10.1, OSM data 2026-04-06) |
+| Built | 2026-04-07 (Planetiler 0.10.1, OSM data 2026-04-06) |
 
-This covers Israel, Lebanon, Syria, Jordan, Iraq, Iran, Saudi Arabia, Egypt (Sinai), and the Gulf states. **Yemen and southern Saudi Arabia (south of lat 24°) are not covered.**
+This covers Israel, Lebanon, Syria, Jordan, Iraq, Iran, Saudi Arabia, Egypt (Sinai), the Gulf states, and Yemen.
 
 #### Inspecting the current file
 
@@ -150,26 +150,36 @@ npx pmtiles show https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east
 
 #### Regenerating with a larger bounding box
 
-The current file was generated with **Planetiler** (v0.10.1, run locally).
+The current file was generated with **Planetiler** (v0.10.1, run locally). For future updates the recommended approach is the `pmtiles` CLI, which uses HTTP range requests to extract only the needed tiles from Protomaps' hosted planet — no 120 GB download required.
 
-**Option A — slice.openstreetmap.us (easiest for one-off changes):**
-1. Go to [slice.openstreetmap.us](https://slice.openstreetmap.us), paste the desired bbox (e.g. `32,10,65,42`) into the "Paste bbox or GeoJSON" field, click **Load**, name the area, then click **Generate Slice** and download the resulting `.pmtiles` file. This site is automatable via browser tools.
+**Option A — `pmtiles extract` CLI (recommended for one-off changes):**
 
-**Option B — Planetiler (used to generate the original file; best for full control or automation):**
-1. ```bash
-   java -jar planetiler.jar \
-     --download \
-     --area=middle-east \
-     --bounds=32,10,65,42 \
-     --output=middle-east-extended.pmtiles
-   ```
+Install: `brew install protomaps/homebrew-go-pmtiles/go-pmtiles`
+
+Find a recent build date at https://maps.protomaps.com/builds/, then run:
+```bash
+pmtiles extract https://build.protomaps.com/20260404.pmtiles middle-east.pmtiles \
+  --bbox=32,10,65,42 --maxzoom=15 --download-threads=4
+```
+bbox format: `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`. Replace the date with the one from the builds index. The command fetches only the tiles in the bbox via HTTP range requests (a few GB, not 120 GB).
+
+> **Do not use `slice.openstreetmap.us`** — that site downloads raw `.osm.pbf` data (OSM XML/binary), not `.pmtiles`.
+
+**Option B — Planetiler (best for full control or custom schemas):**
+```bash
+java -jar planetiler.jar \
+  --download \
+  --area=middle-east \
+  --bounds=32,10,65,42 \
+  --output=middle-east-extended.pmtiles
+```
 
 Both produce the same `protomaps` basemap schema — the map code works identically with either output.
 
 2. **Upload to R2** using Wrangler (bucket name visible in Cloudflare dashboard → R2):
    ```bash
    wrangler r2 object put <bucket-name>/middle-east.pmtiles \
-     --file=middle-east-extended.pmtiles \
+     --file=middle-east.pmtiles \
      --content-type=application/vnd.mapbox-vector-tile
    ```
    The public URL (`pub-0cb002...r2.dev`) does not change after upload.
