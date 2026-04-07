@@ -6,9 +6,7 @@
     var map = A.map;
     var showToast = A.showToast;
 
-    var orefPoints = null;
-    var orefPointsPromise = null;
-    var predictionLines = [];
+    var predictionFeatures = [];
     var enabled = localStorage.getItem('oref-predict') === 'true';
     var predictionUpdateScheduled = false;
 
@@ -16,47 +14,25 @@
     var PREDICTION_MIN_SPAN = 0.1;
     var ISRAEL_CENTER = [31.5, 34.8];
 
-    function ensureOrefPoints() {
-      if (orefPoints) return Promise.resolve(orefPoints);
-      if (orefPointsPromise) return orefPointsPromise;
-
-      orefPointsPromise = fetch('oref_points.json')
-        .then(function(resp) {
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          return resp.json();
-        })
-        .then(function(data) {
-          orefPoints = data || {};
-          return orefPoints;
-        })
-        .finally(function() {
-          orefPointsPromise = null;
-        });
-
-      return orefPointsPromise;
-    }
-
-    function polygonCentroid(poly) {
-      var rings = poly.getLatLngs();
-      if (!rings || rings.length === 0) return null;
-      var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
-      if (outer.length === 0 || typeof outer[0].lat !== 'number') return null;
+    // GeoJSON feature → [lat, lng] centroid of outer ring
+    function polygonCentroid(feature) {
+      var outer = feature.geometry.coordinates[0];
+      if (!outer || outer.length === 0) return null;
       var sumLat = 0, sumLng = 0;
       for (var i = 0; i < outer.length; i++) {
-        sumLat += outer[i].lat;
-        sumLng += outer[i].lng;
+        sumLat += outer[i][1];
+        sumLng += outer[i][0];
       }
       return [sumLat / outer.length, sumLng / outer.length];
     }
 
-    function polygonArea(poly) {
-      var rings = poly.getLatLngs();
-      if (!rings || rings.length === 0) return 0;
-      var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
-      if (outer.length < 3) return 0;
+    // GeoJSON feature → approximate polygon area (degrees²)
+    function polygonArea(feature) {
+      var outer = feature.geometry.coordinates[0];
+      if (!outer || outer.length < 3) return 0;
       var area = 0;
       for (var i = 0, j = outer.length - 1; i < outer.length; j = i++) {
-        area += (outer[j].lng + outer[i].lng) * (outer[j].lat - outer[i].lat);
+        area += (outer[j][0] + outer[i][0]) * (outer[j][1] - outer[i][1]);
       }
       return Math.abs(area / 2);
     }
@@ -176,27 +152,29 @@
     }
 
     function clearPredictionLines() {
-      for (var i = 0; i < predictionLines.length; i++) {
-        map.removeLayer(predictionLines[i]);
-      }
-      predictionLines = [];
+      if (predictionFeatures.length === 0) return;
+      predictionFeatures = [];
+      updatePredictionSource();
+    }
+
+    function updatePredictionSource() {
+      var src = map.getSource('prediction-source');
+      if (src) src.setData({ type: 'FeatureCollection', features: predictionFeatures });
     }
 
     // Cluster alerted locations by polygon adjacency.
-    // Two alerted locations are in the same cluster if their Voronoi polygons
-    // share a vertex (i.e., are touching). Connected components via union-find.
-    function clusterByAdjacency(locPoints, locationPolygons) {
+    // Two alerted locations are in the same cluster if their polygons share a vertex.
+    function clusterByAdjacency(locPoints, featureMap) {
       var n = locPoints.length;
       if (n === 0) return [];
       // Collect polygon vertices for each location
       var locVerts = [];
       for (var i = 0; i < n; i++) {
-        var poly = locationPolygons[locPoints[i][3]];
+        var feature = featureMap[locPoints[i][3]];
         var verts = [];
-        if (poly) {
-          var rings = poly.getLatLngs();
-          var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
-          for (var j = 0; j < outer.length; j++) verts.push([outer[j].lat, outer[j].lng]);
+        if (feature) {
+          var outer = feature.geometry.coordinates[0];
+          for (var j = 0; j < outer.length; j++) verts.push([outer[j][1], outer[j][0]]);
         }
         locVerts.push(verts);
       }
@@ -240,22 +218,26 @@
         return;
       }
 
-      ensureOrefPoints().then(function(orefPts) {
-        clearPredictionLines();
+      A.ensureOrefPoints().then(function(orefPts) {
         var locationStates = A.locationStates;
-        var locationPolygons = A.locationPolygons;
+        var featureMap = A.featureMap;
 
         var locPoints = [];
         for (var name in locationStates) {
           var entry = locationStates[name];
           if (!entry || entry.state !== 'red') continue;
           var pt = orefPts[name];
-          if (!pt) { var poly = locationPolygons[name]; if (poly) pt = polygonCentroid(poly); }
+          if (!pt) { var feature = featureMap[name]; if (feature) pt = polygonCentroid(feature); }
           if (pt) locPoints.push([pt[0], pt[1], 1, name]);
         }
-        if (locPoints.length < 3) return;
+        if (locPoints.length < 3) {
+          clearPredictionLines();
+          return;
+        }
 
-        var clusters = clusterByAdjacency(locPoints, locationPolygons);
+        var clusters = clusterByAdjacency(locPoints, featureMap);
+        var newFeatures = [];
+
         for (var ci = 0; ci < clusters.length; ci++) {
           var cluster = clusters[ci];
           if (cluster.length < 3) continue;
@@ -263,25 +245,24 @@
           var VERTS_PER_POLY = 12;
           var vertices = [];
           for (var i = 0; i < cluster.length; i++) {
-            var poly = locationPolygons[cluster[i][3]];
-            if (!poly) continue;
-            var rings = poly.getLatLngs();
-            var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
+            var feature = featureMap[cluster[i][3]];
+            if (!feature) continue;
+            var outer = feature.geometry.coordinates[0];
             var step = Math.max(1, Math.floor(outer.length / VERTS_PER_POLY));
-            for (var j = 0; j < outer.length; j += step) vertices.push([outer[j].lat, outer[j].lng, 1]);
+            for (var j = 0; j < outer.length; j += step) vertices.push([outer[j][1], outer[j][0], 1]);
           }
           if (vertices.length < 6) continue;
 
           var line = fitLine(vertices);
           if (!line) continue;
 
-          // Area-weighted centroid using polygon vertex mean (visual center of the blob).
+          // Area-weighted centroid
           var awLat = 0, awLng = 0, awTotal = 0;
           for (var i = 0; i < cluster.length; i++) {
             var locName = cluster[i][3];
-            var polyForArea = locationPolygons[locName];
-            var a = polyForArea ? Math.max(polygonArea(polyForArea), 1e-6) : 1e-6;
-            var pc = polyForArea ? polygonCentroid(polyForArea) : null;
+            var polyFeature = featureMap[locName];
+            var a = polyFeature ? Math.max(polygonArea(polyFeature), 1e-6) : 1e-6;
+            var pc = polyFeature ? polygonCentroid(polyFeature) : null;
             if (pc) { awLat += pc[0] * a; awLng += pc[1] * a; awTotal += a; }
           }
           if (awTotal < 1e-12) continue;
@@ -342,7 +323,7 @@
 
           var totalArc = arcSource - arcInward;
           var numSeg = Math.max(20, Math.round(totalArc * 5));
-          var lineCoords = [];
+          var lineCoords = []; // [lat, lng] pairs
           for (var si = 0; si <= numSeg; si++) {
             var d = arcInward + (si / numSeg) * totalArc;
             if (d >= 0) {
@@ -354,22 +335,33 @@
           lineCoords = clipAtCoast(lineCoords);
           if (lineCoords.length < 2) continue;
 
-          var polyline = L.polyline(lineCoords, {
-            color: '#ff4444', weight: 2.5, opacity: 0.7, dashArray: '10, 8', interactive: false
-          }).addTo(map);
-          predictionLines.push(polyline);
+          // Main dashed line — convert [lat, lng] → [lng, lat] for GeoJSON
+          newFeatures.push({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: lineCoords.map(function(c) { return [c[1], c[0]]; })
+            },
+            properties: { kind: 'line' }
+          });
 
+          // Arrowhead
           var arrowSize = 0.08;
           var tipPt = lineCoords[lineCoords.length - 1];
           var px = -sourceDy, py = sourceDx;
-          var tip = [tipPt[0] + sourceDx * arrowSize, tipPt[1] + sourceDy * arrowSize];
-          var left = [tipPt[0] + px * arrowSize * 0.5, tipPt[1] + py * arrowSize * 0.5];
-          var right = [tipPt[0] - px * arrowSize * 0.5, tipPt[1] - py * arrowSize * 0.5];
-          var arrow = L.polyline([left, tip, right], {
-            color: '#ff4444', weight: 2.5, opacity: 0.7, interactive: false
-          }).addTo(map);
-          predictionLines.push(arrow);
+          var tip   = [tipPt[0] + sourceDx * arrowSize, tipPt[1] + sourceDy * arrowSize];
+          var left  = [tipPt[0] + px * arrowSize * 0.5,  tipPt[1] + py * arrowSize * 0.5];
+          var right = [tipPt[0] - px * arrowSize * 0.5,  tipPt[1] - py * arrowSize * 0.5];
+          newFeatures.push({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: [[left[1], left[0]], [tip[1], tip[0]], [right[1], right[0]]]
+            },
+            properties: { kind: 'arrow' }
+          });
 
+          // Uncertainty band
           var sigmaPerp = Math.sqrt(Math.max(0, line.lambda2) / line.totalWeight);
           var lambda1Safe = Math.max(line.lambda1, 1e-6);
           if (sigmaPerp > 0.001) {
@@ -379,17 +371,22 @@
               var pt = lineCoords[bi];
               var dMain = (pt[0] - cx) * sourceDx + (pt[1] - cy) * sourceDy;
               var w = sigmaPerp * Math.sqrt(1 + dMain * dMain / lambda1Safe);
-              bandLeft.push([pt[0] + perpDx * w, pt[1] + perpDy * w]);
-              bandRight.push([pt[0] - perpDx * w, pt[1] - perpDy * w]);
+              bandLeft.push([pt[1] + perpDy * w, pt[0] + perpDx * w]); // [lng, lat]
+              bandRight.push([pt[1] - perpDy * w, pt[0] - perpDx * w]);
             }
             bandRight.reverse();
-            var band = L.polygon(bandLeft.concat(bandRight), {
-              color: '#ff4444', fillColor: '#ff4444', fillOpacity: 0.1,
-              opacity: 0.2, weight: 1, interactive: false
-            }).addTo(map);
-            predictionLines.push(band);
+            var ring = bandLeft.concat(bandRight);
+            ring.push(ring[0]); // close GeoJSON ring
+            newFeatures.push({
+              type: 'Feature',
+              geometry: { type: 'Polygon', coordinates: [ring] },
+              properties: { kind: 'band' }
+            });
           }
         }
+
+        predictionFeatures = newFeatures;
+        updatePredictionSource();
       });
     }
 
@@ -418,6 +415,41 @@
       } else {
         clearPredictionLines();
       }
+    }
+
+    // Add MapLibre source and layers for prediction overlays
+    function setupLayers() {
+      map.addSource('prediction-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+      map.addLayer({
+        id: 'prediction-band',
+        type: 'fill',
+        source: 'prediction-source',
+        filter: ['==', ['get', 'kind'], 'band'],
+        paint: { 'fill-color': '#ff4444', 'fill-opacity': 0.1 }
+      });
+      map.addLayer({
+        id: 'prediction-line',
+        type: 'line',
+        source: 'prediction-source',
+        filter: ['==', ['get', 'kind'], 'line'],
+        paint: { 'line-color': '#ff4444', 'line-width': 2.5, 'line-opacity': 0.7, 'line-dasharray': [10, 8] }
+      });
+      map.addLayer({
+        id: 'prediction-arrow',
+        type: 'line',
+        source: 'prediction-source',
+        filter: ['==', ['get', 'kind'], 'arrow'],
+        paint: { 'line-color': '#ff4444', 'line-width': 2.5, 'line-opacity': 0.7 }
+      });
+    }
+
+    if (map.loaded()) {
+      setupLayers();
+    } else {
+      map.once('load', setupLayers);
     }
 
     // Wire up menu toggle in #ext-menu
