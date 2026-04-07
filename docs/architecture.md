@@ -150,17 +150,21 @@ npx pmtiles show https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east
 
 #### Regenerating with a larger bounding box
 
-To extend coverage (e.g. to include Yemen, lat down to ~10°N):
+The current file was generated with **Planetiler**. For a one-off bbox change (e.g. adding Yemen), **the Protomaps dashboard is the easier option** — no local tooling required.
 
-1. **Generate a new PMTiles file** using Planetiler with `--bounds=32,10,65,42`:
-   ```bash
+**Option A — Protomaps dashboard (recommended for one-off changes):**
+1. Go to [app.protomaps.com](https://app.protomaps.com), draw a bounding box covering the desired region, and download the `.pmtiles` file.
+
+**Option B — Planetiler (for automation or fresh OSM data):**
+1. ```bash
    java -jar planetiler.jar \
      --download \
      --area=middle-east \
      --bounds=32,10,65,42 \
      --output=middle-east-extended.pmtiles
    ```
-   Or use the [Protomaps Tileserver](https://protomaps.com/dashboard) to download a pre-built extract for a custom bounding box.
+
+Both produce the same `protomaps` basemap schema — the map code works identically with either output.
 
 2. **Upload to R2** using Wrangler (bucket name visible in Cloudflare dashboard → R2):
    ```bash
