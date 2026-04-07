@@ -1081,6 +1081,43 @@ body.idle #right-panel {
     }
   });
 
+  // --- Basemap style customizations ---
+  // Modify the Protomaps layer list before passing to MapLibre so tweaks are
+  // baked into the initial style rather than applied post-load via setPaintProperty.
+  // Add future basemap tweaks here.
+  function scaleWidthExpr(expr, factor) {
+    if (typeof expr === 'number') return expr * factor;
+    if (!Array.isArray(expr) || expr[0] !== 'interpolate') return expr;
+    var scaled = [expr[0], expr[1], expr[2]];
+    for (var i = 3; i < expr.length; i += 2) {
+      scaled.push(expr[i]);
+      scaled.push(expr[i + 1] * factor);
+    }
+    return scaled;
+  }
+
+  function customizeBasemapLayers(layers) {
+    return layers.map(function(l) {
+      l = Object.assign({}, l, { paint: Object.assign({}, l.paint), layout: Object.assign({}, l.layout) });
+      // Roads: narrow to 40% of default width
+      if (l['source-layer'] === 'roads' && l.paint && l.paint['line-width']) {
+        l.paint['line-width'] = scaleWidthExpr(l.paint['line-width'], 0.4);
+      }
+      // Country borders: solid non-disputed only, thicker
+      if (l.id === 'boundaries_country') {
+        l.filter = ['all', ['<=', 'kind_detail', 2], ['!=', 'disputed', true]];
+        l.paint['line-width'] = 2;
+      }
+      // Sub-regional boundaries: only at zoom 9+
+      if (l.id === 'boundaries') {
+        l.filter = ['>', 'kind_detail', 2];
+        l.paint['line-width'] = 0.8;
+        l.paint['line-opacity'] = ['step', ['zoom'], 0, 9, 1];
+      }
+      return l;
+    });
+  }
+
   var MAP_STYLE = {
     version: 8,
     glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
@@ -1092,7 +1129,7 @@ body.idle #right-panel {
         attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
       }
     },
-    layers: basemaps.layers('protomaps', WARM_FLAVOR, { lang: 'he' })
+    layers: customizeBasemapLayers(basemaps.layers('protomaps', WARM_FLAVOR, { lang: 'he' }))
   };
 
   var map = new maplibregl.Map({
@@ -1119,29 +1156,8 @@ body.idle #right-panel {
   map.on('load', function() {
     mapLoaded = true;
 
-    // Narrow all roads to 65% of their default width
-    // MapLibre doesn't support ['*', scalar, interpolate_expr], so scale stop values directly
-    function scaleWidthExpr(expr, factor) {
-      if (typeof expr === 'number') return expr * factor;
-      if (!Array.isArray(expr) || expr[0] !== 'interpolate') return expr;
-      // ['interpolate', interp, input, zoom1, val1, zoom2, val2, ...]
-      var scaled = [expr[0], expr[1], expr[2]];
-      for (var i = 3; i < expr.length; i += 2) {
-        scaled.push(expr[i]);              // zoom stop — unchanged
-        scaled.push(expr[i + 1] * factor); // width value — scaled
-      }
-      return scaled;
-    }
-    map.getStyle().layers.forEach(function(l) {
-      if (l['source-layer'] === 'roads' && l.paint && l.paint['line-width']) {
-        map.setPaintProperty(l.id, 'line-width', scaleWidthExpr(l.paint['line-width'], 0.4));
-      }
-    });
-
-    // Thicker real country borders, exclude disputed
-    map.setFilter('boundaries_country', ['all', ['<=', 'kind_detail', 2], ['!=', 'disputed', true]]);
-    map.setPaintProperty('boundaries_country', 'line-width', 2);
     // Disputed country borders (West Bank/Gaza outline, Lebanon, Golan): visible but dashed
+    // (non-disputed borders and road widths are baked into MAP_STYLE via customizeBasemapLayers)
     map.addLayer({
       id: 'boundaries_disputed',
       type: 'line',
@@ -1154,10 +1170,6 @@ body.idle #right-panel {
         'line-dasharray': [4, 3]
       }
     }, 'boundaries_country');
-    // Sub-regional boundaries (districts): only show when zoomed in
-    map.setFilter('boundaries', ['>', 'kind_detail', 2]);
-    map.setPaintProperty('boundaries', 'line-width', 0.8);
-    map.setPaintProperty('boundaries', 'line-opacity', ['step', ['zoom'], 0, 9, 1]);
 
     map.addSource('alerts-source', { type: 'geojson', data: polygonsGeoJSON });
 
