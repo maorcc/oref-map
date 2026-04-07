@@ -5,7 +5,7 @@
   var map = null;
   var getLocationStates = function() { return {}; };
   var getLocationHistory = function() { return {}; };
-  var getLocationPolygons = function() { return {}; };
+  var getFeatureMap = function() { return {}; };
   var getCurrentUserPosition = function() { return null; };
   var getIsLiveMode = function() { return true; };
   var getCurrentViewTime = function() { return 0; };
@@ -14,8 +14,6 @@
   function createController() {
     var MIN_ELLIPSE_CLUSTER_SIZE = 20;
 
-    var orefPoints = null;
-    var orefPointsPromise = null;
     var ellipseMarkers = [];
     var ellipseOverlays = [];
     var ellipseVisualLayers = [];
@@ -38,6 +36,29 @@
     var editingSelectionState = null;
     var MIN_EDIT_SEMI_AXIS_METERS = 120;
 
+    function haversineMeters(lat1, lng1, lat2, lng2) {
+      var R = 6371008.8;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLng = (lng2 - lng1) * Math.PI / 180;
+      var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function featureBbox(feat) {
+      var outer = feat.geometry.coordinates[0];
+      var minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
+      for (var ci = 0; ci < outer.length; ci++) {
+        var pt = outer[ci];
+        if (pt[0] < minLng) minLng = pt[0];
+        if (pt[0] > maxLng) maxLng = pt[0];
+        if (pt[1] < minLat) minLat = pt[1];
+        if (pt[1] > maxLat) maxLat = pt[1];
+      }
+      return { minLng: minLng, maxLng: maxLng, minLat: minLat, maxLat: maxLat };
+    }
+
     function getDisplayedRedAlerts() {
       var locationStates = getLocationStates();
       var locationHistory = getLocationHistory();
@@ -59,35 +80,23 @@
     }
 
     function ensureOrefPoints() {
-      if (orefPoints) return Promise.resolve(orefPoints);
-      if (orefPointsPromise) return orefPointsPromise;
-
-      orefPointsPromise = fetch('oref_points.json')
-        .then(function(resp) {
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          return resp.json();
-        })
-        .then(function(data) {
-          orefPoints = data || {};
-          return orefPoints;
-        })
-        .finally(function() {
-          orefPointsPromise = null;
-        });
-
-      return orefPointsPromise;
+      return window.AppState.ensureOrefPoints();
     }
 
     function clear() {
       for (var i = 0; i < ellipseMarkers.length; i++) {
-        map.removeLayer(ellipseMarkers[i]);
+        ellipseMarkers[i].remove();
       }
       ellipseMarkers = [];
-      for (var j = 0; j < ellipseOverlays.length; j++) {
-        map.removeLayer(ellipseOverlays[j]);
-      }
       ellipseOverlays = [];
+      var overlaySrc = map.getSource('ellipse-overlays');
+      if (overlaySrc) overlaySrc.setData({ type: 'FeatureCollection', features: [] });
       clearExtendedVisual();
+    }
+
+    function flushOverlaySource() {
+      var src = map.getSource('ellipse-overlays');
+      if (src) src.setData({ type: 'FeatureCollection', features: ellipseOverlays });
     }
 
     function formatPercent(ratio) {
@@ -117,28 +126,26 @@
       return mantissa + 'E' + exponentSign + exponentDigits;
     }
 
-    function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, function(ch) {
-        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
-      });
-    }
-
     function clearExtendedVisual() {
       for (var i = 0; i < ellipseVisualLayers.length; i++) {
-        map.removeLayer(ellipseVisualLayers[i]);
+        if (ellipseVisualLayers[i] && typeof ellipseVisualLayers[i].remove === 'function') {
+          ellipseVisualLayers[i].remove();
+        }
       }
       ellipseVisualLayers = [];
+      var src = map.getSource('ellipse-visual');
+      if (src) src.setData({ type: 'FeatureCollection', features: [] });
     }
 
     function clearEditingLayers() {
       for (var i = 0; i < editingLayers.length; i++) {
         if (editingLayers[i] && typeof editingLayers[i].remove === 'function') {
           editingLayers[i].remove();
-        } else {
-          map.removeLayer(editingLayers[i]);
         }
       }
       editingLayers = [];
+      var src = map.getSource('ellipse-editing');
+      if (src) src.setData({ type: 'FeatureCollection', features: [] });
     }
 
     function removeEditingControl() {
@@ -181,32 +188,29 @@
     function suspendMapInteractions() {
       if (!map || suspendedMapInteractions) return;
       suspendedMapInteractions = {
-        dragging: !!(map.dragging && map.dragging.enabled()),
-        touchZoom: !!(map.touchZoom && map.touchZoom.enabled()),
-        scrollWheelZoom: !!(map.scrollWheelZoom && map.scrollWheelZoom.enabled()),
-        doubleClickZoom: !!(map.doubleClickZoom && map.doubleClickZoom.enabled()),
-        boxZoom: !!(map.boxZoom && map.boxZoom.enabled()),
-        keyboard: !!(map.keyboard && map.keyboard.enabled()),
-        tap: !!(map.tap && map.tap.enabled && map.tap.enabled())
+        dragPan:         map.dragPan         && map.dragPan.isEnabled(),
+        scrollZoom:      map.scrollZoom      && map.scrollZoom.isEnabled(),
+        touchZoomRotate: map.touchZoomRotate && map.touchZoomRotate.isEnabled(),
+        doubleClickZoom: map.doubleClickZoom && map.doubleClickZoom.isEnabled(),
+        boxZoom:         map.boxZoom         && map.boxZoom.isEnabled(),
+        keyboard:        map.keyboard        && map.keyboard.isEnabled()
       };
-      if (suspendedMapInteractions.dragging && map.dragging) map.dragging.disable();
-      if (suspendedMapInteractions.touchZoom && map.touchZoom) map.touchZoom.disable();
-      if (suspendedMapInteractions.scrollWheelZoom && map.scrollWheelZoom) map.scrollWheelZoom.disable();
-      if (suspendedMapInteractions.doubleClickZoom && map.doubleClickZoom) map.doubleClickZoom.disable();
-      if (suspendedMapInteractions.boxZoom && map.boxZoom) map.boxZoom.disable();
-      if (suspendedMapInteractions.keyboard && map.keyboard) map.keyboard.disable();
-      if (suspendedMapInteractions.tap && map.tap) map.tap.disable();
+      if (suspendedMapInteractions.dragPan)         map.dragPan.disable();
+      if (suspendedMapInteractions.scrollZoom)      map.scrollZoom.disable();
+      if (suspendedMapInteractions.touchZoomRotate) map.touchZoomRotate.disable();
+      if (suspendedMapInteractions.doubleClickZoom) map.doubleClickZoom.disable();
+      if (suspendedMapInteractions.boxZoom)         map.boxZoom.disable();
+      if (suspendedMapInteractions.keyboard)        map.keyboard.disable();
     }
 
     function resumeMapInteractions() {
       if (!map || !suspendedMapInteractions) return;
-      if (suspendedMapInteractions.dragging && map.dragging) map.dragging.enable();
-      if (suspendedMapInteractions.touchZoom && map.touchZoom) map.touchZoom.enable();
-      if (suspendedMapInteractions.scrollWheelZoom && map.scrollWheelZoom) map.scrollWheelZoom.enable();
-      if (suspendedMapInteractions.doubleClickZoom && map.doubleClickZoom) map.doubleClickZoom.enable();
-      if (suspendedMapInteractions.boxZoom && map.boxZoom) map.boxZoom.enable();
-      if (suspendedMapInteractions.keyboard && map.keyboard) map.keyboard.enable();
-      if (suspendedMapInteractions.tap && map.tap) map.tap.enable();
+      if (suspendedMapInteractions.dragPan)         map.dragPan.enable();
+      if (suspendedMapInteractions.scrollZoom)      map.scrollZoom.enable();
+      if (suspendedMapInteractions.touchZoomRotate) map.touchZoomRotate.enable();
+      if (suspendedMapInteractions.doubleClickZoom) map.doubleClickZoom.enable();
+      if (suspendedMapInteractions.boxZoom)         map.boxZoom.enable();
+      if (suspendedMapInteractions.keyboard)        map.keyboard.enable();
       suspendedMapInteractions = null;
     }
 
@@ -214,40 +218,39 @@
       if (!cluster || !cluster.geometry || !userPos) return;
       clearExtendedVisual();
 
-      var centerLatLng = [cluster.geometry.center.lat, cluster.geometry.center.lng];
-      var userLatLng = [userPos.lat, userPos.lng];
-      var midLatLng = [
-        (centerLatLng[0] + userLatLng[0]) / 2,
-        (centerLatLng[1] + userLatLng[1]) / 2
+      var centerLat = cluster.geometry.center.lat;
+      var centerLng = cluster.geometry.center.lng;
+      var userLat = userPos.lat;
+      var userLng = userPos.lng;
+      var midLat = (centerLat + userLat) / 2;
+      var midLng = (centerLng + userLng) / 2;
+
+      var features = [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [centerLng, centerLat] },
+          properties: { kind: 'center' }
+        },
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [[centerLng, centerLat], [userLng, userLat]]
+          },
+          properties: { kind: 'line' }
+        }
       ];
+      var src = map.getSource('ellipse-visual');
+      if (src) src.setData({ type: 'FeatureCollection', features: features });
 
-      var centerMarker = L.circleMarker(centerLatLng, {
-        radius: 6,
-        color: '#1d4ed8',
-        weight: 2,
-        fillColor: '#ffffff',
-        fillOpacity: 1
-      }).addTo(map);
+      var labelEl = document.createElement('div');
+      labelEl.style.cssText = 'background:rgba(255,255,255,0.96);border:1px solid #93c5fd;border-radius:12px;padding:4px 8px;color:#1d4ed8;font:12px Arial,sans-serif;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);pointer-events:none;';
+      labelEl.textContent = formatPercent(cluster.normalizedDistanceRatio);
+      var ratioMarker = new maplibregl.Marker({ element: labelEl, anchor: 'center' })
+        .setLngLat([midLng, midLat])
+        .addTo(map);
 
-      var connectionLine = L.polyline([centerLatLng, userLatLng], {
-        color: '#1d4ed8',
-        weight: 2,
-        opacity: 0.9,
-        dashArray: '6 6'
-      }).addTo(map);
-
-      var ratioLabel = L.marker(midLatLng, {
-        interactive: false,
-        icon: L.divIcon({
-          className: '',
-          html: '<div style="background:rgba(255,255,255,0.96);border:1px solid #93c5fd;border-radius:12px;padding:4px 8px;color:#1d4ed8;font:12px Arial,sans-serif;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.15);">' +
-            escapeHtml(formatPercent(cluster.normalizedDistanceRatio)) + '</div>',
-          iconSize: null
-        })
-      }).addTo(map);
-
-      ellipseVisualLayers.push(centerMarker, connectionLine, ratioLabel);
-
+      ellipseVisualLayers.push(ratioMarker);
     }
 
     function isClusterEligibleForExtendedVisual(cluster) {
@@ -358,12 +361,16 @@
     }
 
     function projectEllipsePoint(point) {
-      var projected = map.options.crs.project(L.latLng(point.lat, point.lng));
-      return { x: projected.x, y: projected.y, lat: point.lat, lng: point.lng };
+      var x = point.lng * 20037508.34 / 180;
+      var y = Math.log(Math.tan((90 + point.lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+      return { x: x, y: y, lat: point.lat, lng: point.lng };
     }
 
     function unprojectEllipsePoint(point) {
-      return map.options.crs.unproject(L.point(point.x, point.y));
+      return {
+        lng: point.x * 180 / 20037508.34,
+        lat: Math.atan(Math.exp(point.y * Math.PI / 20037508.34)) * 360 / Math.PI - 90
+      };
     }
 
     function normalizeVector(vector, fallback) {
@@ -409,9 +416,9 @@
         y: geometry.centerProjected.y + direction.y * boundaryScale
       };
       var boundaryLatLng = unprojectEllipsePoint(boundaryPoint);
-      return map.distance(
-        [geometry.center.lat, geometry.center.lng],
-        [boundaryLatLng.lat, boundaryLatLng.lng]
+      return haversineMeters(
+        geometry.center.lat, geometry.center.lng,
+        boundaryLatLng.lat, boundaryLatLng.lng
       );
     }
 
@@ -564,44 +571,51 @@
       return ellipseOverridesByClusterKey[summary.clusterKey] || summary.sourceGeometry;
     }
 
-    function addGeometryOverlay(geometry, style, popupHtml) {
-      if (!geometry) return null;
-
-      var overlay;
+    function buildGeometryGeoJsonFeature(geometry, style) {
+      var coords;
       if (geometry.type === 'circle') {
-        overlay = L.circle([geometry.center.lat, geometry.center.lng], {
-          radius: geometry.radiusMeters,
-          color: style.color,
-          weight: style.weight,
-          opacity: style.opacity,
-          fillColor: style.fillColor,
-          fillOpacity: style.fillOpacity,
-          dashArray: style.dashArray || null
-        });
+        var ring = [];
+        var cp = projectEllipsePoint(geometry.center);
+        for (var i = 0; i < 72; i++) {
+          var theta = (Math.PI * 2 * i) / 72;
+          var x = cp.x + Math.cos(theta) * geometry.radiusMeters;
+          var y = cp.y + Math.sin(theta) * geometry.radiusMeters;
+          var ll = unprojectEllipsePoint({ x: x, y: y });
+          ring.push([ll.lng, ll.lat]);
+        }
+        ring.push(ring[0]);
+        coords = [ring];
       } else {
-        overlay = L.polygon(buildEllipseLatLngs(geometry), {
-          color: style.color,
-          weight: style.weight,
-          opacity: style.opacity,
+        var pts = buildEllipseLatLngs(geometry);
+        var poly = pts.map(function(ll) { return [ll.lng, ll.lat]; });
+        poly.push(poly[0]);
+        coords = [poly];
+      }
+      return {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: coords },
+        properties: {
+          strokeColor: style.color,
+          strokeWidth: style.weight,
+          strokeOpacity: style.opacity,
           fillColor: style.fillColor,
           fillOpacity: style.fillOpacity,
           dashArray: style.dashArray || null
-        });
-      }
+        }
+      };
+    }
 
-      if (popupHtml) {
-        overlay.bindPopup(popupHtml, { maxWidth: 260 });
-      }
-      overlay.addTo(map);
-      return overlay;
+    function addGeometryOverlay(geometry, style) {
+      if (!geometry) return null;
+      return buildGeometryGeoJsonFeature(geometry, style);
     }
 
     function geometryContainsLatLng(geometry, latlng) {
       if (!geometry || !latlng) return false;
       if (geometry.type === 'circle') {
-        return map.distance(
-          [geometry.center.lat, geometry.center.lng],
-          [latlng.lat, latlng.lng]
+        return haversineMeters(
+          geometry.center.lat, geometry.center.lng,
+          latlng.lat, latlng.lng
         ) <= geometry.radiusMeters;
       }
 
@@ -619,9 +633,9 @@
     function getGeometryPositionMetrics(geometry, latlng) {
       if (!geometry || !latlng) return null;
       if (geometry.type === 'circle') {
-        var distanceMeters = map.distance(
-          [geometry.center.lat, geometry.center.lng],
-          [latlng.lat, latlng.lng]
+        var distanceMeters = haversineMeters(
+          geometry.center.lat, geometry.center.lng,
+          latlng.lat, latlng.lng
         );
         return {
           centerDistanceMeters: distanceMeters,
@@ -640,9 +654,9 @@
       );
 
       return {
-        centerDistanceMeters: map.distance(
-          [geometry.center.lat, geometry.center.lng],
-          [latlng.lat, latlng.lng]
+        centerDistanceMeters: haversineMeters(
+          geometry.center.lat, geometry.center.lng,
+          latlng.lat, latlng.lng
         ),
         normalizedDistanceRatio: normalizedDistanceRatio
       };
@@ -661,31 +675,26 @@
     function addClusterGeometryOverlay(geometry, summary) {
       if (!geometry) return null;
 
-      var overlay = addGeometryOverlay(geometry, {
+      var feature = addGeometryOverlay(geometry, {
         color: '#951111',
         weight: 2,
         opacity: 0.95,
         fillColor: '#951111',
         fillOpacity: 0.08
       });
-      if (overlay && summary && Array.isArray(summary.locations) && summary.locations.length) {
-        overlay.on('dblclick', function(event) {
-          L.DomEvent.stop(event);
-          window.calcEllipseAlgC({ locations: summary.locations }).catch(function(error) {
-            console.error(error);
-            showToast('Failed to calculate server ellipse');
-          });
-        });
+      if (feature && summary && Array.isArray(summary.locations) && summary.locations.length) {
+        feature.properties.clusterKey = summary.clusterKey || '';
+        feature.properties.locations = summary.locations.join('||');
       }
-      if (overlay) ellipseOverlays.push(overlay);
-      return overlay;
+      if (feature) ellipseOverlays.push(feature);
+      return feature;
     }
 
-    function polygonRings(polygon) {
-      var latlngs = polygon.getLatLngs();
-      if (!latlngs || !latlngs.length) return [];
-      if (Array.isArray(latlngs[0])) return latlngs;
-      return [latlngs];
+    function polygonRings(feature) {
+      if (!feature || !feature.geometry || !feature.geometry.coordinates) return [];
+      return feature.geometry.coordinates.map(function(ring) {
+        return ring.map(function(c) { return { lat: c[1], lng: c[0] }; });
+      });
     }
 
     function latLngsAlmostEqual(a, b) {
@@ -745,14 +754,17 @@
         return polygonTouchCache[cacheKey];
       }
 
-      var locationPolygons = getLocationPolygons();
-      var polyA = locationPolygons[nameA];
-      var polyB = locationPolygons[nameB];
+      var featureMap = getFeatureMap();
+      var polyA = featureMap[nameA];
+      var polyB = featureMap[nameB];
       if (!polyA || !polyB) {
         polygonTouchCache[cacheKey] = false;
         return false;
       }
-      if (!polyA.getBounds().intersects(polyB.getBounds())) {
+      var bboxA = featureBbox(polyA);
+      var bboxB = featureBbox(polyB);
+      if (bboxA.maxLng < bboxB.minLng || bboxB.maxLng < bboxA.minLng ||
+          bboxA.maxLat < bboxB.minLat || bboxB.maxLat < bboxA.minLat) {
         polygonTouchCache[cacheKey] = false;
         return false;
       }
@@ -915,19 +927,10 @@
     function drawEllipseOverlays(redAlerts, pointsMap) {
       clear();
 
-      var alertDateByLocation = {};
-      for (var a = 0; a < redAlerts.length; a++) {
-        alertDateByLocation[redAlerts[a].location] = redAlerts[a].alertDate || '';
-      }
       var missing = [];
       var summaries = buildBaseClusterGeometrySummaries(redAlerts, pointsMap);
       var renderedClusterCount = 0;
-      var icon = L.divIcon({
-        className: 'ellipse-pin',
-        html: '<div style="width:9px;height:9px;background:transparent;border:1px solid #fff;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,0.4);box-sizing:border-box;"></div>',
-        iconSize: [16, 16],
-        iconAnchor: [8, 8]
-      });
+      var pinHtml = '<div style="width:9px;height:9px;background:transparent;border:1px solid #fff;border-radius:50%;box-shadow:0 1px 6px rgba(0,0,0,0.4);box-sizing:border-box;"></div>';
 
       for (var c = 0; c < summaries.length; c++) {
         var summary = summaries[c];
@@ -939,12 +942,22 @@
             continue;
           }
 
-          var marker = L.marker([point[0], point[1]], {
-            icon: icon,
-            keyboard: false
-          });
-          marker.bindPopup(location + (alertDateByLocation[location] ? '<br>' + alertDateByLocation[location] : ''));
-          marker.addTo(map);
+          var pinEl = document.createElement('div');
+          pinEl.className = 'ellipse-pin';
+          pinEl.innerHTML = pinHtml;
+          pinEl.style.cursor = 'pointer';
+          pinEl.addEventListener('click', (function(loc) {
+            return function(event) {
+              event.stopPropagation();
+              if (window.AppState && typeof window.AppState.openLocationPanel === 'function') {
+                window.AppState.openLocationPanel(loc);
+              }
+            };
+          })(location));
+
+          var marker = new maplibregl.Marker({ element: pinEl, anchor: 'center' })
+            .setLngLat([point[1], point[0]])
+            .addTo(map);
           ellipseMarkers.push(marker);
         }
         if (!getEffectiveGeometry(summary)) {
@@ -956,6 +969,7 @@
         }
         addClusterGeometryOverlay(getEffectiveGeometry(summary), summary);
       }
+      flushOverlaySource();
       return { missing: missing, clusterCount: renderedClusterCount };
     }
 
@@ -974,9 +988,9 @@
           for (var i = 0; i < summary.locations.length; i++) {
             var point = pointsMap[summary.locations[i]];
             if (!point || point.length < 2) continue;
-            var distanceMeters = map.distance(
-              [userLatLng.lat, userLatLng.lng],
-              [point[0], point[1]]
+            var distanceMeters = haversineMeters(
+              userLatLng.lat, userLatLng.lng,
+              point[0], point[1]
             );
             if (distanceMeters < minDistanceMeters) minDistanceMeters = distanceMeters;
           }
@@ -1106,8 +1120,18 @@
 
       var geometry = editingSession.draftGeometry;
       if (editingSession.overlay) {
-        editingSession.overlay.setLatLngs(buildEllipseLatLngs(geometry));
-        if (editingSession.overlay.redraw) editingSession.overlay.redraw();
+        var lls = buildEllipseLatLngs(geometry);
+        var coords = lls.map(function(ll) { return [ll.lng, ll.lat]; });
+        coords.push(coords[0]);
+        var editingSrc = map.getSource('ellipse-editing');
+        if (editingSrc) editingSrc.setData({
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: { type: 'Polygon', coordinates: [coords] },
+            properties: {}
+          }]
+        });
       }
       if (editingSession.centerMarker && activeAnchorName !== 'center') {
         editingSession.centerMarker.setLatLng([geometry.center.lat, geometry.center.lng]);
@@ -1165,21 +1189,15 @@
     }
 
     function createEditAnchorIcon(fillColor, borderColor, size) {
-      return L.divIcon({
-        className: '',
-        html:
-          '<div style="' +
-          'width:' + size + 'px;' +
-          'height:' + size + 'px;' +
-          'border-radius:50%;' +
-          'background:' + fillColor + ';' +
-          'border:2px solid ' + borderColor + ';' +
-          'box-shadow:0 1px 6px rgba(0,0,0,0.25);' +
-          'box-sizing:border-box;' +
-          '"></div>',
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2]
-      });
+      return '<div style="' +
+        'width:' + size + 'px;' +
+        'height:' + size + 'px;' +
+        'border-radius:50%;' +
+        'background:' + fillColor + ';' +
+        'border:2px solid ' + borderColor + ';' +
+        'box-shadow:0 1px 6px rgba(0,0,0,0.25);' +
+        'box-sizing:border-box;' +
+        '"></div>';
     }
 
     function normalizeHandleLatLng(latlng) {
@@ -1209,7 +1227,7 @@
           var normalized = normalizeHandleLatLng(nextLatLng);
           if (!normalized) return;
           this._latlng = normalized;
-          var point = map.latLngToContainerPoint([normalized.lat, normalized.lng]);
+          var point = map.project([normalized.lng, normalized.lat]);
           element.style.left = point.x + 'px';
           element.style.top = point.y + 'px';
           element.style.transform = 'translate(-50%, -50%)';
@@ -1219,7 +1237,9 @@
         },
         remove: function() {
           endActiveHandleDrag();
-          map.off('zoom move resize', syncPosition);
+          map.off('zoom', syncPosition);
+          map.off('move', syncPosition);
+          map.off('resize', syncPosition);
           element.removeEventListener('mousedown', beginHandleDrag, true);
           element.removeEventListener('touchstart', beginHandleDrag, true);
           if (element.parentNode) element.parentNode.removeChild(element);
@@ -1229,8 +1249,9 @@
       function pointEventToLatLng(event) {
         var source = event.touches && event.touches.length ? event.touches[0] : event;
         var rect = mapContainer.getBoundingClientRect();
-        var point = L.point(source.clientX - rect.left, source.clientY - rect.top);
-        return map.containerPointToLatLng(point);
+        var px = source.clientX - rect.left;
+        var py = source.clientY - rect.top;
+        return map.unproject([px, py]);
       }
 
       function syncPosition() {
@@ -1274,11 +1295,13 @@
         event.stopPropagation();
       }
 
-      L.DomEvent.disableClickPropagation(element);
-      L.DomEvent.disableScrollPropagation(element);
+      element.addEventListener('click', function(e) { e.stopPropagation(); });
+      element.addEventListener('wheel', function(e) { e.stopPropagation(); });
       element.addEventListener('mousedown', beginHandleDrag, true);
       element.addEventListener('touchstart', beginHandleDrag, { capture: true, passive: false });
-      map.on('zoom move resize', syncPosition);
+      map.on('zoom', syncPosition);
+      map.on('move', syncPosition);
+      map.on('resize', syncPosition);
       syncPosition();
       return handle;
     }
@@ -1286,7 +1309,7 @@
     function createEditingMarker(latlng, icon, onDrag) {
       var marker = createEditableHandle(
         latlng,
-        icon && icon.options && icon.options.html ? icon.options.html : '',
+        typeof icon === 'string' ? icon : (icon && icon.options && icon.options.html ? icon.options.html : ''),
         onDrag
       );
       editingLayers.push(marker);
@@ -1356,8 +1379,8 @@
         sync(true);
       });
 
-      L.DomEvent.disableClickPropagation(control);
-      L.DomEvent.disableScrollPropagation(control);
+      control.addEventListener('click', function(e) { e.stopPropagation(); });
+      control.addEventListener('wheel', function(e) { e.stopPropagation(); });
       map.getContainer().appendChild(control);
       editingControl = control;
     }
@@ -1368,15 +1391,20 @@
 
       if (!editingSession || !editingSession.draftGeometry || editingSession.draftGeometry.type !== 'ellipse') return;
 
-      editingSession.overlay = addGeometryOverlay(editingSession.draftGeometry, {
-        color: '#1d4ed8',
-        weight: 2,
-        opacity: 1,
-        fillColor: '#93c5fd',
-        fillOpacity: 0.08,
-        dashArray: '8 6'
+      var geometry = editingSession.draftGeometry;
+      var lls = buildEllipseLatLngs(geometry);
+      var coords = lls.map(function(ll) { return [ll.lng, ll.lat]; });
+      coords.push(coords[0]);
+      var editingSrc = map.getSource('ellipse-editing');
+      if (editingSrc) editingSrc.setData({
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: { type: 'Polygon', coordinates: [coords] },
+          properties: {}
+        }]
       });
-      if (editingSession.overlay) editingLayers.push(editingSession.overlay);
+      editingSession.overlay = true; // sentinel for syncEditingMarkersFromDraft
 
       editingSession.centerMarker = createEditingMarker(
         editingSession.draftGeometry.center,
@@ -1680,13 +1708,148 @@
     map = AS.map;
     getLocationStates      = function() { return AS.locationStates; };
     getLocationHistory     = function() { return AS.locationHistory; };
-    getLocationPolygons    = function() { return AS.locationPolygons; };
+    getFeatureMap          = function() { return AS.featureMap; };
     getCurrentUserPosition = function() { return AS.userPosition; };
     getIsLiveMode          = function() { return AS.isLiveMode; };
     getCurrentViewTime     = function() { return AS.viewTime; };
     showToast              = function(msg, opts) { AS.showToast(msg, opts); };
 
     var controller = createController();
+
+    function setupLayers() {
+      if (!map.getSource('ellipse-overlays')) {
+        map.addSource('ellipse-overlays', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.addLayer({
+          id: 'ellipse-overlays-fill',
+          type: 'fill',
+          source: 'ellipse-overlays',
+          paint: {
+            'fill-color': ['coalesce', ['get', 'fillColor'], '#951111'],
+            'fill-opacity': ['coalesce', ['get', 'fillOpacity'], 0.08]
+          }
+        });
+        map.addLayer({
+          id: 'ellipse-overlays-stroke',
+          type: 'line',
+          source: 'ellipse-overlays',
+          paint: {
+            'line-color': ['coalesce', ['get', 'strokeColor'], '#951111'],
+            'line-width': ['coalesce', ['get', 'strokeWidth'], 2],
+            'line-opacity': ['coalesce', ['get', 'strokeOpacity'], 0.95]
+          }
+        });
+      }
+
+      if (!map.getSource('ellipse-visual')) {
+        map.addSource('ellipse-visual', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.addLayer({
+          id: 'ellipse-visual-line',
+          type: 'line',
+          source: 'ellipse-visual',
+          filter: ['==', ['get', 'kind'], 'line'],
+          paint: {
+            'line-color': '#1d4ed8',
+            'line-width': 2,
+            'line-opacity': 0.9,
+            'line-dasharray': [3, 3]
+          }
+        });
+        map.addLayer({
+          id: 'ellipse-visual-circle',
+          type: 'circle',
+          source: 'ellipse-visual',
+          filter: ['==', ['get', 'kind'], 'center'],
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#ffffff',
+            'circle-stroke-color': '#1d4ed8',
+            'circle-stroke-width': 2
+          }
+        });
+      }
+
+      if (!map.getSource('ellipse-editing')) {
+        map.addSource('ellipse-editing', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.addLayer({
+          id: 'ellipse-editing-fill',
+          type: 'fill',
+          source: 'ellipse-editing',
+          paint: { 'fill-color': '#93c5fd', 'fill-opacity': 0.08 }
+        });
+        map.addLayer({
+          id: 'ellipse-editing-stroke',
+          type: 'line',
+          source: 'ellipse-editing',
+          paint: {
+            'line-color': '#1d4ed8',
+            'line-width': 2,
+            'line-opacity': 1,
+            'line-dasharray': [4, 3]
+          }
+        });
+      }
+
+      if (!map.getSource('algc-overlay')) {
+        map.addSource('algc-overlay', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] }
+        });
+        map.addLayer({
+          id: 'algc-overlay-fill',
+          type: 'fill',
+          source: 'algc-overlay',
+          paint: { 'fill-color': '#60a5fa', 'fill-opacity': 0.12 }
+        });
+        map.addLayer({
+          id: 'algc-overlay-stroke',
+          type: 'line',
+          source: 'algc-overlay',
+          paint: {
+            'line-color': '#1d4ed8',
+            'line-width': 2,
+            'line-opacity': 0.95
+          }
+        });
+      }
+    }
+
+    function setupEventHandlers() {
+      map.on('dblclick', 'ellipse-overlays-fill', function(event) {
+        if (!event.features || !event.features.length) return;
+        event.preventDefault();
+        var props = event.features[0].properties || {};
+        var locations = props.locations ? String(props.locations).split('||') : [];
+        if (!locations.length) return;
+        window.calcEllipseAlgC({ locations: locations }).catch(function(error) {
+          console.error(error);
+          showToast('Failed to calculate server ellipse');
+        });
+      });
+
+      map.on('dblclick', 'algc-overlay-fill', function(event) {
+        event.preventDefault();
+        clearAlgCServiceOverlay();
+      });
+    }
+
+    if (map.loaded()) {
+      setupLayers();
+      setupEventHandlers();
+    } else {
+      map.once('load', function() {
+        setupLayers();
+        setupEventHandlers();
+      });
+    }
 
     // Restore persisted enabled state
     var ellipseEnabled = false;
@@ -1706,7 +1869,11 @@
 
     function clearAlgCServiceOverlay() {
       if (!algCOverlayLayer) return;
-      map.removeLayer(algCOverlayLayer);
+      if (algCOverlayLayer.marker && typeof algCOverlayLayer.marker.remove === 'function') {
+        algCOverlayLayer.marker.remove();
+      }
+      var algcSrc = map.getSource('algc-overlay');
+      if (algcSrc) algcSrc.setData({ type: 'FeatureCollection', features: [] });
       algCOverlayLayer = null;
     }
 
@@ -1716,20 +1883,33 @@
       return { x: vector.x / length, y: vector.y / length };
     }
 
+    function projectEllipseInitPoint(point) {
+      var x = point.lng * 20037508.34 / 180;
+      var y = Math.log(Math.tan((90 + point.lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180;
+      return { x: x, y: y };
+    }
+
+    function unprojectEllipseInitPoint(point) {
+      return {
+        lng: point.x * 180 / 20037508.34,
+        lat: Math.atan(Math.exp(point.y * Math.PI / 20037508.34)) * 360 / Math.PI - 90
+      };
+    }
+
     function buildAlgCServiceRenderable(ellipse) {
       if (!ellipse || !ellipse.center || !ellipse.axes) {
         throw new Error('calcEllipseAlgC: server response is missing ellipse geometry');
       }
 
-      var center = L.latLng(ellipse.center.lat, ellipse.center.lng);
-      var centerProjected = map.options.crs.project(center);
+      var center = { lat: ellipse.center.lat, lng: ellipse.center.lng };
+      var centerProjected = projectEllipseInitPoint(center);
       var angleRad = ((Number(ellipse.angle_deg) || 0) * Math.PI) / 180;
       var sampleDeltaDegrees = 0.01;
-      var sampleLatLng = L.latLng(
-        center.lat + Math.sin(angleRad) * sampleDeltaDegrees,
-        center.lng + Math.cos(angleRad) * sampleDeltaDegrees
-      );
-      var sampleProjected = map.options.crs.project(sampleLatLng);
+      var samplePoint = {
+        lat: center.lat + Math.sin(angleRad) * sampleDeltaDegrees,
+        lng: center.lng + Math.cos(angleRad) * sampleDeltaDegrees
+      };
+      var sampleProjected = projectEllipseInitPoint(samplePoint);
       var majorAxis = normalizeProjectedVector({
         x: sampleProjected.x - centerProjected.x,
         y: sampleProjected.y - centerProjected.y
@@ -1762,7 +1942,7 @@
         var y = renderable.centerProjected.y +
           renderable.majorAxis.y * Math.cos(theta) * renderable.semiMajor +
           renderable.minorAxis.y * Math.sin(theta) * renderable.semiMinor;
-        latlngs.push(map.options.crs.unproject(L.point(x, y)));
+        latlngs.push(unprojectEllipseInitPoint({ x: x, y: y }));
       }
       return latlngs;
     }
@@ -1770,37 +1950,40 @@
     function drawAlgCServiceOverlay(renderable, payload, options) {
       clearAlgCServiceOverlay();
 
-      var layerGroup = L.layerGroup();
       var latlngs = buildAlgCServiceLatLngs(renderable);
-      var polygon = L.polygon(latlngs, {
-        color: '#1d4ed8',
-        weight: 2,
-        opacity: 0.95,
-        fillColor: '#60a5fa',
-        fillOpacity: 0.12
-      }).addTo(layerGroup);
+      var coords = latlngs.map(function(ll) { return [ll.lng, ll.lat]; });
+      coords.push(coords[0]);
 
-      var centerMarker = L.circleMarker([renderable.center.lat, renderable.center.lng], {
-        radius: 5,
-        color: '#1d4ed8',
-        weight: 2,
-        fillColor: '#ffffff',
-        fillOpacity: 1
-      }).addTo(layerGroup);
+      var features = [{
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [coords] },
+        properties: {}
+      }];
 
-      function removeOnDoubleClick(event) {
-        if (event) L.DomEvent.stop(event);
+      var algcSrc = map.getSource('algc-overlay');
+      if (algcSrc) algcSrc.setData({ type: 'FeatureCollection', features: features });
+
+      var dotEl = document.createElement('div');
+      dotEl.style.cssText = 'width:10px;height:10px;border-radius:50%;background:#ffffff;border:2px solid #1d4ed8;box-shadow:0 1px 4px rgba(0,0,0,0.3);box-sizing:border-box;cursor:pointer;';
+      dotEl.addEventListener('dblclick', function(event) {
+        event.stopPropagation();
+        event.preventDefault();
         clearAlgCServiceOverlay();
-      }
+      });
+      var centerMarker = new maplibregl.Marker({ element: dotEl, anchor: 'center' })
+        .setLngLat([renderable.center.lng, renderable.center.lat])
+        .addTo(map);
 
-      polygon.on('dblclick', removeOnDoubleClick);
-      centerMarker.on('dblclick', removeOnDoubleClick);
-
-      layerGroup.addTo(map);
-      algCOverlayLayer = layerGroup;
+      algCOverlayLayer = { marker: centerMarker };
 
       if (options.fitBounds !== false) {
-        map.fitBounds(L.latLngBounds(latlngs).pad(0.08));
+        var bounds = new maplibregl.LngLatBounds();
+        for (var i = 0; i < latlngs.length; i++) {
+          bounds.extend([latlngs[i].lng, latlngs[i].lat]);
+        }
+        if (!bounds.isEmpty()) {
+          map.fitBounds(bounds, { padding: 60 });
+        }
       }
 
       if (options.log !== false) {

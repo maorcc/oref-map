@@ -1920,7 +1920,8 @@ body.idle #right-panel {
     get userPosition() { return currentUserLatLng || null; },
     get isLiveMode() { return isLiveMode; },
     get viewTime() { return currentViewTime; },
-    showToast: function(msg, opts) { showToast(msg, opts); }
+    showToast: function(msg, opts) { showToast(msg, opts); },
+    openLocationPanel: function(name) { openLocationPanel(name); }
   };
 
   // --- Colors ---
