@@ -123,6 +123,61 @@ Location polygons are pre-computed offline and shipped as `web/locations_polygon
 - Per-feature state is driven by data properties, not Leaflet `setStyle`.
 - The `featureMap` lookup (`name → GeoJSON Feature`) is exposed on `AppState` for use by extensions (e.g. ellipse mode).
 
+### Basemap Tiles (PMTiles on R2)
+
+The basemap is a self-hosted Protomaps vector tile file stored on Cloudflare R2 and served via the R2 public bucket URL:
+
+```
+https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east.pmtiles
+```
+
+**Current file coverage:**
+| Property | Value |
+|----------|-------|
+| File | `middle-east.pmtiles` |
+| Bounds (lng) | 32.0 – 65.0 |
+| Bounds (lat) | 24.0 – 42.0 |
+| Zoom | 0 – 10 |
+| Built | 2026-03-10 (Planetiler 0.10.1, OSM data 2026-04-06) |
+
+This covers Israel, Lebanon, Syria, Jordan, Iraq, Iran, Saudi Arabia, Egypt (Sinai), and the Gulf states. **Yemen and southern Saudi Arabia (south of lat 24°) are not covered.**
+
+#### Inspecting the current file
+
+```bash
+npx pmtiles show https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east.pmtiles
+```
+
+#### Regenerating with a larger bounding box
+
+To extend coverage (e.g. to include Yemen, lat down to ~10°N):
+
+1. **Generate a new PMTiles file** using Planetiler with `--bounds=32,10,65,42`:
+   ```bash
+   java -jar planetiler.jar \
+     --download \
+     --area=middle-east \
+     --bounds=32,10,65,42 \
+     --output=middle-east-extended.pmtiles
+   ```
+   Or use the [Protomaps Tileserver](https://protomaps.com/dashboard) to download a pre-built extract for a custom bounding box.
+
+2. **Upload to R2** using Wrangler (bucket name visible in Cloudflare dashboard → R2):
+   ```bash
+   wrangler r2 object put <bucket-name>/middle-east.pmtiles \
+     --file=middle-east-extended.pmtiles \
+     --content-type=application/vnd.mapbox-vector-tile
+   ```
+   The public URL (`pub-0cb002...r2.dev`) does not change after upload.
+
+3. **Update `maxBounds` in `web/index.html`** to match the new lat extent (e.g. `[[32.0, 10.0], [65.0, 42.0]]` for Yemen coverage).
+
+#### R2 bucket info
+
+- **Public URL**: `https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/`
+- **Public access**: enabled — the client fetches tiles directly from R2 at runtime via the `pmtiles://` protocol, no Worker involved.
+- Bucket name is visible in Cloudflare dashboard → R2.
+
 ### Geocoding
 
 `web/cities_geo.json` maps ~1,430 Oref location names to `[lat, lng]`. Locations without coordinates are silently skipped.
