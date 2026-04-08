@@ -3174,15 +3174,26 @@ body.idle #right-panel {
         return best;
       }
 
-      function expireStale(atTime) {
-        for (var loc in locStates) {
-          if (atTime - locStates[loc].since >= ALERT_MAX_AGE_MS) delete locStates[loc];
-        }
-      }
-
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
-        expireStale(e.alertDate);
+        // Expire stale entries — if expiry causes a state drop, close the current band.
+        var maxExpiry = 0, anyExpired = false;
+        for (var loc in locStates) {
+          if (e.alertDate - locStates[loc].since >= ALERT_MAX_AGE_MS) {
+            var t = locStates[loc].since + ALERT_MAX_AGE_MS;
+            if (t > maxExpiry) maxExpiry = t;
+            delete locStates[loc];
+            anyExpired = true;
+          }
+        }
+        if (anyExpired) {
+          var domAfterExpiry = dominantState();
+          if (domAfterExpiry !== curState) {
+            if (curState) bands.push({ start: curStart, end: maxExpiry, state: curState });
+            curState = domAfterExpiry;
+            curStart = maxExpiry;
+          }
+        }
         if (e.state === 'green') {
           delete locStates[e.location];
         } else {
