@@ -101,7 +101,7 @@ def main() -> None:
     verbose = "--verbose" in sys.argv or "-v" in sys.argv
     filter_date = None
     for i, arg in enumerate(sys.argv[1:], 1):
-        if arg == "--date" and i < len(sys.argv):
+        if arg == "--date" and i + 1 < len(sys.argv):
             filter_date = sys.argv[i + 1]
 
     remote_files = sorted(COMPARE_DIR.glob("*.remote.jsonl"))
@@ -111,12 +111,6 @@ def main() -> None:
 
     if filter_date:
         remote_files = [f for f in remote_files if filter_date in f.name]
-
-    # Load all new files to check cross-date presence
-    all_new_rids: set[int] = set()
-    for f in COMPARE_DIR.glob("*.new.jsonl"):
-        for e in parse_jsonl(f):
-            all_new_rids.add(e["rid"])
 
     results = []
     for remote_file in remote_files:
@@ -192,10 +186,10 @@ def main() -> None:
     print("\n  Root cause analysis:")
     differs = [r for r in results if r["status"] == "differs" and r.get("only_remote", 0) > 0]
     if differs:
-        all_special = all(r.get("only_remote_all_special", False) for r in differs)
         print(f"  - {len(differs)} dates have only-remote entries (entries in R2 not returned by API).")
-        if all_special:
-            print("  - ALL missing entries are from cities with apostrophe/geresh characters.")
+        special_dates = [r for r in differs if r.get("only_remote_all_special")]
+        if special_dates:
+            print(f"  - {len(special_dates)} of these dates have ONLY apostrophe/geresh cities in only-remote.")
             print("    Root cause: oref API migrated city names from ASCII apostrophes to Hebrew")
             print("    geresh/gershayim (׳/״). Older entries under the ASCII name are no longer")
             print("    returned by mode=3 city-by-city queries, even though they were captured")
