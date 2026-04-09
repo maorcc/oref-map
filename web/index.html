@@ -1218,7 +1218,9 @@ body.idle #right-panel {
 
     // If geo data already fetched, build polygons now
     if (pendingPolygonData) {
-      buildPolygons(pendingPolygonData);
+      var cb = pendingPolygonCallback;
+      pendingPolygonCallback = null;
+      buildPolygons(pendingPolygonData, cb);
       pendingPolygonData = null;
     }
   });
@@ -2074,8 +2076,14 @@ body.idle #right-panel {
   // Coordinates in locations_polygons.json are already [lng, lat] — GeoJSON order
   var nameToId = {};   // name → numeric feature id (for setFeatureState)
 
-  function buildPolygons(data) {
-    if (!mapLoaded) { pendingPolygonData = data; return; }
+  var pendingPolygonCallback = null;
+
+  function buildPolygons(data, onReady) {
+    if (!mapLoaded) {
+      pendingPolygonData = data;
+      if (onReady) pendingPolygonCallback = onReady;
+      return;
+    }
     var features = [];
     var fid = 0;
     for (var name in data) {
@@ -2097,6 +2105,7 @@ body.idle #right-panel {
     polygonsGeoJSON.features = features;
     updateMapLibreSource();
     console.log('Loaded GeoJSON polygons for', features.length, 'locations');
+    if (onReady) onReady();
   }
 
   // --- Title classification ---
@@ -3675,8 +3684,6 @@ body.idle #right-panel {
     fetch('locations_polygons.json').then(function(r) { return r.json(); })
     .then(function(data) {
 
-      buildPolygons(data);
-
       // Load favorite markers
       Object.keys(favorites).forEach(function(name) {
         addFavoriteMarker(name, favorites[name]);
@@ -3690,21 +3697,17 @@ body.idle #right-panel {
       // Init timeline immediately (button always visible)
       initTimeline();
 
-      // Start live + history polling immediately
-      setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-      historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-      setInterval(fadeGreenMarkers, FADE_TICK_MS);
-      fetchLiveAlerts();
-
-      fetchHistory(function() {
-        initialized = true;
-      });
-      // Day-history load in background (independent of live history)
-      fetchExtendedHistory(function() {
-        rebuildTimelineFn();
+      // Build polygons; start polling only after nameToId is populated
+      buildPolygons(data, function() {
+        setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+        historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+        setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        fetchLiveAlerts();
+        fetchHistory(function() { initialized = true; });
+        fetchExtendedHistory(function() { rebuildTimelineFn(); });
+        if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
       });
 
-      if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
     }).catch(function(err) {
       console.error('Failed to load geo data:', err);
       setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
