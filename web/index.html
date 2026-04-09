@@ -142,7 +142,7 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 /* Location panel (replaces Leaflet popups) */
 #location-panel {
   position: fixed;
-  z-index: 1000;
+  z-index: 1010;
   background: #fff;
   box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
   transition: transform 0.28s ease;
@@ -1137,7 +1137,9 @@ body.idle #right-panel {
     style: MAP_STYLE,
     center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], // MapLibre uses [lng, lat]
     zoom: DEFAULT_ZOOM,
-    maxBounds: [[32.0, 11.0], [65.0, 42.0]]
+    maxBounds: [[32.0, 11.0], [65.0, 42.0]],
+    maxTileCacheZoomLevels: 8,
+    fadeDuration: 0
   });
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
@@ -2202,8 +2204,8 @@ body.idle #right-panel {
     var tlBtn = document.getElementById('timeline-btn');
     var panelOpen = menuOpen ||
       (tlBtn && tlBtn.classList.contains('open'));
-    var popupOpen = openPanelName !== null;
-    document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
+    // Location panel is non-modal: map stays interactive while it's open
+    document.body.classList.toggle('has-overlay', panelOpen);
   }
 
   function recordHistory(name, title, alertDate, state) {
@@ -2275,7 +2277,7 @@ body.idle #right-panel {
     var isFav = !!favorites[name];
     var starColor = isFav ? '#f5a623' : '#ccc';
     var starChar = isFav ? '\u2605' : '\u2606';
-    var starBtn = '<span class="fav-star" onclick="window._toggleFav()" ' +
+    var starBtn = '<span class="fav-star" onclick="window._toggleFav(event)" ' +
       'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
       'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
     return '<div style="direction:rtl;text-align:right"><b>' + name + '</b>' + starBtn +
@@ -2283,14 +2285,45 @@ body.idle #right-panel {
       '</div>';
   }
 
+  var _panelHighlightFeature = null;
+  var _panelHighlightSaved = null;
+
+  function _applyPanelHighlight(name) {
+    var feature = featureMap[name];
+    if (!feature) return;
+    _panelHighlightFeature = feature;
+    _panelHighlightSaved = {
+      fillOpacity: feature.properties.fillOpacity,
+      lineOpacity: feature.properties.lineOpacity,
+      lineWidth: feature.properties.lineWidth
+    };
+    feature.properties.fillOpacity = Math.max(feature.properties.fillOpacity, 0.35);
+    feature.properties.lineOpacity = Math.max(feature.properties.lineOpacity, 0.85);
+    feature.properties.lineWidth = 2;
+    updateMapLibreSource();
+  }
+
+  function _removePanelHighlight() {
+    if (!_panelHighlightFeature || !_panelHighlightSaved) return;
+    _panelHighlightFeature.properties.fillOpacity = _panelHighlightSaved.fillOpacity;
+    _panelHighlightFeature.properties.lineOpacity = _panelHighlightSaved.lineOpacity;
+    _panelHighlightFeature.properties.lineWidth = _panelHighlightSaved.lineWidth;
+    updateMapLibreSource();
+    _panelHighlightFeature = null;
+    _panelHighlightSaved = null;
+  }
+
   function openLocationPanel(name) {
+    _removePanelHighlight();
     openPanelName = name;
     document.getElementById('location-panel-content').innerHTML = buildPanelHtml(name);
     document.getElementById('location-panel').classList.add('open');
+    _applyPanelHighlight(name);
     updateOverlay();
   }
 
   function closeLocationPanel() {
+    _removePanelHighlight();
     openPanelName = null;
     document.getElementById('location-panel').classList.remove('open');
     updateOverlay();
@@ -2300,7 +2333,8 @@ body.idle #right-panel {
 
 
   // Expose for panel onclick — uses openPanelName so no name is embedded in HTML
-  window._toggleFav = function() {
+  window._toggleFav = function(e) {
+    if (e) e.stopPropagation();
     var name = openPanelName;
     if (!name) return;
     var latlng = favorites[name];
@@ -2875,6 +2909,7 @@ body.idle #right-panel {
 
   function reconstructStateAt(targetTime) {
     cancelPolygonHint();
+    closeLocationPanel(); // must run before clearing loop so _removePanelHighlight fires first
     // Clear all polygons
     for (var name in locationStates) {
       var entry = locationStates[name];
@@ -2882,7 +2917,6 @@ body.idle #right-panel {
         resetFeatureStyle(entry.marker);
       }
     }
-    closeLocationPanel();
     locationStates = {};
 
     // Replay history up to targetTime
@@ -3514,7 +3548,7 @@ body.idle #right-panel {
       if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
     }
 
-    var GAP_SKIP_MS = 1000; // real-time ms before skipping a dead gap
+    var GAP_SKIP_MS = 300; // real-time ms before skipping a dead gap
 
     function isInBand(time) {
       for (var i = 0; i < computedBands.length; i++) {
