@@ -1180,8 +1180,8 @@ body.idle #right-panel {
       type: 'fill',
       source: 'alerts-source',
       paint: {
-        'fill-color': ['get', 'fillColor'],
-        'fill-opacity': ['get', 'fillOpacity']
+        'fill-color': ['coalesce', ['feature-state', 'fillColor'], '#888888'],
+        'fill-opacity': ['coalesce', ['feature-state', 'fillOpacity'], 0.01]
       }
     });
 
@@ -1198,9 +1198,9 @@ body.idle #right-panel {
       type: 'line',
       source: 'alerts-source',
       paint: {
-        'line-color': ['get', 'lineColor'],
-        'line-opacity': ['get', 'lineOpacity'],
-        'line-width': ['get', 'lineWidth']
+        'line-color': ['coalesce', ['feature-state', 'lineColor'], '#888888'],
+        'line-opacity': ['coalesce', ['feature-state', 'lineOpacity'], 0],
+        'line-width': ['coalesce', ['feature-state', 'lineWidth'], 1]
       }
     });
 
@@ -2072,9 +2072,12 @@ body.idle #right-panel {
 
   // --- Build pre-computed polygons from locations_polygons.json ---
   // Coordinates in locations_polygons.json are already [lng, lat] — GeoJSON order
+  var nameToId = {};   // name → numeric feature id (for setFeatureState)
+
   function buildPolygons(data) {
     if (!mapLoaded) { pendingPolygonData = data; return; }
     var features = [];
+    var fid = 0;
     for (var name in data) {
       var coords = data[name];
       if (!Array.isArray(coords)) continue;
@@ -2082,18 +2085,14 @@ body.idle #right-panel {
       var polygonCoords = isNested ? coords : [coords];
       var feature = {
         type: 'Feature',
-        properties: {
-          name: name,
-          fillColor: '#888888',
-          fillOpacity: 0.01,
-          lineColor: '#888888',
-          lineOpacity: 0,
-          lineWidth: 1
-        },
+        id: fid,
+        properties: { name: name },
         geometry: { type: 'Polygon', coordinates: polygonCoords }
       };
       features.push(feature);
       featureMap[name] = feature;
+      nameToId[name] = fid;
+      fid++;
     }
     polygonsGeoJSON.features = features;
     updateMapLibreSource();
@@ -2141,23 +2140,23 @@ body.idle #right-panel {
     return 'red'; // default to danger for unknown
   }
 
-  // --- Marker management ---
-  function applyFeatureStyle(feature, state, opacity) {
-    if (!feature) return;
-    feature.properties.fillColor = COLORS[state];
-    feature.properties.fillOpacity = opacity;
-    feature.properties.lineColor = COLORS[state];
-    feature.properties.lineOpacity = opacity + 0.15;
-    feature.properties.lineWidth = state === 'red' ? 0.5 : 1;
+  // --- Marker management (feature-state) ---
+  function applyFeatureStyle(name, state, opacity) {
+    var id = nameToId[name];
+    if (id === undefined) return;
+    map.setFeatureState({ source: 'alerts-source', id: id }, {
+      fillColor: COLORS[state],
+      fillOpacity: opacity,
+      lineColor: COLORS[state],
+      lineOpacity: opacity + 0.15,
+      lineWidth: state === 'red' ? 0.5 : 1
+    });
   }
 
-  function resetFeatureStyle(feature) {
-    if (!feature) return;
-    feature.properties.fillColor = '#888888';
-    feature.properties.fillOpacity = 0.01;
-    feature.properties.lineColor = '#888888';
-    feature.properties.lineOpacity = 0;
-    feature.properties.lineWidth = 1;
+  function resetFeatureStyle(name) {
+    var id = nameToId[name];
+    if (id === undefined) return;
+    map.removeFeatureState({ source: 'alerts-source', id: id });
   }
 
   function setLocationState(name, state, since) {
@@ -2174,24 +2173,21 @@ body.idle #right-panel {
       }
     }
 
-    var feature = featureMap[name] || null;
-    if (!feature) return;
+    if (nameToId[name] === undefined) return;
 
     var now = Date.now();
     var opacity = state === 'green'
       ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
       : 0.3;
-    applyFeatureStyle(feature, state, opacity);
-    locationStates[name] = { state: state, since: since || Date.now(), marker: feature };
-    updateMapLibreSource();
+    applyFeatureStyle(name, state, opacity);
+    locationStates[name] = { state: state, since: since || Date.now() };
     playSoundForState(state, name);
   }
 
   function removeLocation(name) {
     var entry = locationStates[name];
-    if (entry && entry.marker) {
-      resetFeatureStyle(entry.marker);
-      updateMapLibreSource();
+    if (entry) {
+      resetFeatureStyle(name);
     }
     if (openPanelName === name) closeLocationPanel();
     delete locationStates[name];
@@ -2285,31 +2281,34 @@ body.idle #right-panel {
       '</div>';
   }
 
-  var _panelHighlightFeature = null;
+  var _panelHighlightName = null;
   var _panelHighlightSaved = null;
 
   function _applyPanelHighlight(name) {
-    var feature = featureMap[name];
-    if (!feature) return;
-    _panelHighlightFeature = feature;
-    _panelHighlightSaved = {
-      fillOpacity: feature.properties.fillOpacity,
-      lineOpacity: feature.properties.lineOpacity,
-      lineWidth: feature.properties.lineWidth
-    };
-    feature.properties.fillOpacity = Math.max(feature.properties.fillOpacity, 0.35);
-    feature.properties.lineOpacity = Math.max(feature.properties.lineOpacity, 0.85);
-    feature.properties.lineWidth = 2;
-    updateMapLibreSource();
+    var id = nameToId[name];
+    if (id === undefined) return;
+    _panelHighlightName = name;
+    _panelHighlightSaved = map.getFeatureState({ source: 'alerts-source', id: id }) || {};
+    map.setFeatureState({ source: 'alerts-source', id: id }, {
+      fillColor: _panelHighlightSaved.fillColor || '#888888',
+      fillOpacity: Math.max((_panelHighlightSaved.fillOpacity || 0.01), 0.35),
+      lineColor: _panelHighlightSaved.lineColor || '#888888',
+      lineOpacity: Math.max((_panelHighlightSaved.lineOpacity || 0), 0.85),
+      lineWidth: 2
+    });
   }
 
   function _removePanelHighlight() {
-    if (!_panelHighlightFeature || !_panelHighlightSaved) return;
-    _panelHighlightFeature.properties.fillOpacity = _panelHighlightSaved.fillOpacity;
-    _panelHighlightFeature.properties.lineOpacity = _panelHighlightSaved.lineOpacity;
-    _panelHighlightFeature.properties.lineWidth = _panelHighlightSaved.lineWidth;
-    updateMapLibreSource();
-    _panelHighlightFeature = null;
+    if (!_panelHighlightName) return;
+    var id = nameToId[_panelHighlightName];
+    if (id !== undefined) {
+      if (_panelHighlightSaved && Object.keys(_panelHighlightSaved).length > 0) {
+        map.setFeatureState({ source: 'alerts-source', id: id }, _panelHighlightSaved);
+      } else {
+        map.removeFeatureState({ source: 'alerts-source', id: id });
+      }
+    }
+    _panelHighlightName = null;
     _panelHighlightSaved = null;
   }
 
@@ -2396,32 +2395,21 @@ body.idle #right-panel {
   // --- Polygon pulse hint (mobile) ---
   function showPolygonHint() {
     // Collect all currently colored polygons and those with recent history
-    var targets = []; // [{feature, color, origProps}]
+    var targets = []; // [{name, color, savedState}]
 
     for (var name in locationStates) {
       var entry = locationStates[name];
-      var feature = featureMap[name];
-      if (!feature) continue;
-      var op = entry.state === 'green'
-        ? 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS))
-        : 0.3;
-      var p = feature.properties;
-      targets.push({
-        feature: feature,
-        color: COLORS[entry.state],
-        origProps: { fillColor: p.fillColor, fillOpacity: p.fillOpacity, lineColor: p.lineColor, lineOpacity: p.lineOpacity, lineWidth: p.lineWidth }
-      });
+      if (nameToId[name] === undefined) continue;
+      var saved = map.getFeatureState({ source: 'alerts-source', id: nameToId[name] }) || {};
+      targets.push({ name: name, color: COLORS[entry.state], savedState: saved });
     }
 
     // Also include recently-faded polygons with history but no active state
     if (targets.length === 0) {
       for (var hName in locationHistory) {
-        if (locationHistory[hName].length > 0 && !locationStates[hName]) {
-          var hFeature = featureMap[hName];
-          if (hFeature) {
-            var hp = hFeature.properties;
-            targets.push({ feature: hFeature, color: COLORS.green, origProps: { fillColor: hp.fillColor, fillOpacity: hp.fillOpacity, lineColor: hp.lineColor, lineOpacity: hp.lineOpacity, lineWidth: hp.lineWidth } });
-          }
+        if (locationHistory[hName].length > 0 && !locationStates[hName] && nameToId[hName] !== undefined) {
+          var hSaved = map.getFeatureState({ source: 'alerts-source', id: nameToId[hName] }) || {};
+          targets.push({ name: hName, color: COLORS.green, savedState: hSaved });
         }
       }
     }
@@ -2434,20 +2422,26 @@ body.idle #right-panel {
       var t = (step % 10) / 10;
       var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
       for (var i = 0; i < targets.length; i++) {
-        var fp = targets[i].feature.properties;
-        fp.fillColor = targets[i].color; fp.fillOpacity = opacity;
-        fp.lineColor = targets[i].color; fp.lineOpacity = Math.min(opacity + 0.15, 0.8); fp.lineWidth = 2;
+        var id = nameToId[targets[i].name];
+        if (id === undefined) continue;
+        map.setFeatureState({ source: 'alerts-source', id: id }, {
+          fillColor: targets[i].color, fillOpacity: opacity,
+          lineColor: targets[i].color, lineOpacity: Math.min(opacity + 0.15, 0.8), lineWidth: 2
+        });
       }
-      updateMapLibreSource();
       step++;
       if (step >= totalSteps) {
         clearInterval(polygonHintInterval);
         polygonHintInterval = null;
         for (var j = 0; j < targets.length; j++) {
-          var rp = targets[j].origProps;
-          Object.assign(targets[j].feature.properties, rp);
+          var rid = nameToId[targets[j].name];
+          if (rid === undefined) continue;
+          if (Object.keys(targets[j].savedState).length > 0) {
+            map.setFeatureState({ source: 'alerts-source', id: rid }, targets[j].savedState);
+          } else {
+            map.removeFeatureState({ source: 'alerts-source', id: rid });
+          }
         }
-        updateMapLibreSource();
         polygonHintTargets = null;
       }
     }, 100);
@@ -2460,9 +2454,15 @@ body.idle #right-panel {
     }
     if (polygonHintTargets) {
       for (var i = 0; i < polygonHintTargets.length; i++) {
-        resetFeatureStyle(polygonHintTargets[i].feature);
+        var id = nameToId[polygonHintTargets[i].name];
+        if (id === undefined) continue;
+        var saved = polygonHintTargets[i].savedState;
+        if (saved && Object.keys(saved).length > 0) {
+          map.setFeatureState({ source: 'alerts-source', id: id }, saved);
+        } else {
+          map.removeFeatureState({ source: 'alerts-source', id: id });
+        }
       }
-      updateMapLibreSource();
       polygonHintTargets = null;
     }
   }
@@ -2584,17 +2584,18 @@ body.idle #right-panel {
         toRemove.push(name);
       } else {
         var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-        if (entry.marker) {
-          entry.marker.properties.fillOpacity = opacity;
-          entry.marker.properties.lineOpacity = opacity + 0.15;
+        var id = nameToId[name];
+        if (id !== undefined) {
+          map.setFeatureState({ source: 'alerts-source', id: id }, {
+            fillOpacity: opacity,
+            lineOpacity: opacity + 0.15
+          });
         }
       }
     }
     for (var i = 0; i < toRemove.length; i++) {
       removeLocation(toRemove[i]);
     }
-    // Always push opacity updates to the source (even without removals)
-    updateMapLibreSource();
     if (toRemove.length > 0) {
       updateLiveStatus();
       document.dispatchEvent(new CustomEvent('app:stateChanged'));
@@ -2909,13 +2910,10 @@ body.idle #right-panel {
 
   function reconstructStateAt(targetTime) {
     cancelPolygonHint();
-    closeLocationPanel(); // must run before clearing loop so _removePanelHighlight fires first
+    closeLocationPanel();
     // Clear all polygons
     for (var name in locationStates) {
-      var entry = locationStates[name];
-      if (entry && entry.marker) {
-        resetFeatureStyle(entry.marker);
-      }
+      resetFeatureStyle(name);
     }
     locationStates = {};
 
@@ -2941,23 +2939,18 @@ body.idle #right-panel {
     for (var loc in accumulated) {
       var s = accumulated[loc].state;
       var sinceTime = accumulated[loc].since;
-      var feature = featureMap[loc] || null;
-      if (!feature) continue;
-      var fp = feature.properties;
+      if (nameToId[loc] === undefined) continue;
       if (s === 'green') {
         var elapsed = targetTime - sinceTime;
         if (elapsed >= GREEN_FADE_MS) continue; // already faded
         var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-        fp.lineColor = COLORS.green; fp.fillColor = COLORS.green;
-        fp.fillOpacity = opacity; fp.lineOpacity = opacity + 0.15; fp.lineWidth = 1;
+        applyFeatureStyle(loc, 'green', opacity);
       } else {
         if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
-        fp.lineColor = COLORS[s]; fp.fillColor = COLORS[s];
-        fp.fillOpacity = 0.3; fp.lineOpacity = 0.45; fp.lineWidth = s === 'red' ? 0.5 : 1;
+        applyFeatureStyle(loc, s, 0.3);
       }
-      locationStates[loc] = { state: s, since: sinceTime, marker: feature };
+      locationStates[loc] = { state: s, since: sinceTime };
     }
-    updateMapLibreSource();
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
   }
 
