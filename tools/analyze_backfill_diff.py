@@ -174,7 +174,7 @@ def main() -> None:
                 for e in r["only_new_samples"]:
                     print(f"      rid={e['rid']} {e['alertDate']} {e['data']}")
 
-    print(f"\n  Status summary:")
+    print("\n  Status summary:")
     for status, cnt in sorted(status_counts.items()):
         print(f"    {status:<22} {cnt}")
     print(f"\n  Total only-remote (entries that would be lost): {total_only_r}")

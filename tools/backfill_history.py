@@ -276,8 +276,8 @@ async def main() -> None:
                 for day in dates_to_fetch
             ]
             remote_results = await asyncio.gather(*remote_tasks)
-            remote_by_date = dict(zip(dates_to_fetch, remote_results))
-            print(f"  Done.")
+            remote_by_date = dict(zip(dates_to_fetch, remote_results, strict=True))
+            print("  Done.")
 
         print("Deduplicating and grouping by date...")
         seen_rids: set = set()
@@ -424,7 +424,7 @@ async def main() -> None:
         print(f"  Saved: {COMPARE_DIR}/{day}.remote.jsonl, {new_path.name}")
 
         if dry_run:
-            print(f"  --dry-run: skipping upload")
+            print("  --dry-run: skipping upload")
             skipped_declined += 1
         elif verdict == "unsafe" and not force:
             print(f"  Skipping {day} — unsafe (use --force to override)")
@@ -463,7 +463,7 @@ async def main() -> None:
     if fetch_elapsed is not None:
         print(f"  Oref fetch time:  {fetch_elapsed:.1f}s (concurrency={CONCURRENCY})")
     else:
-        print(f"  Oref fetch time:  skipped (--reuse)")
+        print("  Oref fetch time:  skipped (--reuse)")
     print(f"  API entries:      {total} across {len(by_date)} dates")
     print(f"  Date range:       {all_dates[0]} .. {all_dates[-1]}")
     if update_today:
