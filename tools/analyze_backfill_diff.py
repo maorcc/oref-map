@@ -23,13 +23,13 @@ COMPARE_DIR = Path("tmp/backfill-compare")
 
 def parse_jsonl(path: Path) -> list[dict]:
     entries = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip().rstrip(",")
         if line:
             try:
                 entries.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                raise ValueError(f"{path}:{lineno}: invalid JSONL: {e}") from e
     return entries
 
 
@@ -58,10 +58,6 @@ def analyze_date(day: str, remote: list[dict], new: list[dict], verbose: bool) -
 
     if not remote and new:
         result["status"] = "missing_from_r2"
-        return result
-
-    if remote and not new:
-        result["status"] = "no_new_file"
         return result
 
     result["status"] = "differs"
@@ -104,20 +100,23 @@ def main() -> None:
         if arg == "--date" and i + 1 < len(sys.argv):
             filter_date = sys.argv[i + 1]
 
-    remote_files = sorted(COMPARE_DIR.glob("*.remote.jsonl"))
-    if not remote_files:
+    days = sorted(
+        {f.name.replace(".remote.jsonl", "") for f in COMPARE_DIR.glob("*.remote.jsonl")}
+        | {f.name.replace(".new.jsonl", "") for f in COMPARE_DIR.glob("*.new.jsonl")}
+    )
+    if not days:
         print(f"No files found in {COMPARE_DIR}")
         sys.exit(1)
 
     if filter_date:
-        remote_files = [f for f in remote_files if filter_date in f.name]
+        days = [d for d in days if filter_date in d]
 
     results = []
-    for remote_file in remote_files:
-        day = remote_file.name.replace(".remote.jsonl", "")
-        remote = parse_jsonl(remote_file)
-
+    for day in days:
+        remote_file = COMPARE_DIR / f"{day}.remote.jsonl"
         new_file = COMPARE_DIR / f"{day}.new.jsonl"
+        remote = parse_jsonl(remote_file) if remote_file.exists() else []
+
         if not new_file.exists():
             results.append({
                 "day": day, "remote": len(remote), "new": "MISSING",

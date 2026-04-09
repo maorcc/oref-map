@@ -99,13 +99,13 @@ async def fetch_cities(session: aiohttp.ClientSession) -> list[str]:
 
 def parse_jsonl(path: Path) -> list[dict]:
     entries = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip().rstrip(",")
         if line:
             try:
                 entries.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                raise ValueError(f"{path}:{lineno}: invalid JSONL: {e}") from e
     return entries
 
 
@@ -119,15 +119,27 @@ async def fetch_remote(
     dest: Path,
 ) -> list[dict]:
     """Fetch day-history from the public API. Returns entries or [] if not found.
-    Raises on unexpected HTTP errors (fail fast)."""
-    async with session.get(f"{DAY_HISTORY_URL}?date={day}") as resp:
-        if resp.status == 404:
-            return []
-        if resp.status != 200:
-            raise RuntimeError(f"day-history {day}: unexpected HTTP {resp.status}")
-        data = await resp.json(content_type=None)
-    dest.write_text(to_jsonl(data), encoding="utf-8")
-    return data
+    Retries on network errors. Raises on unexpected HTTP errors (fail fast)."""
+    for attempt in range(RETRIES):
+        try:
+            timeout = aiohttp.ClientTimeout(total=20)
+            async with session.get(f"{DAY_HISTORY_URL}?date={day}", timeout=timeout) as resp:
+                if resp.status == 404:
+                    dest.write_text("", encoding="utf-8")
+                    return []
+                if resp.status != 200:
+                    raise RuntimeError(f"day-history {day}: unexpected HTTP {resp.status}")
+                data = await resp.json(content_type=None)
+            dest.write_text(to_jsonl(data), encoding="utf-8")
+            return data
+        except RuntimeError:
+            raise  # don't retry explicit HTTP errors
+        except Exception as e:
+            if attempt < RETRIES - 1:
+                print(f"  RETRY {attempt + 1} day-history {day}: {e!r}")
+                await asyncio.sleep(RETRY_DELAYS[attempt])
+            else:
+                raise RuntimeError(f"day-history {day} failed after {RETRIES} attempts: {e!r}") from e
 
 
 def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
@@ -234,7 +246,10 @@ async def main() -> None:
         remote_by_date: dict[str, list] = {}
         for day in all_dates:
             remote_file = COMPARE_DIR / f"{day}.remote.jsonl"
-            remote_by_date[day] = parse_jsonl(remote_file) if remote_file.exists() else []
+            if not remote_file.exists():
+                print(f"Error: --reuse missing {remote_file}; run without --reuse first", file=sys.stderr)
+                sys.exit(1)
+            remote_by_date[day] = parse_jsonl(remote_file)
         total = sum(len(v) for v in by_date.values())
         print(f"  Loaded {total} entries across {len(by_date)} dates")
     else:
