@@ -11,6 +11,9 @@ function section(name) { console.log('\n' + name); }
 
 // ── Extracted pure functions (mirrored from prediction-mode.js) ───────
 
+var YELLOW_WINDOW_MS = 5 * 60 * 1000;
+var CORRIDOR_DIST_DEG = 5000 / 111.32;
+
 // Andrew's monotone chain convex hull. Points are [lat, lng] pairs.
 function convexHull(points) {
   var n = points.length;
@@ -174,7 +177,7 @@ function nelderMead(f, x0, step, maxIter) {
   return { x: simplex[order[0]], f: values[order[0]] };
 }
 
-function ellipseFitLoss(params, hullVerts, border, numPts, rMin, aspectMax) {
+function ellipseFitLoss(params, boundaryVerts, border, numPts, rMin, aspectMax) {
   var a = params[2], b = params[3];
   if (a <= 1e-9 || b <= 1e-9) return 1e12;
   var pts = ellipsePoints(params, numPts);
@@ -182,7 +185,7 @@ function ellipseFitLoss(params, hullVerts, border, numPts, rMin, aspectMax) {
   for (var i = 0; i < numPts; i++) {
     if (!pointInBorder(pts[i][0], pts[i][1], border)) continue;
     nInside++;
-    var d = distToPolygonBoundary(pts[i], hullVerts);
+    var d = distToPolygonBoundary(pts[i], boundaryVerts);
     sumSq += d * d;
   }
   if (nInside === 0) return 1e12;
@@ -214,11 +217,14 @@ function parseAlertDateMs(s) {
   return isNaN(t) ? null : t;
 }
 
-function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory, windowMs) {
+// adjacentNames: optional object used as a set of location names to restrict
+// the yellow search (falsy = check all locations).
+function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory, adjacentNames) {
   if (!earliestRedMs) return false;
-  var lo = earliestRedMs - windowMs;
+  var lo = earliestRedMs - YELLOW_WINDOW_MS;
   var hi = earliestRedMs;
   for (var name in locationHistory) {
+    if (adjacentNames && !adjacentNames[name]) continue;
     var arr = locationHistory[name]; if (!arr) continue;
     for (var j = 0; j < arr.length; j++) {
       var e = arr[j]; if (!e || !isYellowTitle(e.title)) continue;
@@ -229,6 +235,7 @@ function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory, windowMs
   if (extHistory) {
     for (var i = 0; i < extHistory.length; i++) {
       var e = extHistory[i]; if (!e || !isYellowTitle(e.title)) continue;
+      if (adjacentNames && e.location && !adjacentNames[e.location]) continue;
       var ts = typeof e.alertDate === 'number' ? e.alertDate : parseAlertDateMs(e.alertDate);
       if (ts && ts >= lo && ts <= hi) return true;
     }
@@ -245,17 +252,102 @@ function eastwardVector(theta) {
   return { dLat: dLat, dLng: dLng, bearing: bearingDeg };
 }
 
-function sourceExtensionDeg(bearingDeg) {
-  var b = ((bearingDeg % 360) + 360) % 360;
-  if (b >= 55 && b < 120) return 25;
-  if (b >= 120 && b < 165) return 22;
-  if (b >= 165 && b < 195) return 20;
-  return 10;
+// Union polygon boundary — standalone version using raw [lat,lng] arrays.
+// (Production version uses Leaflet polygon objects via polygonOuterRing.)
+function clusterUnionBoundaryRaw(polygons) {
+  var QFACTOR = 1e4;
+  function qn(x) { return Math.round(x * QFACTOR) / QFACTOR; }
+  function vkey(lat, lng) { return qn(lat) + ',' + qn(lng); }
+
+  var edgeCount = Object.create(null);
+  var edgeEnds  = Object.create(null);
+
+  for (var i = 0; i < polygons.length; i++) {
+    var outer = polygons[i];
+    var nn = outer.length;
+    for (var j = 0; j < nn; j++) {
+      var lat1 = outer[j][0], lng1 = outer[j][1];
+      var lat2 = outer[(j+1)%nn][0], lng2 = outer[(j+1)%nn][1];
+      var ak = vkey(lat1, lng1), bk = vkey(lat2, lng2);
+      if (ak === bk) continue;
+      var ekey = ak < bk ? ak + '|' + bk : bk + '|' + ak;
+      edgeCount[ekey] = (edgeCount[ekey] || 0) + 1;
+      if (!edgeEnds[ekey]) edgeEnds[ekey] = [[qn(lat1), qn(lng1)], [qn(lat2), qn(lng2)]];
+    }
+  }
+
+  var adj = Object.create(null);
+  var pos = Object.create(null);
+
+  for (var ekey in edgeCount) {
+    if (edgeCount[ekey] !== 1) continue;
+    var e = edgeEnds[ekey];
+    var ak = vkey(e[0][0], e[0][1]), bk = vkey(e[1][0], e[1][1]);
+    pos[ak] = e[0]; pos[bk] = e[1];
+    if (!adj[ak]) adj[ak] = [];
+    if (!adj[bk]) adj[bk] = [];
+    adj[ak].push(bk);
+    adj[bk].push(ak);
+  }
+
+  var vkeys = Object.keys(adj);
+  if (vkeys.length === 0) return [];
+
+  // Start from southernmost vertex
+  var startKey = vkeys[0];
+  for (var i = 1; i < vkeys.length; i++) {
+    var p = pos[vkeys[i]], sp = pos[startKey];
+    if (p[0] < sp[0] || (p[0] === sp[0] && p[1] < sp[1])) startKey = vkeys[i];
+  }
+
+  var adjCopy = Object.create(null);
+  for (var k in adj) adjCopy[k] = adj[k].slice();
+
+  var ring = [pos[startKey]];
+  var prev = null, curr = startKey;
+
+  for (var step = 0; step < vkeys.length + 4; step++) {
+    var neighbors = adjCopy[curr];
+    if (!neighbors || neighbors.length === 0) break;
+    var next;
+    if (neighbors.length === 1) {
+      next = neighbors[0];
+    } else {
+      var cp = pos[curr], pp = prev ? pos[prev] : null;
+      var bestKey = null, bestAng = Math.PI * 3;
+      for (var ni = 0; ni < neighbors.length; ni++) {
+        var nk = neighbors[ni];
+        if (pp) {
+          var v1x = cp[0]-pp[0], v1y = cp[1]-pp[1];
+          var np = pos[nk];
+          var v2x = np[0]-cp[0], v2y = np[1]-cp[1];
+          var a1 = Math.atan2(v1y, v1x), a2 = Math.atan2(v2y, v2x);
+          var d = (a2-a1+Math.PI) % (2*Math.PI) - Math.PI;
+          if (Math.abs(d) < bestAng) { bestAng = Math.abs(d); bestKey = nk; }
+        } else { bestKey = nk; break; }
+      }
+      next = bestKey || neighbors[0];
+    }
+    adjCopy[curr] = adjCopy[curr].filter(function(k) { return k !== next; });
+    if (adjCopy[next]) adjCopy[next] = adjCopy[next].filter(function(k) { return k !== curr; });
+    if (next === startKey) break;
+    ring.push(pos[next]);
+    prev = curr; curr = next;
+  }
+
+  return ring;
 }
 
 // ══════════════════════════════════════════════════════════════════════
 //  TESTS
 // ══════════════════════════════════════════════════════════════════════
+
+section('constants');
+(function() {
+  assert(approx(CORRIDOR_DIST_DEG, 5000 / 111.32, 0.01),
+    'CORRIDOR_DIST_DEG ≈ 44.9° (5000 km)');
+  assert(YELLOW_WINDOW_MS === 5 * 60 * 1000, 'YELLOW_WINDOW_MS = 5 min');
+})();
 
 section('convexHull — basic cases');
 (function() {
@@ -276,10 +368,9 @@ section('convexHull — basic cases');
   // Elongated set along diagonal
   var diag = [[0,0],[1,0.1],[2,0.05],[3,0.1],[4,0]];
   var hd = convexHull(diag);
-  // All extreme points should be on hull; the middle with similar y might not be
   assert(hd.length >= 3, 'elongated set: hull has ≥ 3 vertices');
 
-  // Hull encloses all input points (convexity check: each point is inside or on hull)
+  // Hull encloses all input points
   var pts = [[1,2],[3,4],[2,1],[4,2],[3,3],[2,3]];
   var h = convexHull(pts);
   assert(h.length >= 3, 'random points → hull has ≥ 3 vertices');
@@ -287,7 +378,6 @@ section('convexHull — basic cases');
 
 section('pointInBorder — ray-casting');
 (function() {
-  // Square border at [0,0]–[10,10] in [lat,lng]
   var squareBorder = {
     bbox: { minLat: 0, maxLat: 10, minLng: 0, maxLng: 10 },
     points: [[0,0],[10,0],[10,10],[0,10]]
@@ -297,7 +387,6 @@ section('pointInBorder — ray-casting');
   assert(!pointInBorder(5, -1, squareBorder), 'outside (lng negative)');
   assert(!pointInBorder(-1, 5, squareBorder), 'outside (lat negative)');
 
-  // Triangle border: (0,0),(10,0),(5,10)
   var triBorder = {
     bbox: { minLat: 0, maxLat: 10, minLng: 0, maxLng: 10 },
     points: [[0,0],[10,0],[5,10]]
@@ -305,36 +394,27 @@ section('pointInBorder — ray-casting');
   assert(pointInBorder(5, 4, triBorder), 'center-ish of triangle is inside');
   assert(!pointInBorder(1, 9, triBorder), 'top-left corner of bbox is outside triangle');
   assert(pointInBorder(1, 1, triBorder), 'bottom-left corner: inside triangle');
-
-  // Bbox short-circuit: point well outside bbox
   assert(!pointInBorder(100, 100, squareBorder), 'far outside bbox → false');
 })();
 
 section('distToSegment');
 (function() {
-  // Projection onto segment interior
   assert(approx(distToSegment([1,0], [0,0], [2,0]), 0), 'projection to segment = 0 (on segment)');
   assert(approx(distToSegment([1,1], [0,0], [2,0]), 1), 'perpendicular distance = 1');
-  // Clamps to endpoint
   assert(approx(distToSegment([-1,0], [0,0], [2,0]), 1), 'clamps to start endpoint');
   assert(approx(distToSegment([3,0], [0,0], [2,0]), 1), 'clamps to end endpoint');
-  // Degenerate segment (a == b)
   assert(approx(distToSegment([3,4], [0,0], [0,0]), 5), 'degenerate segment → point distance');
 })();
 
 section('distToPolygonBoundary');
 (function() {
-  // Square with side length 2 centered at origin: sides at ±1
   var square = [[-1,-1],[-1,1],[1,1],[1,-1]];
-  // Center is 1.0 away from each side
   assert(approx(distToPolygonBoundary([0,0], square), 1, 0.01), 'center of unit square → dist 1');
-  // On boundary
   assert(approx(distToPolygonBoundary([1,0], square), 0, 0.01), 'on boundary → dist 0');
 })();
 
 section('ellipsePoints — parametric equations');
 (function() {
-  // Circle (a = b, theta = 0): all points at distance a from center
   var r = 2;
   var params = [5, 5, r, r, 0];
   var pts = ellipsePoints(params, 100);
@@ -342,40 +422,32 @@ section('ellipsePoints — parametric equations');
     var dl = pts[i][0] - 5, dg = pts[i][1] - 5;
     assert(approx(Math.sqrt(dl*dl + dg*dg), r, 0.01),
       'circle point ' + i + ' at radius ' + r);
-    if (!approx(Math.sqrt(dl*dl + dg*dg), r, 0.01)) break; // stop on first fail
+    if (!approx(Math.sqrt(dl*dl + dg*dg), r, 0.01)) break;
   }
 
-  // Ellipse (a=3, b=1, theta=0): parametric extremes at (cx±3, cy) and (cx, cy±1)
   var params2 = [0, 0, 3, 1, 0];
   var pts2 = ellipsePoints(params2, 4);
-  // phi=0 → (cx+a, cy); phi=pi/2 → (cx, cy+b); etc.
   assert(approx(pts2[0][0], 3, 0.01) && approx(pts2[0][1], 0, 0.01), 'phi=0 → (cx+a, cy)');
   assert(approx(pts2[1][0], 0, 0.01) && approx(pts2[1][1], 1, 0.01), 'phi=pi/2 → (cx, cy+b)');
 })();
 
 section('ellipseInitialGuess — PCA-based');
 (function() {
-  // Perfectly horizontal points: major axis should align with lat (lat variance dominates)
   var horiz = [];
   for (var i = 0; i < 10; i++) horiz.push([i * 0.1, 0]);
   var g = ellipseInitialGuess(horiz);
   assert(approx(g[0], 0.45, 0.01) && approx(g[1], 0, 0.01),
     'horizontal: center at (0.45, 0)');
-  // theta ≈ 0 (aligned with lat axis)
   assert(approx(g[4], 0, 0.1), 'horizontal: theta ≈ 0, got ' + g[4].toFixed(3));
-  // a > b (elongated along lat)
   assert(g[2] > g[3], 'horizontal: a > b');
 
-  // Perfectly vertical points: major axis along lng
   var vert = [];
   for (var i = 0; i < 10; i++) vert.push([0, i * 0.1]);
   var gv = ellipseInitialGuess(vert);
-  // theta ≈ ±pi/2
   assert(Math.abs(Math.abs(gv[4]) - Math.PI / 2) < 0.1,
     'vertical: theta ≈ ±pi/2, got ' + gv[4].toFixed(3));
   assert(gv[2] > gv[3], 'vertical: a > b');
 
-  // Non-degenerate ellipse with known tilt
   var tilted = [];
   for (var i = 0; i < 20; i++) {
     var phi = (i / 20) * 2 * Math.PI;
@@ -383,21 +455,18 @@ section('ellipseInitialGuess — PCA-based');
                  3 * Math.cos(phi) * Math.sin(0.5) + 1 * Math.sin(phi) * Math.cos(0.5)]);
   }
   var gt = ellipseInitialGuess(tilted);
-  // Center should be near (0,0)
   assert(approx(gt[0], 0, 0.1) && approx(gt[1], 0, 0.1),
     'tilted ellipse: center near origin, got (' + gt[0].toFixed(2) + ',' + gt[1].toFixed(2) + ')');
 })();
 
 section('nelderMead — simple 2D minimization');
 (function() {
-  // Minimize (x-3)^2 + (y-7)^2, minimum at (3,7)
   var f = function(p) { return (p[0]-3)*(p[0]-3) + (p[1]-7)*(p[1]-7); };
   var res = nelderMead(f, [0, 0], [1, 1], 500);
   assert(approx(res.x[0], 3, 0.01) && approx(res.x[1], 7, 0.01),
     'quadratic min at (3,7): got (' + res.x[0].toFixed(3) + ',' + res.x[1].toFixed(3) + ')');
   assert(res.f < 0.001, 'loss ≈ 0 at minimum');
 
-  // Minimize Rosenbrock (harder): f(x,y) = (1-x)^2 + 100*(y-x^2)^2, min at (1,1)
   var rosenbrock = function(p) {
     return (1 - p[0]) * (1 - p[0]) + 100 * (p[1] - p[0]*p[0]) * (p[1] - p[0]*p[0]);
   };
@@ -406,26 +475,21 @@ section('nelderMead — simple 2D minimization');
     'Rosenbrock min ≈ (1,1): got (' + rRes.x[0].toFixed(3) + ',' + rRes.x[1].toFixed(3) + ')');
 })();
 
-section('ellipseFitLoss — loss is zero when ellipse matches hull exactly');
+section('ellipseFitLoss — loss is zero when ellipse matches boundary exactly');
 (function() {
-  // Build a square hull; an ellipse that inscribes the square should have low loss
-  // when ellipse points all lie near the square boundary.
   var bigBorder = {
     bbox: { minLat: -100, maxLat: 100, minLng: -100, maxLng: 100 },
     points: [[-100,-100],[100,-100],[100,100],[-100,100]]
   };
-  // Circle hull (hull ≈ circle of radius 2 at origin)
   var hull = [];
   for (var i = 0; i < 20; i++) {
     var phi = (i / 20) * 2 * Math.PI;
     hull.push([2 * Math.cos(phi), 2 * Math.sin(phi)]);
   }
-  // Perfect fit: circle at origin with radius 2
   var params = [0, 0, 2, 2, 0];
   var loss = ellipseFitLoss(params, hull, bigBorder, 40, 0.1, 4);
-  assert(loss < 0.01, 'circle fits circle hull: loss ≈ 0, got ' + loss.toFixed(4));
+  assert(loss < 0.01, 'circle fits circle boundary: loss ≈ 0, got ' + loss.toFixed(4));
 
-  // Ellipse completely outside border → loss = 1e12
   var tinyBorder = {
     bbox: { minLat: 90, maxLat: 91, minLng: 90, maxLng: 91 },
     points: [[90,90],[91,90],[91,91],[90,91]]
@@ -436,38 +500,21 @@ section('ellipseFitLoss — loss is zero when ellipse matches hull exactly');
 
 section('ellipseFitLoss — border truncation reduces loss');
 (function() {
-  // Simulate a truncated cluster near Israel's western coast.
-  // Hull is a half-ellipse cut by the sea; the border excludes the sea half.
-  // Expected: fitting with border should produce lower loss than fitting to a
-  // full ellipse that tries to match the cut-off half.
-
-  // Rectangular "country" border (land side): lat [30,34], lng [35,40]
   var landBorder = {
     bbox: { minLat: 30, maxLat: 34, minLng: 35, maxLng: 40 },
     points: [[30,35],[34,35],[34,40],[30,40]]
   };
-  // True ellipse centered at (32, 35) with a=2 (NS), b=1 (EW), theta=0
-  // The western half (lng < 35) is "over the sea" and absent from the hull.
   var hullOnLand = [];
   for (var i = 0; i < 20; i++) {
-    var phi = -Math.PI / 2 + (i / 19) * Math.PI; // phi from -90° to 90° (eastern half only)
+    var phi = -Math.PI / 2 + (i / 19) * Math.PI;
     var lat = 32 + 2 * Math.cos(phi);
     var lng = 35 + 1 * Math.sin(phi);
     if (lng >= 35) hullOnLand.push([lat, lng]);
   }
   assert(hullOnLand.length >= 5, 'setup: hull has points on land');
 
-  // The true ellipse (if all points were visible) has its center at (32, 35).
-  // With truncation, PCA-only would miss the center; border-aware fit should find it.
   var trueParams = [32, 35, 2, 1, 0];
-  var fullBorder = {
-    bbox: { minLat: 25, maxLat: 40, minLng: 30, maxLng: 45 },
-    points: [[25,30],[40,30],[40,45],[25,45]]
-  };
   var lossTrue = ellipseFitLoss(trueParams, hullOnLand, landBorder, 40, 0.1, 4);
-  // The "true" ellipse should have finite, bounded loss against the land-only hull.
-  // (The loss won't be near-zero because the border clips part of the ellipse, but it
-  // should be much lower than a completely wrong ellipse.)
   assert(lossTrue < 5, 'true ellipse has bounded loss against truncated hull: ' + lossTrue.toFixed(4));
 })();
 
@@ -483,117 +530,165 @@ section('isYellowTitle — Iran/Yemen early warning detection');
   assert(!isYellowTitle('יש לשהות בסמיכות למרחב המוגן'), 'stay-near-shelter is not Iran/Yemen yellow');
 })();
 
-section('hasPrecedingYellow — gate logic');
+section('hasPrecedingYellow — gate logic (no spatial filter)');
 (function() {
-  var WINDOW = 5 * 60 * 1000;
-  // Use explicit UTC anchor and include Z so parseAlertDateMs is timezone-agnostic.
   var base = new Date('2026-04-10T12:00:00Z').getTime();
   var fmtDate = function(ts) { return new Date(ts).toISOString().slice(0, 19) + 'Z'; };
 
-  var historyWithYellow = {
+  var histWithYellow = {
     'תל אביב': [
       { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 2 * 60 * 1000) },
       { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
     ]
   };
-  assert(hasPrecedingYellow(base, historyWithYellow, null, WINDOW), 'yellow 2 min before red → gate passes');
+  assert(hasPrecedingYellow(base, histWithYellow, null, null), 'yellow 2 min before red → gate passes');
 
-  var historyJustOutside = {
+  var histJustOutside = {
     'תל אביב': [
       { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 6 * 60 * 1000) },
       { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
     ]
   };
-  assert(!hasPrecedingYellow(base, historyJustOutside, null, WINDOW), 'yellow 6 min before red → gate fails');
+  assert(!hasPrecedingYellow(base, histJustOutside, null, null), 'yellow 6 min before red → gate fails');
 
-  var historyOnlyRed = {
-    'תל אביב': [
-      { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
-    ]
+  var histOnlyRed = {
+    'תל אביב': [{ title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }]
   };
-  assert(!hasPrecedingYellow(base, historyOnlyRed, null, WINDOW), 'no yellow at all → gate fails');
+  assert(!hasPrecedingYellow(base, histOnlyRed, null, null), 'no yellow at all → gate fails');
 
-  // Yellow on a different location still passes (covers the whole country scan)
-  var historyOtherLocation = {
+  // Yellow on a different location — no spatial filter, so it passes
+  var histOtherLoc = {
     'באר שבע': [
       { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 3 * 60 * 1000) }
+    ],
+    'תל אביב': [{ title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }]
+  };
+  assert(hasPrecedingYellow(base, histOtherLoc, null, null), 'yellow on different location → gate passes');
+
+  assert(!hasPrecedingYellow(base, {}, null, null), 'empty history → gate fails');
+  assert(!hasPrecedingYellow(null, histWithYellow, null, null), 'null earliestRed → gate fails');
+
+  // extendedHistory path (ms timestamp, with location field)
+  var extHistYellow = [
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 4 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+  ];
+  assert(hasPrecedingYellow(base, {}, extHistYellow, null), 'extHistory ms yellow 4 min before red → gate passes');
+
+  var extHistTooOld = [
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 8 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+  ];
+  assert(!hasPrecedingYellow(base, {}, extHistTooOld, null), 'extHistory ms yellow 8 min before → gate fails');
+})();
+
+section('hasPrecedingYellow — spatial filter (adjacentNames)');
+(function() {
+  var base = new Date('2026-04-10T12:00:00Z').getTime();
+  var fmtDate = function(ts) { return new Date(ts).toISOString().slice(0, 19) + 'Z'; };
+
+  // History contains yellow for 'חיפה' (north) and red cluster is in center Israel.
+  var hist = {
+    'חיפה': [
+      { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 2 * 60 * 1000) }
     ],
     'תל אביב': [
       { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
     ]
   };
-  assert(hasPrecedingYellow(base, historyOtherLocation, null, WINDOW), 'yellow on different location → gate passes');
 
-  // Empty history
-  assert(!hasPrecedingYellow(base, {}, null, WINDOW), 'empty history → gate fails');
-  assert(!hasPrecedingYellow(null, historyWithYellow, null, WINDOW), 'null earliestRed → gate fails');
+  // Without filter → passes (any yellow anywhere)
+  assert(hasPrecedingYellow(base, hist, null, null),
+    'no adjacentNames filter → yellow from חיפה counts');
 
-  // extendedHistory path (timeline mode): yellow stored as ms timestamp
-  var extHistYellow = [
-    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 4 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+  // With filter that only allows center-Israel locations → חיפה excluded → fails
+  var centerAdj = { 'תל אביב': true, 'ראשון לציון': true, 'רמת גן': true };
+  assert(!hasPrecedingYellow(base, hist, null, centerAdj),
+    'adjacentNames excludes חיפה → gate fails for center cluster');
+
+  // With filter that includes חיפה → passes
+  var northAdj = { 'חיפה': true, 'עכו': true, 'נהריה': true };
+  assert(hasPrecedingYellow(base, hist, null, northAdj),
+    'adjacentNames includes חיפה → gate passes for north cluster');
+
+  // extendedHistory with spatial filter
+  var extHist = [
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 3 * 60 * 1000, location: 'חיפה' }
   ];
-  assert(hasPrecedingYellow(base, {}, extHistYellow, WINDOW), 'extendedHistory ms yellow 4 min before red → gate passes');
+  assert(!hasPrecedingYellow(base, {}, extHist, centerAdj),
+    'extHistory: adjacentNames excludes חיפה → gate fails');
+  assert(hasPrecedingYellow(base, {}, extHist, northAdj),
+    'extHistory: adjacentNames includes חיפה → gate passes');
 
-  var extHistTooOld = [
-    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 8 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+  // extHistory entry without a location field → treated as matching any filter
+  var extHistNoLoc = [
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 3 * 60 * 1000 }
   ];
-  assert(!hasPrecedingYellow(base, {}, extHistTooOld, WINDOW), 'extendedHistory ms yellow 8 min before → gate fails');
+  assert(hasPrecedingYellow(base, {}, extHistNoLoc, centerAdj),
+    'extHistory entry with no location → always matches adjacentNames');
 })();
 
 section('eastwardVector — always returns positive-lng direction');
 (function() {
-  // theta = pi/4 (NE) → dLng = sin(pi/4) > 0 → bearing ≈ 45°
   var v = eastwardVector(Math.PI / 4);
   assert(v.dLng > 0, 'NE: dLng > 0');
   assert(approx(v.bearing, 45, 0.5), 'NE: bearing ≈ 45°, got ' + v.bearing.toFixed(1));
 
-  // theta = -pi/4 (NW direction in (lat,lng) space); flip to SE (also eastward, dLng > 0).
-  // Direction (cos(-pi/4), sin(-pi/4)) = (0.707, -0.707) flips to (-0.707, 0.707) → bearing 135°.
   var vFlip = eastwardVector(-Math.PI / 4);
   assert(vFlip.dLng > 0, 'flipped NW→SE: dLng > 0');
   assert(approx(vFlip.bearing, 135, 0.5), 'flipped: bearing ≈ 135° (SE), got ' + vFlip.bearing.toFixed(1));
 
-  // theta = pi/2 (due east along lng): bearing = 90°
   var vE = eastwardVector(Math.PI / 2);
   assert(approx(vE.bearing, 90, 0.5), 'due east: bearing = 90°');
 
-  // theta = -pi/2 → flip → due east
   var vW = eastwardVector(-Math.PI / 2);
   assert(approx(vW.bearing, 90, 0.5), 'west flipped to east: bearing = 90°');
 
-  // theta = 0 → due north along lat (lng component = 0). In east-only convention:
-  // dLng = sin(0) = 0, so we don't flip (dLng >= 0). bearing = atan2(0,1) = 0 → north.
-  // This edge case means the ellipse is perfectly N-S and no east direction exists.
   var vN = eastwardVector(0);
   assert(approx(vN.bearing, 0, 0.5), 'due north: bearing = 0° (N-S edge case)');
 })();
 
-section('sourceExtensionDeg — bearing to country distance');
+section('clusterUnionBoundaryRaw — two adjacent squares');
 (function() {
-  // Iran (roughly east, 55–120°)
-  assert(sourceExtensionDeg(90) === 25, 'bearing 90° → Iran (25)');
-  assert(sourceExtensionDeg(60) === 25, 'bearing 60° → Iran (25)');
-  assert(sourceExtensionDeg(119) === 25, 'bearing 119° → Iran (25)');
+  // Two unit squares sharing an edge: left=[0,0]-[1,1], right=[0,1]-[1,2]
+  // Union boundary should be a rectangle: 6 unique boundary edges → 6-vertex ring
+  // (or 4 corners of the 1×2 bounding rect, but union boundary keeps the vertex count)
+  var leftSquare = [[0,0],[1,0],[1,1],[0,1]];
+  var rightSquare = [[0,1],[1,1],[1,2],[0,2]];
+  var ring = clusterUnionBoundaryRaw([leftSquare, rightSquare]);
+  assert(ring.length >= 4, 'two adjacent squares → union ring has ≥ 4 vertices, got ' + ring.length);
+  // Interior edge ([0,1]–[1,1]) should NOT appear in the ring;
+  // the boundary should span lat∈[0,1], lng∈[0,2].
+  var lats = ring.map(function(p) { return p[0]; });
+  var lngs = ring.map(function(p) { return p[1]; });
+  assert(Math.min.apply(null, lats) >= 0 - 1e-4 && Math.max.apply(null, lats) <= 1 + 1e-4,
+    'union ring lat range [0,1]');
+  assert(Math.min.apply(null, lngs) >= 0 - 1e-4 && Math.max.apply(null, lngs) <= 2 + 1e-4,
+    'union ring lng range [0,2]');
 
-  // Iran/Yemen SE (120–165°)
-  assert(sourceExtensionDeg(140) === 22, 'bearing 140° → Iran/Yemen SE (22)');
+  // Single polygon → all edges are boundary edges → ring = polygon
+  var tri = [[0,0],[1,0],[0.5,1]];
+  var triRing = clusterUnionBoundaryRaw([tri]);
+  assert(triRing.length === 3, 'single triangle → ring has 3 vertices, got ' + triRing.length);
+})();
 
-  // Yemen S (165–195°)
-  assert(sourceExtensionDeg(180) === 20, 'bearing 180° → Yemen (20)');
-  assert(sourceExtensionDeg(170) === 20, 'bearing 170° → Yemen (20)');
-
-  // Fallback (other bearings — shouldn't fire for valid Iran/Yemen, but handled)
-  assert(sourceExtensionDeg(45) === 10, 'bearing 45° → fallback (10)');
-  assert(sourceExtensionDeg(200) === 10, 'bearing 200° → fallback (10)');
+section('clusterUnionBoundaryRaw — L-shaped cluster');
+(function() {
+  // Three unit squares forming an L-shape:
+  //   bottom-left=[0,0]-[1,1], bottom-right=[0,1]-[1,2], top-left=[1,0]-[2,1]
+  var sq1 = [[0,0],[1,0],[1,1],[0,1]]; // bottom-left
+  var sq2 = [[0,1],[1,1],[1,2],[0,2]]; // bottom-right
+  var sq3 = [[1,0],[2,0],[2,1],[1,1]]; // top-left
+  var ring = clusterUnionBoundaryRaw([sq1, sq2, sq3]);
+  assert(ring.length >= 6, 'L-shaped cluster → ring has ≥ 6 vertices (has concavity), got ' + ring.length);
+  // Bounding box should cover full extents
+  var lats = ring.map(function(p) { return p[0]; });
+  var lngs = ring.map(function(p) { return p[1]; });
+  assert(Math.min.apply(null, lats) < 0.1, 'L-shape: ring reaches lat ≈ 0');
+  assert(Math.max.apply(null, lats) > 1.9, 'L-shape: ring reaches lat ≈ 2');
+  assert(Math.max.apply(null, lngs) > 1.9, 'L-shape: ring reaches lng ≈ 2');
 })();
 
 section('full pipeline — ellipse fit converges on synthetic truncated data');
 (function() {
-  // Simulate an alert cluster that would span [31,32] lat x [35,37] lng but is
-  // cut at lng=35 (western border). We build a hull from points with lng >= 35
-  // and check that the fit center is reasonably close to the true ellipse center.
-
-  // True ellipse: cx=31.5, cy=35, a=1 (lat), b=1 (lng), theta=pi/4
   var cx_true = 31.5, cy_true = 35.5, a_true = 0.8, b_true = 0.3, theta_true = 0.6;
   var fullPts = [];
   for (var i = 0; i < 40; i++) {
@@ -604,7 +699,6 @@ section('full pipeline — ellipse fit converges on synthetic truncated data');
     var lng = cy_true + a_true * cp * sinT + b_true * sp * cosT;
     fullPts.push([lat, lng]);
   }
-  // Land border: cut anything west of lng=35.2 (removes ~1/4 of the ellipse)
   var border = {
     bbox: { minLat: 28, maxLat: 36, minLng: 35.2, maxLng: 42 },
     points: [[28,35.2],[36,35.2],[36,42],[28,42]]
@@ -613,11 +707,9 @@ section('full pipeline — ellipse fit converges on synthetic truncated data');
   var hull = convexHull(landPts);
   assert(hull.length >= 4, 'hull has enough points: ' + hull.length);
 
-  // Compute initial guess and check it's reasonable
   var guess = ellipseInitialGuess(hull);
   assert(guess[0] > 30 && guess[0] < 33, 'initial guess center lat in range');
 
-  // Loss function at true params vs a bad guess
   var lossTrue = ellipseFitLoss(
     [cx_true, cy_true, a_true, b_true, theta_true],
     hull, border, 40, 0.05, 4

@@ -5,34 +5,36 @@
   // Launch-direction prediction — border-aware ellipse fitting.
   //
   // Strategy (see issue #136):
-  //  1. Cluster red-alerted locations by polygon adjacency.
-  //  2. Gate each cluster on "yellow precedes red within 5 min": only fit
-  //     when an early-warning (yellow) alert occurred shortly before the
-  //     red alerts, which empirically means Iran/Yemen. Lebanon events
-  //     typically have no preceding yellow and are intentionally skipped.
-  //  3. Build the convex hull of the cluster's polygon vertices.
-  //  4. Fit an ellipse to the hull using a Nelder-Mead optimizer where the
-  //     loss is the mean squared distance from ellipse sample points
-  //     (that lie inside Israel's land border) to the hull boundary. Ellipse
-  //     arcs that fall outside the border (e.g. over the Mediterranean) are
+  //  1. Cluster red-alerted locations by polygon adjacency (direct touch OR
+  //     bridged through a single non-red polygon).
+  //  2. Gate each cluster on "yellow precedes red within 5 min", but only
+  //     counting yellow alerts from locations spatially adjacent to the
+  //     cluster — this prevents a Lebanon cluster from being triggered by
+  //     yellows from a simultaneous Iran event in the centre of the country.
+  //  3. Build the outer boundary ring of the union of all cluster polygons.
+  //  4. Fit an ellipse to the boundary using a Nelder-Mead optimizer where
+  //     the loss is the mean squared distance from ellipse sample points
+  //     (that lie inside Israel's land border) to the union boundary.
+  //     Ellipse arcs outside the border (e.g. over the Mediterranean) are
   //     ignored — this lets the fit complete truncated alert blobs.
-  //  5. Estimate slope uncertainty by re-fitting on even/odd hull vertices.
+  //  5. Estimate slope uncertainty by re-fitting on even/odd boundary subsets.
   //  6. Draw the corridor eastward only (positive longitude direction) as a
-  //     geodesic. Filter predictions with aspect ratio < 1.2.
+  //     5000 km geodesic. Filter predictions with aspect ratio < 1.2.
   //
   // Debug visuals (always shown when feature is enabled):
   //  - Status bar: per-cluster fit progress and timing.
-  //  - Hull points: blue circles on each convex hull vertex.
-  //  - Initial-guess ellipse: orange dashed polyline (shown immediately).
-  //  - Best-fit ellipse: green solid polyline (shown when optimisation done).
+  //  - Union boundary points: green circles on each boundary vertex.
+  //  - Initial-guess ellipse: dashed green polyline (shown immediately).
+  //  - Best-fit ellipse: solid green polyline (shown when optimisation done).
   // ------------------------------------------------------------------
 
   var ASPECT_RATIO_MIN = 1.2;
-  var MIN_CLUSTER_RED = 3;
+  var MIN_CLUSTER_RED = 15;
   var YELLOW_WINDOW_MS = 5 * 60 * 1000;
   var FIT_NUM_PTS = 40;
   var FIT_MAX_ITER = 120;
   var CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+  var CORRIDOR_DIST_DEG = 5000 / 111.32; // ~44.9° ≈ 5000 km
 
   var YELLOW_PATTERNS = [
     /בדקות הקרובות צפויות להתקבל התרעות/,
@@ -251,14 +253,14 @@
       reorder(); return {x:simplex[order[0]],f:values[order[0]]};
     }
 
-    function ellipseFitLoss(params, hullVerts, border, numPts, rMin, aspectMax) {
+    function ellipseFitLoss(params, boundaryVerts, border, numPts, rMin, aspectMax) {
       var a=params[2], b=params[3];
       if(a<=1e-9||b<=1e-9) return 1e12;
       var pts=ellipsePoints(params,numPts), sumSq=0, nInside=0;
       for(var i=0;i<numPts;i++){
         if(!pointInBorder(pts[i][0],pts[i][1],border)) continue;
         nInside++;
-        var d=distToPolygonBoundary(pts[i],hullVerts);
+        var d=distToPolygonBoundary(pts[i],boundaryVerts);
         sumSq+=d*d;
       }
       if(nInside===0) return 1e12;
@@ -270,19 +272,19 @@
       return sumSq/nInside+lossAspect+lossSize;
     }
 
-    function runFit(hullVerts, border, warmStart) {
-      var guess = warmStart ? warmStart.slice() : ellipseInitialGuess(hullVerts);
+    function runFit(boundaryVerts, border, warmStart) {
+      var guess = warmStart ? warmStart.slice() : ellipseInitialGuess(boundaryVerts);
       var rMin = guess[2]/4;
       var minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
-      for(var i=0;i<hullVerts.length;i++){
-        if(hullVerts[i][0]<minLat)minLat=hullVerts[i][0];
-        if(hullVerts[i][0]>maxLat)maxLat=hullVerts[i][0];
-        if(hullVerts[i][1]<minLng)minLng=hullVerts[i][1];
-        if(hullVerts[i][1]>maxLng)maxLng=hullVerts[i][1];
+      for(var i=0;i<boundaryVerts.length;i++){
+        if(boundaryVerts[i][0]<minLat)minLat=boundaryVerts[i][0];
+        if(boundaryVerts[i][0]>maxLat)maxLat=boundaryVerts[i][0];
+        if(boundaryVerts[i][1]<minLng)minLng=boundaryVerts[i][1];
+        if(boundaryVerts[i][1]>maxLng)maxLng=boundaryVerts[i][1];
       }
       var dLat=Math.max(maxLat-minLat,0.01), dLng=Math.max(maxLng-minLng,0.01), dim=Math.max(dLat,dLng);
       var step=[0.15*dLat,0.15*dLng,0.2*dim,0.2*dim,0.1];
-      var loss=function(p){return ellipseFitLoss(p,hullVerts,border,FIT_NUM_PTS,rMin,4);};
+      var loss=function(p){return ellipseFitLoss(p,boundaryVerts,border,FIT_NUM_PTS,rMin,4);};
       var res=nelderMead(loss,guess,step,FIT_MAX_ITER);
       var p=res.x;
       if(p[3]>p[2]){var t=p[2];p[2]=p[3];p[3]=t;p[4]+=Math.PI/2;}
@@ -291,9 +293,8 @@
     }
 
     // ----------------------------------------------------------------
-    // Iran/Yemen gate: yellow precedes red within YELLOW_WINDOW_MS.
-    // Checks both locationHistory (live, recent) and extendedHistory
-    // (timeline mode, older events).
+    // Iran/Yemen gate: yellow precedes red within YELLOW_WINDOW_MS,
+    // restricted to yellow alerts from locations adjacent to the cluster.
     // ----------------------------------------------------------------
     function parseAlertDateMs(s) {
       if (!s) return null;
@@ -308,12 +309,15 @@
       return false;
     }
 
-    function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory) {
+    // adjacentNames: optional object used as a set of location names to restrict
+    // the yellow search to (falsy = check all locations).
+    function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory, adjacentNames) {
       if (!earliestRedMs) return false;
       var lo = earliestRedMs - YELLOW_WINDOW_MS, hi = earliestRedMs;
 
-      // Check locationHistory (stores recent events as {title, alertDate string, state})
+      // Check locationHistory (keyed by location name)
       for (var name in locationHistory) {
+        if (adjacentNames && !adjacentNames[name]) continue;
         var arr = locationHistory[name]; if (!arr) continue;
         for (var j=0;j<arr.length;j++) {
           var e=arr[j]; if(!e||!isYellowTitle(e.title)) continue;
@@ -328,6 +332,7 @@
         for (var i=0;i<extHistory.length;i++) {
           var e=extHistory[i];
           if(!e||!isYellowTitle(e.title)) continue;
+          if(adjacentNames && e.location && !adjacentNames[e.location]) continue;
           var ts=typeof e.alertDate==='number' ? e.alertDate : parseAlertDateMs(e.alertDate);
           if(ts&&ts>=lo&&ts<=hi) return true;
         }
@@ -338,29 +343,236 @@
 
     // ----------------------------------------------------------------
     // Clustering by polygon adjacency
+    //
+    // Two red polygons belong to the same cluster if:
+    //   (a) they share at least one vertex (within tolerance), OR
+    //   (b) they both share vertices with a single non-red polygon
+    //       (i.e., they are separated by at most one non-red polygon).
     // ----------------------------------------------------------------
-    function clusterByAdjacency(locPoints, locationPolygons) {
-      var n=locPoints.length; if(n===0) return [];
-      var locVerts=new Array(n);
-      for(var i=0;i<n;i++){
-        var poly=locationPolygons[locPoints[i][3]], vs=[];
-        if(poly){var outer=polygonOuterRing(poly);for(var j=0;j<outer.length;j++)vs.push([outer[j].lat,outer[j].lng]);}
-        locVerts[i]=vs;
+    function clusterByAdjacency(redPoints, locationPolygons, locationStates) {
+      var n = redPoints.length; if (n === 0) return [];
+
+      // Build vertex arrays for all red points
+      var locVerts = new Array(n);
+      for (var i = 0; i < n; i++) {
+        var poly = locationPolygons[redPoints[i][3]], vs = [];
+        if (poly) {
+          var outer = polygonOuterRing(poly);
+          for (var j = 0; j < outer.length; j++) vs.push([outer[j].lat, outer[j].lng]);
+        }
+        locVerts[i] = vs;
       }
-      var parent=new Array(n); for(var i=0;i<n;i++)parent[i]=i;
-      function find(i){while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i];}return i;}
-      var tol2=0.005*0.005;
-      for(var i=0;i<n;i++) for(var j=i+1;j<n;j++){
-        if(find(i)===find(j)) continue;
-        var vi=locVerts[i],vj=locVerts[j],found=false;
-        for(var a=0;a<vi.length&&!found;a++) for(var b=0;b<vj.length&&!found;b++){
-          var dl=vi[a][0]-vj[b][0],dg=vi[a][1]-vj[b][1];
-          if(dl*dl+dg*dg<tol2){parent[find(i)]=find(j);found=true;}
+
+      var parent = new Array(n);
+      for (var i = 0; i < n; i++) parent[i] = i;
+      function find(i) { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; }
+      function union(i, j) { var ri = find(i), rj = find(j); if (ri !== rj) parent[ri] = rj; }
+
+      var tol2 = 0.005 * 0.005;
+
+      // Phase 1: direct touch between red polygons
+      for (var i = 0; i < n; i++) {
+        for (var j = i+1; j < n; j++) {
+          if (find(i) === find(j)) continue;
+          var vi = locVerts[i], vj = locVerts[j], found = false;
+          for (var a = 0; a < vi.length && !found; a++) {
+            for (var b = 0; b < vj.length && !found; b++) {
+              var dl = vi[a][0]-vj[b][0], dg = vi[a][1]-vj[b][1];
+              if (dl*dl+dg*dg < tol2) { union(i, j); found = true; }
+            }
+          }
         }
       }
-      var groups={};
-      for(var i=0;i<n;i++){var r=find(i);if(!groups[r])groups[r]=[];groups[r].push(locPoints[i]);}
-      return Object.keys(groups).map(function(k){return groups[k];});
+
+      // Phase 2: bridge through a single non-red polygon.
+      // Build a name→index map for the red locations first.
+      var redNameToIdx = Object.create(null);
+      for (var i = 0; i < n; i++) redNameToIdx[redPoints[i][3]] = i;
+
+      for (var locName in locationPolygons) {
+        // Only iterate non-red polygons
+        if (redNameToIdx[locName] !== undefined) continue;
+        var state = locationStates ? locationStates[locName] : null;
+        if (state && state.state === 'red') continue;
+
+        var bridgePoly = locationPolygons[locName];
+        if (!bridgePoly) continue;
+        var bridgeOuter = polygonOuterRing(bridgePoly);
+        if (bridgeOuter.length === 0) continue;
+
+        // Find all red polygon indices that touch this non-red polygon
+        var touchingRed = [];
+        for (var i = 0; i < n; i++) {
+          var vi = locVerts[i], touches = false;
+          for (var a = 0; a < bridgeOuter.length && !touches; a++) {
+            var bLat = bridgeOuter[a].lat, bLng = bridgeOuter[a].lng;
+            for (var b = 0; b < vi.length && !touches; b++) {
+              var dl = bLat - vi[b][0], dg = bLng - vi[b][1];
+              if (dl*dl + dg*dg < tol2) touches = true;
+            }
+          }
+          if (touches) touchingRed.push(i);
+        }
+
+        // Union all red polygons that share this non-red bridge polygon
+        for (var ti = 1; ti < touchingRed.length; ti++) {
+          union(touchingRed[0], touchingRed[ti]);
+        }
+      }
+
+      var groups = Object.create(null);
+      for (var i = 0; i < n; i++) {
+        var r = find(i);
+        if (!groups[r]) groups[r] = [];
+        groups[r].push(redPoints[i]);
+      }
+      return Object.keys(groups).map(function(k) { return groups[k]; });
+    }
+
+    // ----------------------------------------------------------------
+    // Find all location names adjacent to a cluster (for yellow gate).
+    // "Adjacent" = polygon shares a vertex with any cluster polygon.
+    // The cluster's own locations are always included.
+    // ----------------------------------------------------------------
+    function clusterAdjacentNames(cluster, locationPolygons) {
+      var tol2 = 0.005 * 0.005;
+
+      // Collect all vertices of the cluster's polygons (flat array)
+      var clusterVerts = [];
+      var adjacent = Object.create(null);
+      for (var i = 0; i < cluster.length; i++) {
+        adjacent[cluster[i][3]] = true;
+        var poly = locationPolygons[cluster[i][3]];
+        if (!poly) continue;
+        var outer = polygonOuterRing(poly);
+        for (var j = 0; j < outer.length; j++) {
+          clusterVerts.push([outer[j].lat, outer[j].lng]);
+        }
+      }
+
+      // Check every other location
+      for (var locName in locationPolygons) {
+        if (adjacent[locName]) continue;
+        var poly = locationPolygons[locName];
+        if (!poly) continue;
+        var outer = polygonOuterRing(poly);
+        var touches = false;
+        for (var a = 0; a < outer.length && !touches; a++) {
+          var lat = outer[a].lat, lng = outer[a].lng;
+          for (var b = 0; b < clusterVerts.length && !touches; b++) {
+            var dl = lat - clusterVerts[b][0], dg = lng - clusterVerts[b][1];
+            if (dl*dl + dg*dg < tol2) touches = true;
+          }
+        }
+        if (touches) adjacent[locName] = true;
+      }
+
+      return adjacent;
+    }
+
+    // ----------------------------------------------------------------
+    // Union polygon boundary
+    //
+    // Collects all polygon edges from the cluster.  Edges shared by
+    // exactly one polygon are on the outer boundary.  Stitches them
+    // into a ring using the smallest-turning-angle heuristic at
+    // multi-way junctions (same algorithm as generate_israel_border.py).
+    // Falls back to convex hull if stitching fails.
+    // ----------------------------------------------------------------
+    function clusterUnionBoundary(cluster, locationPolygons) {
+      var QFACTOR = 1e4; // ~11 m precision
+      function qn(x) { return Math.round(x * QFACTOR) / QFACTOR; }
+      function vkey(lat, lng) { return qn(lat) + ',' + qn(lng); }
+
+      var edgeCount = Object.create(null);
+      var edgeEnds  = Object.create(null); // canonical ekey → [[lat,lng],[lat,lng]]
+
+      for (var i = 0; i < cluster.length; i++) {
+        var poly = locationPolygons[cluster[i][3]];
+        if (!poly) continue;
+        var outer = polygonOuterRing(poly);
+        var nn = outer.length;
+        for (var j = 0; j < nn; j++) {
+          var lat1 = outer[j].lat, lng1 = outer[j].lng;
+          var lat2 = outer[(j+1)%nn].lat, lng2 = outer[(j+1)%nn].lng;
+          var ak = vkey(lat1, lng1), bk = vkey(lat2, lng2);
+          if (ak === bk) continue;
+          var ekey = ak < bk ? ak + '|' + bk : bk + '|' + ak;
+          edgeCount[ekey] = (edgeCount[ekey] || 0) + 1;
+          if (!edgeEnds[ekey]) {
+            edgeEnds[ekey] = [[qn(lat1), qn(lng1)], [qn(lat2), qn(lng2)]];
+          }
+        }
+      }
+
+      // Build adjacency for boundary edges (count === 1)
+      var adj = Object.create(null);
+      var pos = Object.create(null); // vkey → [lat, lng]
+
+      for (var ekey in edgeCount) {
+        if (edgeCount[ekey] !== 1) continue;
+        var e = edgeEnds[ekey];
+        var ak = vkey(e[0][0], e[0][1]), bk = vkey(e[1][0], e[1][1]);
+        pos[ak] = e[0]; pos[bk] = e[1];
+        if (!adj[ak]) adj[ak] = [];
+        if (!adj[bk]) adj[bk] = [];
+        adj[ak].push(bk);
+        adj[bk].push(ak);
+      }
+
+      var vkeys = Object.keys(adj);
+      if (vkeys.length === 0) return [];
+
+      // Start from the southernmost (then westernmost) vertex
+      var startKey = vkeys[0];
+      for (var i = 1; i < vkeys.length; i++) {
+        var p = pos[vkeys[i]], sp = pos[startKey];
+        if (p[0] < sp[0] || (p[0] === sp[0] && p[1] < sp[1])) startKey = vkeys[i];
+      }
+
+      // Copy adjacency so we can mutate it while walking
+      var adjCopy = Object.create(null);
+      for (var k in adj) adjCopy[k] = adj[k].slice();
+
+      var ring = [pos[startKey]];
+      var prev = null, curr = startKey;
+
+      for (var step = 0; step < vkeys.length + 4; step++) {
+        var neighbors = adjCopy[curr];
+        if (!neighbors || neighbors.length === 0) break;
+
+        var next;
+        if (neighbors.length === 1) {
+          next = neighbors[0];
+        } else {
+          // At a multi-way junction pick the smallest turning angle
+          var cp = pos[curr], pp = prev ? pos[prev] : null;
+          var bestKey = null, bestAng = Math.PI * 3;
+          for (var ni = 0; ni < neighbors.length; ni++) {
+            var nk = neighbors[ni];
+            if (pp) {
+              var v1x = cp[0]-pp[0], v1y = cp[1]-pp[1];
+              var np = pos[nk];
+              var v2x = np[0]-cp[0], v2y = np[1]-cp[1];
+              var a1 = Math.atan2(v1y, v1x), a2 = Math.atan2(v2y, v2x);
+              var d = (a2-a1+Math.PI) % (2*Math.PI) - Math.PI;
+              if (Math.abs(d) < bestAng) { bestAng = Math.abs(d); bestKey = nk; }
+            } else {
+              bestKey = nk; break;
+            }
+          }
+          next = bestKey || neighbors[0];
+        }
+
+        adjCopy[curr] = adjCopy[curr].filter(function(k) { return k !== next; });
+        if (adjCopy[next]) adjCopy[next] = adjCopy[next].filter(function(k) { return k !== curr; });
+
+        if (next === startKey) break;
+        ring.push(pos[next]);
+        prev = curr; curr = next;
+      }
+
+      return ring;
     }
 
     // ----------------------------------------------------------------
@@ -383,14 +595,6 @@
       return [lat2*toDeg, lng2*toDeg];
     }
 
-    function sourceExtensionDeg(bearingDeg) {
-      var b=((bearingDeg%360)+360)%360;
-      if(b>=55&&b<120) return 25;
-      if(b>=120&&b<165) return 22;
-      if(b>=165&&b<195) return 20;
-      return 10;
-    }
-
     function eastwardVector(theta) {
       var dLat=Math.cos(theta), dLng=Math.sin(theta);
       if(dLng<0){dLat=-dLat;dLng=-dLng;}
@@ -400,13 +604,15 @@
     }
 
     function drawPredictionCorridor(fit) {
-      var east=eastwardVector(fit.theta);
-      var bearing=east.bearing, extDeg=sourceExtensionDeg(bearing), numSeg=24;
-      var lineCoords=[];
-      for(var i=0;i<=numSeg;i++) lineCoords.push(gcDest(fit.cx,fit.cy,bearing,(i/numSeg)*extDeg));
-      addLayer(L.polyline(lineCoords,{color:'#ff4444',weight:2.5,opacity:0.8,dashArray:'10,8',interactive:false}));
-      // Arrow
-      var tip=lineCoords[lineCoords.length-1], base=lineCoords[lineCoords.length-2];
+      var east = eastwardVector(fit.theta);
+      var bearing = east.bearing, numSeg = 24;
+      var lineCoords = [];
+      for (var i = 0; i <= numSeg; i++) {
+        lineCoords.push(gcDest(fit.cx, fit.cy, bearing, (i/numSeg) * CORRIDOR_DIST_DEG));
+      }
+      addLayer(L.polyline(lineCoords, {color:'#ff4444',weight:2.5,opacity:0.8,dashArray:'10,8',interactive:false}));
+      // Arrow tip
+      var tip = lineCoords[lineCoords.length-1], base = lineCoords[lineCoords.length-2];
       var vx=tip[0]-base[0], vy=tip[1]-base[1], vlen=Math.sqrt(vx*vx+vy*vy)||1;
       vx/=vlen; vy/=vlen;
       var as=0.12, px=-vy, py=vx;
@@ -414,64 +620,75 @@
         [tip[0]+px*as*0.5-vx*as, tip[1]+py*as*0.5-vy*as],
         tip,
         [tip[0]-px*as*0.5-vx*as, tip[1]-py*as*0.5-vy*as]
-      ],{color:'#ff4444',weight:2.5,opacity:0.8,interactive:false}));
+      ], {color:'#ff4444',weight:2.5,opacity:0.8,interactive:false}));
       // Uncertainty band
-      if(fit.dTheta>0.005){
-        var bHi=eastwardVector(fit.theta+fit.dTheta).bearing, bLo=eastwardVector(fit.theta-fit.dTheta).bearing;
-        var hiC=[],loC=[];
-        for(var i=0;i<=numSeg;i++){var d=(i/numSeg)*extDeg;hiC.push(gcDest(fit.cx,fit.cy,bHi,d));loC.push(gcDest(fit.cx,fit.cy,bLo,d));}
-        addLayer(L.polygon(hiC.concat(loC.slice().reverse()),{color:'#ff4444',fillColor:'#ff4444',fillOpacity:0.12,opacity:0.25,weight:1,interactive:false}));
+      if (fit.dTheta > 0.005) {
+        var bHi = eastwardVector(fit.theta+fit.dTheta).bearing;
+        var bLo = eastwardVector(fit.theta-fit.dTheta).bearing;
+        var hiC = [], loC = [];
+        for (var i = 0; i <= numSeg; i++) {
+          var d = (i/numSeg) * CORRIDOR_DIST_DEG;
+          hiC.push(gcDest(fit.cx, fit.cy, bHi, d));
+          loC.push(gcDest(fit.cx, fit.cy, bLo, d));
+        }
+        addLayer(L.polygon(hiC.concat(loC.slice().reverse()),
+          {color:'#ff4444',fillColor:'#ff4444',fillOpacity:0.12,opacity:0.25,weight:1,interactive:false}));
       }
     }
 
     function clearPrediction() {
-      for(var i=0;i<predictionLayers.length;i++) map.removeLayer(predictionLayers[i]);
-      predictionLayers=[];
+      for (var i = 0; i < predictionLayers.length; i++) map.removeLayer(predictionLayers[i]);
+      predictionLayers = [];
       clearStatus();
     }
 
     // ----------------------------------------------------------------
-    // Prepare cluster data (hull, initial guess) — synchronous.
+    // Prepare cluster data (union boundary, initial guess) — synchronous.
     // Returns null if cluster doesn't meet minimum requirements.
     // ----------------------------------------------------------------
-    var VERTS_PER_POLY = 12;
     function prepareCluster(cluster, locationPolygons) {
-      var raw=[];
-      for(var i=0;i<cluster.length;i++){
-        var poly=locationPolygons[cluster[i][3]]; if(!poly) continue;
-        var outer=polygonOuterRing(poly);
-        var step=Math.max(1,Math.floor(outer.length/VERTS_PER_POLY));
-        for(var j=0;j<outer.length;j+=step) raw.push([outer[j].lat,outer[j].lng]);
+      // Attempt to build the union polygon boundary
+      var boundary = clusterUnionBoundary(cluster, locationPolygons);
+
+      // Fallback to convex hull of sampled polygon vertices if stitching fails
+      if (boundary.length < 6) {
+        var raw = [];
+        for (var i = 0; i < cluster.length; i++) {
+          var poly = locationPolygons[cluster[i][3]]; if (!poly) continue;
+          var outer = polygonOuterRing(poly);
+          for (var j = 0; j < outer.length; j++) raw.push([outer[j].lat, outer[j].lng]);
+        }
+        if (raw.length < 6) return null;
+        boundary = convexHull(raw);
       }
-      if(raw.length<6) return null;
-      var hull=convexHull(raw);
-      if(hull.length<4) return null;
-      var guess=ellipseInitialGuess(hull);
-      return {hull:hull, guess:guess};
+
+      if (boundary.length < 4) return null;
+      var guess = ellipseInitialGuess(boundary);
+      return {hull: boundary, guess: guess};
     }
 
     // ----------------------------------------------------------------
     // Full fit for one cluster, plus slope-uncertainty bootstrap.
     // ----------------------------------------------------------------
-    function computeFullFit(hull, border, warmStart) {
-      var fit=runFit(hull, border, warmStart);
-      var p=fit.params;
-      var a=p[2], b=p[3], aspect=a>b?a/b:b/a;
-      // Slope uncertainty via even/odd hull subsets
-      var evenV=[],oddV=[];
-      for(var i=0;i<hull.length;i++) (i%2===0?evenV:oddV).push(hull[i]);
-      var thetas=[p[4]];
-      if(evenV.length>=4&&oddV.length>=4){
-        thetas=[runFit(evenV,border,p).params[4], runFit(oddV,border,p).params[4]];
+    function computeFullFit(boundary, border, warmStart) {
+      var fit = runFit(boundary, border, warmStart);
+      var p = fit.params;
+      var a = p[2], b = p[3], aspect = a > b ? a/b : b/a;
+      // Slope uncertainty via even/odd boundary subsets
+      var evenV = [], oddV = [];
+      for (var i = 0; i < boundary.length; i++) (i%2 === 0 ? evenV : oddV).push(boundary[i]);
+      var thetas = [p[4]];
+      if (evenV.length >= 4 && oddV.length >= 4) {
+        thetas = [runFit(evenV, border, p).params[4], runFit(oddV, border, p).params[4]];
       }
-      function wrap(t){return((t+Math.PI/2)%Math.PI+Math.PI)%Math.PI-Math.PI/2;}
-      var t0=wrap(thetas[0]), t1=wrap(thetas[thetas.length-1]);
-      var dTheta=Math.abs(t0-t1); if(dTheta>Math.PI/2) dTheta=Math.PI-dTheta;
-      return {cx:p[0],cy:p[1],a:a,b:b,theta:p[4],aspect:aspect,dTheta:dTheta,loss:fit.loss};
+      function wrap(t) { return ((t+Math.PI/2)%Math.PI+Math.PI)%Math.PI-Math.PI/2; }
+      var t0 = wrap(thetas[0]), t1 = wrap(thetas[thetas.length-1]);
+      var dTheta = Math.abs(t0-t1); if (dTheta > Math.PI/2) dTheta = Math.PI - dTheta;
+      return {cx:p[0], cy:p[1], a:a, b:b, theta:p[4], aspect:aspect, dTheta:dTheta, loss:fit.loss};
     }
 
     function clusterSignature(cluster) {
-      return cluster.map(function(p){return p[3];}).sort().join('|');
+      return cluster.map(function(p) { return p[3]; }).sort().join('|');
     }
 
     // ----------------------------------------------------------------
@@ -482,109 +699,122 @@
       if (!enabled) return;
 
       Promise.all([ensureOrefPoints(), ensureIsraelBorder()]).then(function(res) {
-        var orefPts=res[0], border=res[1];
-        var locationStates=A.locationStates, locationHistory=A.locationHistory;
-        var locationPolygons=A.locationPolygons, extHistory=A.extendedHistory;
+        var orefPts = res[0], border = res[1];
+        var locationStates  = A.locationStates;
+        var locationHistory = A.locationHistory;
+        var locationPolygons = A.locationPolygons;
+        var extHistory = A.extendedHistory;
 
         // Collect red seed points
-        var locPoints=[];
-        for(var name in locationStates){
-          var entry=locationStates[name]; if(!entry||entry.state!=='red') continue;
-          var pt=orefPts[name];
-          if(!pt){var poly=locationPolygons[name];if(poly)pt=polygonCentroid(poly);}
-          if(pt) locPoints.push([pt[0],pt[1],1,name]);
+        var locPoints = [];
+        for (var name in locationStates) {
+          var entry = locationStates[name]; if (!entry || entry.state !== 'red') continue;
+          var pt = orefPts[name];
+          if (!pt) { var poly = locationPolygons[name]; if (poly) pt = polygonCentroid(poly); }
+          if (pt) locPoints.push([pt[0], pt[1], 1, name]);
         }
-        if(locPoints.length<MIN_CLUSTER_RED) return;
+        if (locPoints.length < MIN_CLUSTER_RED) return;
 
-        var clusters=clusterByAdjacency(locPoints,locationPolygons);
-        var now=Date.now(), liveSigs=Object.create(null);
+        var clusters = clusterByAdjacency(locPoints, locationPolygons, locationStates);
+        var now = Date.now(), liveSigs = Object.create(null);
 
-        // ---- Phase 1 (sync): for each eligible cluster, draw hull points +
+        // ---- Phase 1 (sync): for each eligible cluster, draw boundary points +
         //      initial-guess ellipse immediately so the user sees something
         //      right away while the optimizer runs.
-        var workItems=[];
-        var clusterLabel=0;
-        for(var ci=0;ci<clusters.length;ci++){
-          var cluster=clusters[ci]; if(cluster.length<MIN_CLUSTER_RED) continue;
-          // Iran/Yemen gate
-          var earliest=Infinity;
-          for(var k=0;k<cluster.length;k++){var ns=locationStates[cluster[k][3]];if(ns&&ns.since&&ns.since<earliest)earliest=ns.since;}
-          if(!isFinite(earliest)) continue;
-          if(!hasPrecedingYellow(earliest,locationHistory,extHistory)) continue;
-          var sig=clusterSignature(cluster);
-          liveSigs[sig]=true;
-          var prep=prepareCluster(cluster,locationPolygons);
-          if(!prep) continue;
-          clusterLabel++;
-          var label=clusterLabel;
-          // Draw hull points (blue circles)
-          for(var hi=0;hi<prep.hull.length;hi++){
-            addLayer(L.circleMarker(prep.hull[hi],{radius:4,color:'#4488ff',fillColor:'#4488ff',fillOpacity:0.7,weight:1,interactive:false}));
+        var workItems = [];
+        var clusterLabel = 0;
+        for (var ci = 0; ci < clusters.length; ci++) {
+          var cluster = clusters[ci];
+          if (cluster.length < MIN_CLUSTER_RED) continue;
+
+          // Find the earliest red alert timestamp in this cluster
+          var earliest = Infinity;
+          for (var k = 0; k < cluster.length; k++) {
+            var ns = locationStates[cluster[k][3]];
+            if (ns && ns.since && ns.since < earliest) earliest = ns.since;
           }
-          // Draw initial-guess ellipse (dashed orange)
-          drawEllipseLayer(prep.guess, 60, {color:'#ff9900',weight:1.5,opacity:0.8,dashArray:'5,4',interactive:false});
-          setStatus(label,'C'+label+': ⟳ fitting…');
-          // Queue for async optimization
-          workItems.push({label:label, sig:sig, prep:prep, cluster:cluster, earliest:earliest});
+          if (!isFinite(earliest)) continue;
+
+          // Iran/Yemen gate: spatially scoped to locations adjacent to this cluster
+          var adjNames = clusterAdjacentNames(cluster, locationPolygons);
+          if (!hasPrecedingYellow(earliest, locationHistory, extHistory, adjNames)) continue;
+
+          var sig = clusterSignature(cluster);
+          liveSigs[sig] = true;
+          var prep = prepareCluster(cluster, locationPolygons);
+          if (!prep) continue;
+          clusterLabel++;
+          var label = clusterLabel;
+
+          // Draw union boundary vertices (green circles)
+          for (var hi = 0; hi < prep.hull.length; hi++) {
+            addLayer(L.circleMarker(prep.hull[hi], {
+              radius:4, color:'#22cc44', fillColor:'#22cc44',
+              fillOpacity:0.7, weight:1, interactive:false
+            }));
+          }
+          // Draw initial-guess ellipse (dashed green)
+          drawEllipseLayer(prep.guess, 60,
+            {color:'#22cc44', weight:1.5, opacity:0.8, dashArray:'5,4', interactive:false});
+          setStatus(label, 'C'+label+': ⟳ fitting…');
+          workItems.push({label:label, sig:sig, prep:prep, cluster:cluster});
         }
 
-        if(workItems.length===0) return;
+        if (workItems.length === 0) return;
 
-        // ---- Phase 2 (async, sequential): run full fit per cluster,
-        //      replacing the initial-guess ellipse with final results.
+        // ---- Phase 2 (async, sequential): run full fit per cluster.
         //      setTimeout(0) between clusters yields to the browser so
         //      UI repaints between fits.
-        var cached={};
-        for(var i=0;i<workItems.length;i++){
-          var w=workItems[i], c=fitCache[w.sig];
-          if(c&&(now-c.ts)<CACHE_MAX_AGE_MS) cached[w.label]=c.fit;
-        }
-
-        function processNext(i){
-          if(i>=workItems.length){
+        function processNext(i) {
+          if (i >= workItems.length) {
             // Clean stale cache
-            for(var k in fitCache){if(!liveSigs[k]||(now-fitCache[k].ts)>=CACHE_MAX_AGE_MS)delete fitCache[k];}
+            for (var k in fitCache) {
+              if (!liveSigs[k] || (now - fitCache[k].ts) >= CACHE_MAX_AGE_MS) delete fitCache[k];
+            }
             return;
           }
-          var w=workItems[i];
-          // Use cached result if available
-          if(cached[w.label]){
-            var fit=cached[w.label];
-            setStatus(w.label,'C'+w.label+': ✓ cached | aspect='+fit.aspect.toFixed(2)+' | θ='+Math.round(eastwardVector(fit.theta).bearing)+'°');
-            if(fit.aspect>=ASPECT_RATIO_MIN) drawFinalResults(fit);
-            setTimeout(function(next){return function(){processNext(next);};}(i+1), 0);
+          var w = workItems[i];
+          var cached = fitCache[w.sig];
+          if (cached && (now - cached.ts) < CACHE_MAX_AGE_MS) {
+            // Reuse cached result, show original fit time with a "(cached)" note
+            var fit = cached.fit;
+            var dtStr = cached.dt !== undefined ? cached.dt + 'ms (cached)' : '(cached)';
+            var bearingDeg = Math.round(eastwardVector(fit.theta).bearing);
+            var statusStr = 'C'+w.label+': ✓ '+dtStr+' | aspect='+fit.aspect.toFixed(2)+' | θ='+bearingDeg+'°';
+            if (fit.aspect < ASPECT_RATIO_MIN) statusStr += ' (too round, skipped)';
+            setStatus(w.label, statusStr);
+            if (fit.aspect >= ASPECT_RATIO_MIN) drawFinalResults(fit);
+            setTimeout(function(next) { return function() { processNext(next); }; }(i+1), 0);
             return;
           }
-          var t0=performance.now();
-          // Run fit synchronously (blocks for ~300–800 ms per cluster)
-          var fit=computeFullFit(w.prep.hull, border, w.prep.guess);
-          var dt=Math.round(performance.now()-t0);
-          fitCache[w.sig]={fit:fit, ts:now};
-          var bearingDeg=Math.round(eastwardVector(fit.theta).bearing);
-          var statusStr='C'+w.label+': ✓ '+dt+'ms | aspect='+fit.aspect.toFixed(2)+' | θ='+bearingDeg+'°';
-          if(fit.aspect<ASPECT_RATIO_MIN) statusStr+=' (too round, skipped)';
+          var t0 = performance.now();
+          var fit = computeFullFit(w.prep.hull, border, w.prep.guess);
+          var dt = Math.round(performance.now() - t0);
+          fitCache[w.sig] = {fit:fit, ts:now, dt:dt};
+          var bearingDeg = Math.round(eastwardVector(fit.theta).bearing);
+          var statusStr = 'C'+w.label+': ✓ '+dt+'ms | aspect='+fit.aspect.toFixed(2)+' | θ='+bearingDeg+'°';
+          if (fit.aspect < ASPECT_RATIO_MIN) statusStr += ' (too round, skipped)';
           setStatus(w.label, statusStr);
-          if(fit.aspect>=ASPECT_RATIO_MIN) drawFinalResults(fit);
-          setTimeout(function(next){return function(){processNext(next);};}(i+1), 0);
+          if (fit.aspect >= ASPECT_RATIO_MIN) drawFinalResults(fit);
+          setTimeout(function(next) { return function() { processNext(next); }; }(i+1), 0);
         }
-        // Yield once before starting the first fit so all initial-guess ellipses
-        // have a chance to render.
-        setTimeout(function(){processNext(0);}, 0);
+        // Yield once before starting so initial-guess ellipses can render.
+        setTimeout(function() { processNext(0); }, 0);
 
-        // Clean cache entries for clusters that are no longer present
-        for(var k in fitCache){if(!liveSigs[k]||(now-fitCache[k].ts)>=CACHE_MAX_AGE_MS)delete fitCache[k];}
+        // Clean cache entries for clusters no longer present
+        for (var k in fitCache) {
+          if (!liveSigs[k] || (now - fitCache[k].ts) >= CACHE_MAX_AGE_MS) delete fitCache[k];
+        }
 
-      }).catch(function(err){
+      }).catch(function(err) {
         console.warn('prediction update failed:', err);
       });
     }
 
-    // Draw the best-fit ellipse (green) and the prediction corridor (red arrow).
+    // Draw the best-fit ellipse (solid green) and prediction corridor (red arrow).
     function drawFinalResults(fit) {
-      // Final ellipse: solid green
       drawEllipseLayer([fit.cx, fit.cy, fit.a, fit.b, fit.theta], 80,
         {color:'#22cc44', weight:2, opacity:0.9, interactive:false});
-      // Prediction corridor (red dashed arrow)
       drawPredictionCorridor(fit);
     }
 
@@ -592,33 +822,33 @@
     // Scheduling and lifecycle
     // ----------------------------------------------------------------
     function schedulePredictionUpdate() {
-      if(predictionUpdateScheduled) return;
-      predictionUpdateScheduled=true;
-      requestAnimationFrame(function(){predictionUpdateScheduled=false;updatePredictionLines();});
+      if (predictionUpdateScheduled) return;
+      predictionUpdateScheduled = true;
+      requestAnimationFrame(function() { predictionUpdateScheduled = false; updatePredictionLines(); });
     }
 
-    function sync() { if(enabled) schedulePredictionUpdate(); }
+    function sync() { if (enabled) schedulePredictionUpdate(); }
 
     function setEnabled(val, opts) {
-      enabled=!!val;
-      localStorage.setItem('oref-predict',enabled);
-      if(opts&&opts.showToast) showToast(enabled?'חיזוי כיוון שיגור מופעל':'חיזוי כיוון שיגור כובה');
-      if(enabled) sync(); else clearPrediction();
+      enabled = !!val;
+      localStorage.setItem('oref-predict', enabled);
+      if (opts && opts.showToast) showToast(enabled ? 'חיזוי כיוון שיגור מופעל' : 'חיזוי כיוון שיגור כובה');
+      if (enabled) sync(); else clearPrediction();
     }
 
-    var menuItem=document.getElementById('menu-predict');
-    if(menuItem){
-      if(enabled) menuItem.classList.add('active');
-      menuItem.querySelector('.menu-item-row').addEventListener('click',function(){
-        var next=!enabled; setEnabled(next,{showToast:true}); menuItem.classList.toggle('active',next);
+    var menuItem = document.getElementById('menu-predict');
+    if (menuItem) {
+      if (enabled) menuItem.classList.add('active');
+      menuItem.querySelector('.menu-item-row').addEventListener('click', function() {
+        var next = !enabled; setEnabled(next, {showToast:true}); menuItem.classList.toggle('active', next);
       });
     }
 
-    document.addEventListener('app:stateChanged', function(){sync();});
-    document.addEventListener('app:escape', function(){clearPrediction();});
-    if(enabled) sync();
+    document.addEventListener('app:stateChanged', function() { sync(); });
+    document.addEventListener('app:escape', function() { clearPrediction(); });
+    if (enabled) sync();
   }
 
-  if(window.AppState) initPrediction();
+  if (window.AppState) initPrediction();
   else document.addEventListener('app:ready', initPrediction);
 })();
