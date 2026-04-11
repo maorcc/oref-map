@@ -139,36 +139,140 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 
 
 
-/* Location panel (replaces Leaflet popups) */
-#location-panel {
+/* --- Unified panel (sidebar + timeline) --- */
+#unified-panel {
+  display: none;
   position: fixed;
   z-index: 1010;
-  background: #fff;
+  background: rgba(255,255,255,0.97);
   box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
-  transition: transform 0.28s ease;
   direction: rtl;
+  flex-direction: column;
+  transition: transform 0.28s ease;
+}
+/* Slim: compact box at bottom-right (mobile default) */
+#unified-panel.slim {
+  display: flex;
   bottom: 0; left: 0; right: 0;
-  max-height: 60vh;
   border-radius: 12px 12px 0 0;
-  padding: 16px 16px 24px;
-  transform: translateY(110%);
+}
+#unified-panel.slim #up-location { display: none; }
+#unified-panel.slim #up-handle { display: none; }
+
+/* Full: bottom sheet (mobile default) */
+#unified-panel.full {
+  display: flex;
+  bottom: 0; left: 0; right: 0;
+  max-height: 55vh;
+  border-radius: 12px 12px 0 0;
+}
+#unified-panel.full #up-event-list {
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
-#location-panel.open { transform: translateY(0); }
-@media (min-width: 600px) {
-  #location-panel {
-    top: 0; right: 0; bottom: 0; left: auto; width: 280px;
-    border-radius: 0; padding: 20px 16px;
-    transform: translateX(110%); max-height: none;
-  }
-  #location-panel.open { transform: translateX(0); }
+
+/* Handle bar (mobile close target) */
+#up-handle {
+  display: none;
+  width: 36px; height: 4px;
+  background: #ccc; border-radius: 2px;
+  margin: 8px auto 4px;
+  cursor: pointer;
+  flex-shrink: 0;
 }
-#location-panel-close {
-  position: absolute; top: 10px; left: 12px;
+#unified-panel.full #up-handle { display: block; }
+
+/* Location section (header + event list) — must shrink to fit within panel */
+#up-location { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+#up-location-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 4px;
+  direction: rtl;
+  flex-shrink: 0;
+}
+#up-location-name { font-size: 15px; flex: 1; }
+#up-fav-star {
+  cursor: pointer; font-size: 18px; color: #ccc;
+  vertical-align: middle; user-select: none;
+}
+#up-location-close {
   background: none; border: none; cursor: pointer;
   font-size: 20px; color: #888; line-height: 1; padding: 4px;
+  margin-inline-start: auto;
 }
-#location-panel-close:hover { color: #333; }
+#up-location-close:hover { color: #333; }
+
+/* Event list rows */
+#up-event-list { direction: rtl; }
+.up-event-row {
+  padding: 3px 12px;
+  display: flex; align-items: baseline; gap: 8px;
+  cursor: pointer; direction: rtl;
+}
+.up-event-row:hover { background: #f5f5f5; }
+.up-event-row.up-current { background: rgba(59,130,246,0.1); border-right: 3px solid #3b82f6; }
+.up-event-time { font-size: 12px; font-weight: bold; white-space: nowrap; }
+.up-event-label { font-size: 13px; color: #444; flex: 1; text-align: right; }
+.up-event-sep { border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 3px; }
+#up-event-list .up-empty { padding: 12px; color: #888; font-size: 13px; text-align: center; }
+
+/* Timeline section inside unified panel */
+#up-timeline {
+  flex-shrink: 0;
+  direction: ltr;
+  padding: 8px 12px 4px;
+  border-top: 1px solid #eee;
+}
+
+/* Close row at bottom of panel */
+#up-close-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 4px;
+  direction: rtl;
+  cursor: pointer;
+}
+#up-close-row:hover .btn-text { color: #111; }
+#up-close-row .tl-close { margin-right: auto; color: #888; }
+#up-close-row .tl-close:hover { color: #333; }
+
+/* Hide trigger button when panel open */
+body.panel-open #timeline-btn { display: none !important; }
+body.panel-open #legend { display: none; }
+/* Selected-location label on map */
+.selected-label .maplibregl-popup-content {
+  background: rgba(59,130,246,0.9); color: #fff;
+  padding: 3px 8px; border-radius: 4px;
+  font-size: 13px; font-weight: bold; direction: rtl;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3); pointer-events: none;
+}
+.selected-label .maplibregl-popup-tip { border-top-color: rgba(59,130,246,0.9); }
+
+/* Idle: hide slim panel but never hide full */
+body.idle #unified-panel.slim { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+
+/* Desktop overrides */
+@media (min-width: 600px) {
+  #unified-panel.slim, #unified-panel.full {
+    right: 0; bottom: 0;
+    width: 320px;
+    box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+    transition: height 0.25s ease, border-radius 0.25s ease;
+  }
+  #unified-panel.slim {
+    border-radius: 12px 0 0 0;
+  }
+  #unified-panel.full {
+    height: 100vh; height: 100dvh;
+    max-height: none; border-radius: 0;
+  }
+  #unified-panel.full #up-handle { display: none; }
+  #unified-panel.full #up-event-list { max-height: none; }
+}
 
 .modal-backdrop {
   display: none;
@@ -395,7 +499,7 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
 @media (hover: hover) {
-  #timeline-btn:not(.open):hover {
+  #timeline-btn:hover {
     background: rgba(253, 230, 138, 0.92);
     border-color: #f59e0b;
   }
@@ -404,19 +508,8 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
 #timeline-btn {
   display: none;
   direction: ltr;
-  flex-direction: column-reverse;
 }
 #timeline-btn.has-data { display: flex; background: rgba(254, 243, 199, 0.92); border-color: #f59e0b; }
-#timeline-btn.open {
-  width: 620px;
-  max-width: min(calc(100vw - 48px), 620px);
-  max-height: 250px;
-  cursor: default;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.97);
-  pointer-events: none;
-}
-#timeline-btn.open * { pointer-events: auto; }
 #timeline-btn-row {
   display: flex;
   align-items: center;
@@ -426,33 +519,14 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   direction: rtl;
   cursor: pointer;
 }
-#timeline-btn.open #timeline-btn-row {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  height: auto;
-  padding: 4px 0;
-  border: none;
-  z-index: 1;
-}
 .btn-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
 .btn-text { font-size: 13px; font-weight: 500; white-space: nowrap; }
-.tl-close { display: none; font-size: 16px; cursor: pointer; color: #888; margin-right: auto; }
+.tl-close { font-size: 16px; cursor: pointer; color: #888; margin-right: auto; }
 .tl-close:hover { color: #333; }
-#timeline-btn.open .tl-close { display: inline; }
-
-#timeline-controls {
-  display: none;
-  padding: 10px 12px;
-  gap: 4px;
-  flex-direction: column;
-}
-#timeline-btn.open #timeline-controls { display: flex; }
 #timeline-transport {
   display: flex;
   align-items: center;
   gap: 6px;
-  order: 2;
 }
 #timeline-transport button {
   background: none;
@@ -472,7 +546,6 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
 #timeline-slider-wrap {
   position: relative;
   width: 100%;
-  order: 0;
   padding-bottom: 6px;
 }
 #timeline-ticks {
@@ -532,7 +605,6 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   align-items: center;
   justify-content: space-between;
   direction: ltr;
-  order: 1;
 }
 #timeline-date-nav {
   display: flex;
@@ -607,9 +679,6 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   }
   #menu-btn { width: 36px; height: 36px; }
   #menu-panel { top: 56px; }
-  #timeline-btn.open {
-    max-width: calc(100vw - 24px);
-  }
   #timeline-btn-row {
     height: 36px;
     padding: 0 10px;
@@ -645,10 +714,6 @@ body.idle #right-panel {
 </div>
 
 <div id="map"></div>
-<div id="location-panel">
-  <button id="location-panel-close" aria-label="סגור">&times;</button>
-  <div id="location-panel-content"></div>
-</div>
 
 <button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -791,26 +856,40 @@ body.idle #right-panel {
   </div>
   <div id="timeline-btn" title="ציר זמן">
     <div id="timeline-btn-row">
-      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
+      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span>
     </div>
-    <div id="timeline-controls">
-      <div id="timeline-slider-wrap">
-        <div id="timeline-ticks"></div>
-        <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+  </div>
+</div>
+<div id="unified-panel">
+  <div id="up-handle"></div>
+  <div id="up-location">
+    <div id="up-location-header">
+      <button id="up-location-close" aria-label="סגור">&times;</button>
+      <b id="up-location-name"></b>
+      <span id="up-fav-star"></span>
+    </div>
+    <div id="up-event-list"></div>
+  </div>
+  <div id="up-timeline">
+    <div id="timeline-slider-wrap">
+      <div id="timeline-ticks"></div>
+      <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+    </div>
+    <div id="timeline-date-row">
+      <span id="timeline-label"></span>
+      <div id="timeline-date-nav">
+        <button id="tl-date-prev" title="יום קודם">&#9666;</button>
+        <span id="tl-date-label"></span>
+        <button id="tl-date-next" title="יום הבא">&#9656;</button>
       </div>
-      <div id="timeline-date-row">
-        <span id="timeline-label"></span>
-        <div id="timeline-date-nav">
-          <button id="tl-date-prev" title="יום קודם">&#9666;</button>
-          <span id="tl-date-label"></span>
-          <button id="tl-date-next" title="יום הבא">&#9656;</button>
-        </div>
-      </div>
-      <div id="timeline-transport">
-        <button id="tl-prev" title="אירוע קודם">⏮</button>
-        <button id="tl-play" title="נגן/עצור">▶</button>
-        <button id="tl-next" title="אירוע הבא">⏭</button>
-      </div>
+    </div>
+    <div id="timeline-transport">
+      <button id="tl-prev" title="אירוע קודם">⏮</button>
+      <button id="tl-play" title="נגן/עצור">▶</button>
+      <button id="tl-next" title="אירוע הבא">⏭</button>
+    </div>
+    <div id="up-close-row">
+      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
     </div>
   </div>
 </div>
@@ -1205,14 +1284,17 @@ body.idle #right-panel {
     });
 
     map.on('click', 'alerts-hit', function(e) {
-      if (document.body.classList.contains('has-overlay')) return;
-      e.originalEvent.stopPropagation(); // prevent document handler from closing panel immediately
+      if (menuOpen) return;
+      e.originalEvent.stopPropagation();
       var name = e.features[0].properties.name;
-      openLocationPanel(name);
+      if (selectedLocation === name) {
+        deselectLocation();
+      } else {
+        openLocationPanel(name);
+      }
     });
     map.on('mouseenter', 'alerts-hit', function() {
-      if (!document.body.classList.contains('has-overlay'))
-        map.getCanvas().style.cursor = 'pointer';
+      if (!menuOpen) map.getCanvas().style.cursor = 'pointer';
     });
     map.on('mouseleave', 'alerts-hit', function() { map.getCanvas().style.cursor = ''; });
 
@@ -1811,6 +1893,12 @@ body.idle #right-panel {
   var historyPollId = null;        // setInterval ID for fetchHistory
   var DAY_HISTORY_MIN_DATE = '2026-02-28';
 
+  // --- Unified panel state ---
+  var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
+  var selectedLocation = null;      // name of location in full mode
+  var _scrollSyncLock = false;      // prevent scroll↔slider infinite loop
+  var _currentEventIdx = -1;        // index of current-time event in list
+
   function todayDateStr() {
     return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' }).format(new Date());
   }
@@ -1897,7 +1985,6 @@ body.idle #right-panel {
       popPanelHistory();
     } else {
       closeTimelinePanel();
-      closeLocationPanel();
       openMenu();
     }
   }
@@ -2198,19 +2285,15 @@ body.idle #right-panel {
     if (entry) {
       resetFeatureStyle(name);
     }
-    if (openPanelName === name) closeLocationPanel();
+    if (selectedLocation === name) closeLocationPanel();
     delete locationStates[name];
   }
 
   // --- Alert history per location ---
-  var openPanelName = null;
 
   function updateOverlay() {
-    var tlBtn = document.getElementById('timeline-btn');
-    var panelOpen = menuOpen ||
-      (tlBtn && tlBtn.classList.contains('open'));
-    // Location panel is non-modal: map stays interactive while it's open
-    document.body.classList.toggle('has-overlay', panelOpen);
+    // Only menu blocks map interaction; unified panel keeps map interactive
+    document.body.classList.toggle('has-overlay', menuOpen);
   }
 
   function recordHistory(name, title, alertDate, state) {
@@ -2228,9 +2311,13 @@ body.idle #right-panel {
       }
     }
     arr.push({ title: title, alertDate: alertDate, state: state });
-    // Refresh panel if open for this location
-    if (openPanelName === name) {
-      document.getElementById('location-panel-content').innerHTML = buildPanelHtml(name);
+    // Refresh unified panel event list if open for this location
+    if (selectedLocation === name) {
+      _scrollSyncLock = true;
+      buildLocationEventList(name);
+      renderEventList();
+      if (!isLiveMode && currentViewTime) syncScrollToTime(currentViewTime);
+      requestAnimationFrame(function() { _scrollSyncLock = false; });
     }
   }
 
@@ -2264,34 +2351,19 @@ body.idle #right-panel {
     return '\u26A0 ' + norm;
   }
 
-  // --- Location panel (replaces popups) ---
-  function buildPanelHtml(name) {
-    var entries = (locationHistory[name] || []).slice()
-      .sort(function(a, b) { return (b.alertDate || '').replace('T', ' ').localeCompare((a.alertDate || '').replace('T', ' ')); });
-    var rows = entries.map(function(e, i) {
-      var color = COLORS[e.state] || '#888';
-      var label = displayLabel(e.title);
-      var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
-      var nextEntry = entries[i + 1];
-      var border = (nextEntry && nextEntry.state === 'green') ? 'border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:4px;' : '';
-      return '<div style="padding:1px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
-        (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
-        '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
-      '</div>';
-    }).join('');
-    var isFav = !!favorites[name];
-    var starColor = isFav ? '#f5a623' : '#ccc';
-    var starChar = isFav ? '\u2605' : '\u2606';
-    var starBtn = '<span class="fav-star" onclick="window._toggleFav(event)" ' +
-      'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
-      'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
-    return '<div style="direction:rtl;text-align:right"><b>' + name + '</b>' + starBtn +
-      (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
-      '</div>';
-  }
-
+  // --- Polygon highlight for selected location ---
   var _panelHighlightName = null;
   var _panelHighlightSaved = null;
+  var _panelLabelPopup = null;
+
+  function _polygonCentroid(name) {
+    var feature = featureMap[name];
+    if (!feature) return null;
+    var coords = feature.geometry.coordinates[0];
+    var sumLng = 0, sumLat = 0;
+    for (var i = 0; i < coords.length; i++) { sumLng += coords[i][0]; sumLat += coords[i][1]; }
+    return [sumLng / coords.length, sumLat / coords.length];
+  }
 
   function _applyPanelHighlight(name) {
     var id = nameToId[name];
@@ -2301,13 +2373,22 @@ body.idle #right-panel {
     map.setFeatureState({ source: 'alerts-source', id: id }, {
       fillColor: _panelHighlightSaved.fillColor || '#888888',
       fillOpacity: Math.max((_panelHighlightSaved.fillOpacity || 0.01), 0.35),
-      lineColor: _panelHighlightSaved.lineColor || '#888888',
-      lineOpacity: Math.max((_panelHighlightSaved.lineOpacity || 0), 0.85),
-      lineWidth: 2
+      lineColor: '#3b82f6',
+      lineOpacity: 1,
+      lineWidth: 3
     });
+    // Show location name label on the map
+    var center = _polygonCentroid(name);
+    if (center) {
+      _panelLabelPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'selected-label', offset: [0, -4] })
+        .setLngLat(center)
+        .setHTML('<b>' + name + '</b>')
+        .addTo(map);
+    }
   }
 
   function _removePanelHighlight() {
+    if (_panelLabelPopup) { _panelLabelPopup.remove(); _panelLabelPopup = null; }
     if (!_panelHighlightName) return;
     var id = nameToId[_panelHighlightName];
     if (id !== undefined) {
@@ -2321,29 +2402,209 @@ body.idle #right-panel {
     _panelHighlightSaved = null;
   }
 
-  function openLocationPanel(name) {
+  // --- Unified panel: event list ---
+  var _locationEventList = []; // merged events for selected location
+
+  function buildLocationEventList(name) {
+    var extEntries = [];
+    var latestExtTs = 0;
+    var bounds = viewingDayBounds();
+    for (var i = 0; i < extendedHistory.length; i++) {
+      var e = extendedHistory[i];
+      if (e.location === name && e.alertDate >= bounds.start && e.alertDate <= bounds.end) {
+        extEntries.push({ title: e.title, alertDate: e.alertDate, state: e.state });
+        if (e.alertDate > latestExtTs) latestExtTs = e.alertDate;
+      }
+    }
+    // Supplement with recent locationHistory entries (fills R2 lag)
+    var locEntries = locationHistory[name] || [];
+    for (var j = 0; j < locEntries.length; j++) {
+      var le = locEntries[j];
+      var leTs = parseAlertDate(le.alertDate);
+      if (leTs && leTs > latestExtTs) {
+        extEntries.push({ title: le.title, alertDate: leTs, state: le.state });
+      }
+    }
+    extEntries.sort(function(a, b) { return a.alertDate - b.alertDate; });
+    // Dedup same title within 1 minute
+    _locationEventList = [];
+    for (var k = 0; k < extEntries.length; k++) {
+      var entry = extEntries[k];
+      var dominated = false;
+      for (var m = _locationEventList.length - 1; m >= 0; m--) {
+        if (_locationEventList[m].title === entry.title &&
+            Math.abs(_locationEventList[m].alertDate - entry.alertDate) <= 60000) {
+          dominated = true; break;
+        }
+      }
+      if (!dominated) _locationEventList.push(entry);
+    }
+  }
+
+  function renderEventList() {
+    var listEl = document.getElementById('up-event-list');
+    if (_locationEventList.length === 0) {
+      listEl.innerHTML = '<div class="up-empty">\u05D0\u05D9\u05DF \u05D0\u05D9\u05E8\u05D5\u05E2\u05D9\u05DD</div>';
+      return;
+    }
+    var html = '';
+    for (var i = 0; i < _locationEventList.length; i++) {
+      var e = _locationEventList[i];
+      var color = COLORS[e.state] || '#888';
+      var label = displayLabel(e.title);
+      var d = new Date(e.alertDate);
+      var timeStr = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      // Group separator: if next entry is non-green and this entry is green
+      var nextE = _locationEventList[i + 1];
+      var sepClass = (nextE && e.state === 'green' && nextE.state !== 'green') ? ' up-event-sep' : '';
+      html += '<div class="up-event-row' + sepClass + '" data-ts="' + e.alertDate + '" data-idx="' + i + '">' +
+        '<span class="up-event-time" style="color:' + color + '">' + timeStr + '</span>' +
+        '<span class="up-event-label">' + label + '</span>' +
+      '</div>';
+    }
+    listEl.innerHTML = html;
+  }
+
+  function updateFavStar(name) {
+    var isFav = !!favorites[name];
+    var starEl = document.getElementById('up-fav-star');
+    starEl.textContent = isFav ? '\u2605' : '\u2606';
+    starEl.style.color = isFav ? '#f5a623' : '#ccc';
+    starEl.title = isFav ? '\u05D4\u05E1\u05E8 \u05DE\u05DE\u05D5\u05E2\u05D3\u05E4\u05D9\u05DD' : '\u05D4\u05D5\u05E1\u05E3 \u05DC\u05DE\u05D5\u05E2\u05D3\u05E4\u05D9\u05DD';
+  }
+
+  function syncScrollToTime(time) {
+    if (!selectedLocation) return;
+    var wasLocked = _scrollSyncLock;
+    _scrollSyncLock = true;
+    var listEl = document.getElementById('up-event-list');
+    var rows = listEl.querySelectorAll('.up-event-row');
+    var targetIdx = -1;
+    for (var i = rows.length - 1; i >= 0; i--) {
+      var ts = Number(rows[i].getAttribute('data-ts'));
+      if (ts <= time) { targetIdx = i; break; }
+    }
+    // Update current marker
+    for (var j = 0; j < rows.length; j++) {
+      rows[j].classList.toggle('up-current', j === targetIdx);
+    }
+    _currentEventIdx = targetIdx;
+    // Scroll to ~75% from top
+    if (targetIdx >= 0 && rows[targetIdx]) {
+      var listHeight = listEl.clientHeight;
+      var targetOffset = rows[targetIdx].offsetTop;
+      var scrollTarget = targetOffset - listHeight * 0.75;
+      listEl.scrollTop = Math.max(0, scrollTarget);
+    }
+    // Only schedule unlock if we acquired the lock (caller may hold it)
+    if (!wasLocked) {
+      requestAnimationFrame(function() { _scrollSyncLock = false; });
+    }
+  }
+
+  // --- Unified panel: open/close ---
+  function openSlimPanel() {
+    if (menuOpen) closeMenu();
+    var panel = document.getElementById('unified-panel');
+    panel.classList.remove('full');
+    panel.classList.add('slim');
+    unifiedPanelState = 'slim';
+    document.body.classList.add('panel-open');
+    pushPanelHistory();
+  }
+
+  function openFullPanel(name) {
     _removePanelHighlight();
-    openPanelName = name;
-    document.getElementById('location-panel-content').innerHTML = buildPanelHtml(name);
-    document.getElementById('location-panel').classList.add('open');
+    if (unifiedPanelState === 'closed') {
+      openSlimPanel();
+    }
+    var panel = document.getElementById('unified-panel');
+    // Animate height on desktop (slim → full)
+    if (window.innerWidth >= 600 && unifiedPanelState === 'slim') {
+      panel.style.height = panel.offsetHeight + 'px';
+      panel.offsetHeight; // force reflow
+    }
+    panel.classList.remove('slim');
+    panel.classList.add('full');
+    if (window.innerWidth >= 600) {
+      panel.style.height = ''; // CSS .full sets height: 100vh, transition animates
+    }
+    unifiedPanelState = 'full';
+    selectedLocation = name;
+    // Populate header
+    document.getElementById('up-location-name').textContent = name;
+    updateFavStar(name);
+    // Build and render event list (lock scroll sync to prevent scroll events
+    // from renderEventList() triggering a seekTo that changes the viewed time)
+    _scrollSyncLock = true;
+    buildLocationEventList(name);
+    renderEventList();
     _applyPanelHighlight(name);
-    updateOverlay();
+    // If in history mode, sync scroll to current time
+    if (!isLiveMode && currentViewTime) {
+      syncScrollToTime(currentViewTime);
+    }
+    // Hold lock until after desktop height transition completes (~250ms CSS),
+    // then release on next rAF to cover any final scroll events
+    if (window.innerWidth >= 600) {
+      panel.addEventListener('transitionend', function handler(e) {
+        if (e.propertyName !== 'height') return;
+        panel.removeEventListener('transitionend', handler);
+        requestAnimationFrame(function() { _scrollSyncLock = false; });
+      });
+      // Fallback: release after 350ms if transitionend doesn't fire (e.g. no transition)
+      setTimeout(function() { _scrollSyncLock = false; }, 350);
+    } else {
+      requestAnimationFrame(function() { _scrollSyncLock = false; });
+    }
+  }
+
+  function deselectLocation() {
+    _removePanelHighlight();
+    selectedLocation = null;
+    _locationEventList = [];
+    _currentEventIdx = -1;
+    document.getElementById('up-event-list').innerHTML = '';
+    var panel = document.getElementById('unified-panel');
+    if (unifiedPanelState === 'full') {
+      // Suppress CSS transition so the swap is instant
+      panel.style.transition = 'none';
+      panel.classList.remove('full');
+      panel.classList.add('slim');
+      panel.offsetHeight; // force reflow with no transition
+      panel.style.transition = '';
+      unifiedPanelState = 'slim';
+    }
+  }
+
+  function closeUnifiedPanel() {
+    var panel = document.getElementById('unified-panel');
+    panel.classList.remove('slim', 'full');
+    unifiedPanelState = 'closed';
+    document.body.classList.remove('panel-open');
+    // Deselect location
+    _removePanelHighlight();
+    selectedLocation = null;
+    _locationEventList = [];
+    _currentEventIdx = -1;
+    document.getElementById('up-event-list').innerHTML = '';
+    // closeTimeline logic is called from within initTimeline
+  }
+
+  // Wrappers that existing code calls
+  function openLocationPanel(name) {
+    openFullPanel(name);
   }
 
   function closeLocationPanel() {
-    _removePanelHighlight();
-    openPanelName = null;
-    document.getElementById('location-panel').classList.remove('open');
-    updateOverlay();
+    if (selectedLocation) deselectLocation();
   }
 
-  document.getElementById('location-panel-close').addEventListener('click', closeLocationPanel);
 
-
-  // Expose for panel onclick — uses openPanelName so no name is embedded in HTML
+  // Expose for panel onclick — uses selectedLocation so no name is embedded in HTML
   window._toggleFav = function(e) {
     if (e) e.stopPropagation();
-    var name = openPanelName;
+    var name = selectedLocation;
     if (!name) return;
     var latlng = favorites[name];
     if (!latlng) {
@@ -2395,9 +2656,9 @@ body.idle #right-panel {
       addFavoriteMarker(name, latlng);
     }
     saveFavorites();
-    // Refresh panel if open
-    if (openPanelName === name) {
-      document.getElementById('location-panel-content').innerHTML = buildPanelHtml(name);
+    // Refresh fav star if panel open for this location
+    if (selectedLocation === name) {
+      updateFavStar(name);
     }
   }
 
@@ -2498,7 +2759,7 @@ body.idle #right-panel {
         updateShadowState(loc, state);
       }
     }
-    if (shouldAutoZoomToEvents() && isLiveMode && isNewAlert && !openPanelName) {
+    if (shouldAutoZoomToEvents() && isLiveMode && isNewAlert && !selectedLocation) {
       maybeZoomToEvent();
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
@@ -2919,7 +3180,6 @@ body.idle #right-panel {
 
   function reconstructStateAt(targetTime) {
     cancelPolygonHint();
-    closeLocationPanel();
     // Clear all polygons
     for (var name in locationStates) {
       resetFeatureStyle(name);
@@ -2959,6 +3219,15 @@ body.idle #right-panel {
         applyFeatureStyle(loc, s, 0.3);
       }
       locationStates[loc] = { state: s, since: sinceTime };
+    }
+    // Re-apply highlight for selected location.
+    // Don't call _removePanelHighlight here — reconstructStateAt already reset all
+    // feature styles above, so restoring the saved state would undo applyFeatureStyle.
+    // Just clear the saved state and re-read what applyFeatureStyle just set.
+    if (selectedLocation) {
+      _panelHighlightName = null;
+      _panelHighlightSaved = null;
+      _applyPanelHighlight(selectedLocation);
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
   }
@@ -3092,6 +3361,8 @@ body.idle #right-panel {
       extendedHistory = [];
       extendedRids = new Set();
       locationHistory = {};
+      _locationEventList = [];
+      if (selectedLocation) document.getElementById('up-event-list').innerHTML = '';
       lastHistoryDate = null;
       stopPlay();
       timelineDate = (newDate === todayDateStr()) ? null : newDate;
@@ -3124,6 +3395,12 @@ body.idle #right-panel {
           mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
+          if (selectedLocation) {
+            _scrollSyncLock = true;
+            buildLocationEventList(selectedLocation);
+            renderEventList();
+            requestAnimationFrame(function() { _scrollSyncLock = false; });
+          }
           if (onSwitched) onSwitched();
         });
       } else {
@@ -3136,6 +3413,12 @@ body.idle #right-panel {
           mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
+          if (selectedLocation) {
+            _scrollSyncLock = true;
+            buildLocationEventList(selectedLocation);
+            renderEventList();
+            requestAnimationFrame(function() { _scrollSyncLock = false; });
+          }
           if (onSwitched) onSwitched();
         });
       }
@@ -3147,13 +3430,11 @@ body.idle #right-panel {
     }
 
     // --- Open / Close ---
-    function isOpen() { return container.classList.contains('open'); }
+    function isOpen() { return unifiedPanelState !== 'closed'; }
 
     function openTimeline() {
-      if (menuOpen) { closeMenu(); }
-      closeLocationPanel();
-      container.classList.add('open');
-      pushPanelHistory();
+      // Delegated to openSlimPanel + timeline init logic
+      openSlimPanel();
       updateDateNav();
       if (!dayHistoryReady) {
         label.textContent = '\u05D8\u05D5\u05E2\u05DF...';
@@ -3162,6 +3443,13 @@ body.idle #right-panel {
           onDayHistoryReady = null;
           rebuildTimeline();
           prefetchPrevDay();
+          // If location selected, refresh event list
+          if (selectedLocation) {
+            _scrollSyncLock = true;
+            buildLocationEventList(selectedLocation);
+            renderEventList();
+            requestAnimationFrame(function() { _scrollSyncLock = false; });
+          }
         };
       } else {
         rebuildTimeline();
@@ -3173,12 +3461,11 @@ body.idle #right-panel {
           });
         }
       }
-      updateOverlay();
     }
 
     function closeTimeline() {
       if (!isOpen()) return;
-      container.classList.remove('open');
+      closeUnifiedPanel();
       stopPlay();
 
       // If viewing a past date, reset to today
@@ -3205,7 +3492,6 @@ body.idle #right-panel {
 
       // Restore live state before zoom decision so getActiveEventBounds reflects reality
       enterLiveMode();
-      updateOverlay();
 
       if (shouldAutoZoomToEvents() && getActiveEventBounds()) {
         maybeZoomToEvent();
@@ -3217,6 +3503,15 @@ body.idle #right-panel {
       }
     }
     closeTimelinePanel = closeTimeline;
+
+    // Listen for seekTo events from unified panel wiring
+    document.addEventListener('app:seekTo', function(e) {
+      var time = e.detail && e.detail.time;
+      if (time) {
+        stopPlay();
+        seekTo(time);
+      }
+    });
 
     // Called when dayHistoryReady becomes true (from fetchExtendedHistory callback in init)
     rebuildTimelineFn = function() {
@@ -3304,18 +3599,8 @@ body.idle #right-panel {
     });
 
     btnRow.addEventListener('click', function(e) {
-      if (isOpen()) {
-        closeTimeline();
-        popPanelHistory();
-      } else {
+      if (!isOpen()) {
         openTimeline();
-      }
-    });
-
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && isOpen()) {
-        closeTimeline();
-        popPanelHistory();
       }
     });
 
@@ -3363,13 +3648,17 @@ body.idle #right-panel {
       document.getElementById('historyTimeLabel').style.display = 'block';
       document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
       reconstructStateAt(time);
+      // Sync event list scroll
+      if (selectedLocation && !_scrollSyncLock) {
+        syncScrollToTime(time);
+      }
     }
 
     function seekTo(time) {
       time = clampTime(time);
       slider.value = Math.min(sliderFromTime(time), 999);
       enterHistoryMode(time);
-      if (shouldAutoZoomToEvents()) maybeZoomToEvent();
+      if (shouldAutoZoomToEvents() && !selectedLocation) maybeZoomToEvent();
     }
 
     // --- Slider input ---
@@ -3378,7 +3667,7 @@ body.idle #right-panel {
       var time = clampTime(timeFromSlider(parseInt(slider.value)));
       slider.value = sliderFromTime(time);
       enterHistoryMode(time);
-      if (shouldAutoZoomToEvents()) maybeZoomToEvent();
+      if (shouldAutoZoomToEvents() && !selectedLocation) maybeZoomToEvent();
     });
 
     // --- Timeline bands (show duration of active alerts) ---
@@ -3620,12 +3909,22 @@ body.idle #right-panel {
         var datePart = isViewingToday() ? '' : ' (' + formatDateLabel(timelineDate) + ')';
         document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
         reconstructStateAt(newTime);
+        // Sync event list scroll (throttled: only when event index changes)
+        if (selectedLocation && _locationEventList.length > 0) {
+          var evIdx = -1;
+          for (var ei = _locationEventList.length - 1; ei >= 0; ei--) {
+            if (_locationEventList[ei].ts <= newTime) { evIdx = ei; break; }
+          }
+          if (evIdx !== _currentEventIdx) {
+            syncScrollToTime(newTime);
+          }
+        }
 
         // Auto-zoom: fly to event area when entering a new event group
         var curIdx = findEventIdx(newTime);
         if (curIdx !== playEventIdx) {
           playEventIdx = curIdx;
-          var bounds = shouldAutoZoomToEvents() && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+          var bounds = shouldAutoZoomToEvents() && !selectedLocation && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
           if (bounds) {
             isZoomingProgrammatically = true;
             isPlaying = false;
@@ -3696,6 +3995,56 @@ body.idle #right-panel {
 
       // Init timeline immediately (button always visible)
       initTimeline();
+
+      // --- Unified panel wiring ---
+      document.getElementById('up-close-row').addEventListener('click', function() {
+        closeTimelinePanel();
+      });
+      document.getElementById('up-handle').addEventListener('click', function() {
+        closeTimelinePanel();
+      });
+      document.getElementById('up-location-close').addEventListener('click', function(e) {
+        e.stopPropagation();
+        deselectLocation();
+      });
+      document.getElementById('up-fav-star').addEventListener('click', function(e) {
+        window._toggleFav(e);
+      });
+      // Event row click: seek to that time
+      document.getElementById('up-event-list').addEventListener('click', function(e) {
+        var row = e.target.closest('.up-event-row');
+        if (!row) return;
+        var ts = Number(row.getAttribute('data-ts'));
+        if (ts) {
+          document.dispatchEvent(new CustomEvent('app:seekTo', { detail: { time: ts } }));
+        }
+      });
+      // Scroll → slider sync
+      document.getElementById('up-event-list').addEventListener('scroll', function() {
+        if (_scrollSyncLock || !selectedLocation || isPlaying) return;
+        _scrollSyncLock = true;
+        var listEl = this;
+        var listHeight = listEl.clientHeight;
+        var targetY = listEl.scrollTop + listHeight * 0.75;
+        var rows = listEl.querySelectorAll('.up-event-row');
+        var closestIdx = 0;
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].offsetTop <= targetY) closestIdx = i;
+          else break;
+        }
+        if (rows[closestIdx]) {
+          var ts = Number(rows[closestIdx].getAttribute('data-ts'));
+          if (ts && ts !== currentViewTime) {
+            document.dispatchEvent(new CustomEvent('app:seekTo', { detail: { time: ts } }));
+            // Update current marker directly (avoid re-triggering scroll)
+            for (var j = 0; j < rows.length; j++) {
+              rows[j].classList.toggle('up-current', j === closestIdx);
+            }
+            _currentEventIdx = closestIdx;
+          }
+        }
+        requestAnimationFrame(function() { _scrollSyncLock = false; });
+      });
 
       // Build polygons; start polling only after nameToId is populated
       buildPolygons(data, function() {
@@ -3770,8 +4119,20 @@ body.idle #right-panel {
         }
       }
       document.dispatchEvent(new CustomEvent('app:escape'));
-      closeLocationPanel();
+      // Unified panel: Full→Slim→Closed
+      if (unifiedPanelState === 'full' && selectedLocation) {
+        deselectLocation();
+      } else if (unifiedPanelState !== 'closed') {
+        closeTimelinePanel();
+        popPanelHistory();
+      }
       document.getElementById('errorDetail').style.display = 'none';
+    }
+    // Arrow keys: prev/next event when timeline is open
+    if (unifiedPanelState !== 'closed' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      var btn = e.key === 'ArrowLeft' ? document.getElementById('tl-next') : document.getElementById('tl-prev');
+      if (btn) btn.click();
     }
   });
 
@@ -3889,22 +4250,13 @@ body.idle #right-panel {
     panelHistoryPushed = false;
     closeMenu();
     closeTimelinePanel();
-    closeLocationPanel();
   });
 
-  // --- Click outside to close panels ---
+  // --- Click outside to close menu ---
   document.addEventListener('click', function(e) {
-    var closed = false;
     if (menuOpen && !menuPanel.contains(e.target) && !menuBtn.contains(e.target)) {
       closeMenu();
-      closed = true;
-    }
-    if (closed) popPanelHistory();
-    if (openPanelName) {
-      var locationPanel = document.getElementById('location-panel');
-      if (locationPanel && !locationPanel.contains(e.target)) {
-        closeLocationPanel();
-      }
+      popPanelHistory();
     }
   });
 
@@ -3963,7 +4315,7 @@ body.idle #right-panel {
   var IDLE_MS = 45000;
   var _idleTimer = null;
   function _enterIdle() {
-    if (menuOpen || document.getElementById('timeline-btn').classList.contains('open')) {
+    if (menuOpen || unifiedPanelState !== 'closed') {
       _resetIdle(); return;
     }
     document.body.classList.add('idle');
