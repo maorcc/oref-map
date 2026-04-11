@@ -9,518 +9,625 @@ function assert(condition, msg) {
 function approx(a, b, tol) { return Math.abs(a - b) < (tol || 1e-6); }
 function section(name) { console.log('\n' + name); }
 
-// ── Extracted functions ──────────────────────────────────────────────
+// ── Extracted pure functions (mirrored from prediction-mode.js) ───────
 
-function polygonArea(poly) {
-  var rings = poly.getLatLngs();
-  if (!rings || rings.length === 0) return 0;
-  var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
-  if (outer.length < 3) return 0;
-  var area = 0;
-  for (var i = 0, j = outer.length - 1; i < outer.length; j = i++) {
-    area += (outer[j].lng + outer[i].lng) * (outer[j].lat - outer[i].lat);
-  }
-  return Math.abs(area / 2);
-}
-
-function polygonCentroid(poly) {
-  var rings = poly.getLatLngs();
-  if (!rings || rings.length === 0) return null;
-  var outer = Array.isArray(rings[0]) && rings[0].length && rings[0][0].lat !== undefined ? rings[0] : rings;
-  if (outer.length === 0 || typeof outer[0].lat !== 'number') return null;
-  var sumLat = 0, sumLng = 0;
-  for (var i = 0; i < outer.length; i++) {
-    sumLat += outer[i].lat;
-    sumLng += outer[i].lng;
-  }
-  return [sumLat / outer.length, sumLng / outer.length];
-}
-
-function clusterPoints(points, eps, minPts) {
-  if (!minPts) minPts = 2;
+// Andrew's monotone chain convex hull. Points are [lat, lng] pairs.
+function convexHull(points) {
   var n = points.length;
-  var eps2 = eps * eps;
-  var labels = [];
-  for (var i = 0; i < n; i++) labels[i] = -1;
-  function neighbors(i) {
-    var nb = [];
-    for (var j = 0; j < n; j++) {
-      var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-      if (dl * dl + dg * dg <= eps2) nb.push(j);
-    }
-    return nb;
+  if (n < 3) return points.slice();
+  var pts = points.slice().sort(function(a, b) {
+    return a[0] - b[0] || a[1] - b[1];
+  });
+  function cross(O, A, B) {
+    return (A[0] - O[0]) * (B[1] - O[1]) - (A[1] - O[1]) * (B[0] - O[0]);
   }
-  var cluster = 0;
+  var lower = [];
   for (var i = 0; i < n; i++) {
-    if (labels[i] !== -1) continue;
-    var nb = neighbors(i);
-    if (nb.length < minPts) { labels[i] = -2; continue; }
-    labels[i] = cluster;
-    var queue = nb.slice(), qi = 0;
-    while (qi < queue.length) {
-      var j = queue[qi++];
-      if (labels[j] === -2) labels[j] = cluster;
-      if (labels[j] !== -1) continue;
-      labels[j] = cluster;
-      var jnb = neighbors(j);
-      if (jnb.length >= minPts) {
-        for (var k = 0; k < jnb.length; k++) queue.push(jnb[k]);
-      }
-    }
-    cluster++;
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], pts[i]) <= 0) lower.pop();
+    lower.push(pts[i]);
   }
-  if (cluster === 0) return [];
-  for (var i = 0; i < n; i++) {
-    if (labels[i] >= 0) continue;
-    var best = Infinity, bestC = -1;
-    for (var j = 0; j < n; j++) {
-      if (labels[j] < 0) continue;
-      var dl = points[i][0] - points[j][0], dg = points[i][1] - points[j][1];
-      var d2 = dl * dl + dg * dg;
-      if (d2 < best) { best = d2; bestC = labels[j]; }
-    }
-    if (bestC < 0) continue;
-    labels[i] = bestC;
+  var upper = [];
+  for (var i = n - 1; i >= 0; i--) {
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], pts[i]) <= 0) upper.pop();
+    upper.push(pts[i]);
   }
-  var groups = {};
-  for (var i = 0; i < n; i++) {
-    var c = labels[i];
-    if (c < 0) continue;
-    if (!groups[c]) groups[c] = [];
-    groups[c].push(points[i]);
-  }
-  return Object.keys(groups).map(function(k) { return groups[k]; });
+  lower.pop(); upper.pop();
+  return lower.concat(upper);
 }
 
-function fitLine(points) {
-  var n = points.length;
-  if (n < 2) return null;
-  var totalW = 0, cx = 0, cy = 0;
-  for (var i = 0; i < n; i++) {
-    var w = points[i][2] || 1;
-    totalW += w; cx += points[i][0] * w; cy += points[i][1] * w;
+// Point-in-polygon (ray casting). border = {bbox, points: [[lat,lng], ...]}.
+function pointInBorder(lat, lng, border) {
+  var bbox = border.bbox;
+  if (lat < bbox.minLat || lat > bbox.maxLat || lng < bbox.minLng || lng > bbox.maxLng) return false;
+  var pts = border.points;
+  var n = pts.length;
+  var inside = false;
+  for (var i = 0, j = n - 1; i < n; j = i++) {
+    var latI = pts[i][0], lngI = pts[i][1];
+    var latJ = pts[j][0], lngJ = pts[j][1];
+    if ((latI > lat) !== (latJ > lat)) {
+      var lngInt = lngI + (lngJ - lngI) * (lat - latI) / (latJ - latI + 1e-20);
+      if (lng < lngInt) inside = !inside;
+    }
   }
-  cx /= totalW; cy /= totalW;
+  return inside;
+}
+
+function distToSegment(p, a, b) {
+  var dx = b[0] - a[0], dy = b[1] - a[1];
+  var L2 = dx * dx + dy * dy;
+  if (L2 < 1e-20) {
+    var ddx = p[0] - a[0], ddy = p[1] - a[1];
+    return Math.sqrt(ddx * ddx + ddy * ddy);
+  }
+  var t = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2;
+  if (t < 0) t = 0; else if (t > 1) t = 1;
+  var px = a[0] + t * dx, py = a[1] + t * dy;
+  var qx = p[0] - px, qy = p[1] - py;
+  return Math.sqrt(qx * qx + qy * qy);
+}
+
+function distToPolygonBoundary(p, polyVerts) {
+  var min = Infinity;
+  var n = polyVerts.length;
+  for (var i = 0; i < n; i++) {
+    var d = distToSegment(p, polyVerts[i], polyVerts[(i + 1) % n]);
+    if (d < min) min = d;
+  }
+  return min;
+}
+
+function ellipsePoints(params, numPts) {
+  var cx = params[0], cy = params[1], a = params[2], b = params[3], theta = params[4];
+  var cosT = Math.cos(theta), sinT = Math.sin(theta);
+  var pts = new Array(numPts);
+  for (var i = 0; i < numPts; i++) {
+    var phi = (i / numPts) * 2 * Math.PI;
+    var cp = Math.cos(phi), sp = Math.sin(phi);
+    pts[i] = [cx + a * cp * cosT - b * sp * sinT, cy + a * cp * sinT + b * sp * cosT];
+  }
+  return pts;
+}
+
+function ellipseInitialGuess(points) {
+  var n = points.length;
+  var sx = 0, sy = 0;
+  for (var i = 0; i < n; i++) { sx += points[i][0]; sy += points[i][1]; }
+  var cx = sx / n, cy = sy / n;
   var cxx = 0, cxy = 0, cyy = 0;
   for (var i = 0; i < n; i++) {
-    var w = points[i][2] || 1;
     var dx = points[i][0] - cx, dy = points[i][1] - cy;
-    cxx += w * dx * dx; cxy += w * dx * dy; cyy += w * dy * dy;
+    cxx += dx * dx; cxy += dx * dy; cyy += dy * dy;
   }
+  cxx /= n; cxy /= n; cyy /= n;
   var diff = cxx - cyy;
   var disc = Math.sqrt(diff * diff + 4 * cxy * cxy);
   var lambda1 = (cxx + cyy + disc) / 2;
   var lambda2 = (cxx + cyy - disc) / 2;
+  if (lambda1 < 0) lambda1 = 0;
+  if (lambda2 < 0) lambda2 = 0;
+  var a = Math.sqrt(2 * lambda1);
+  var b = Math.sqrt(2 * lambda2);
   var vx, vy;
-  if (Math.abs(cxy) > 1e-12) {
-    vx = lambda1 - cyy; vy = cxy;
-  } else if (cxx >= cyy) {
-    vx = 1; vy = 0;
-  } else {
-    vx = 0; vy = 1;
+  if (Math.abs(cxy) > 1e-12) { vx = lambda1 - cyy; vy = cxy; }
+  else if (cxx >= cyy) { vx = 1; vy = 0; }
+  else { vx = 0; vy = 1; }
+  var theta = Math.atan2(vy, vx);
+  if (a < b) { var t = a; a = b; b = t; theta += Math.PI / 2; }
+  theta = ((theta + Math.PI / 2) % Math.PI + Math.PI) % Math.PI - Math.PI / 2;
+  if (a < 1e-6) a = 1e-6;
+  if (b < 1e-6) b = 1e-6;
+  return [cx, cy, a, b, theta];
+}
+
+function nelderMead(f, x0, step, maxIter) {
+  var n = x0.length;
+  var alpha = 1, gamma = 2, rho = 0.5, sigma = 0.5;
+  var simplex = new Array(n + 1);
+  var values = new Array(n + 1);
+  simplex[0] = x0.slice();
+  values[0] = f(simplex[0]);
+  for (var i = 0; i < n; i++) {
+    var p = x0.slice();
+    p[i] += step[i];
+    simplex[i + 1] = p;
+    values[i + 1] = f(p);
   }
-  var len = Math.sqrt(vx * vx + vy * vy);
-  if (len > 0) { vx /= len; vy /= len; }
-  return { center: [cx, cy], direction: [vx, vy], lambda1: lambda1, lambda2: lambda2, totalWeight: totalW };
+  var order = new Array(n + 1);
+  function reorder() {
+    for (var i = 0; i <= n; i++) order[i] = i;
+    order.sort(function(a, b) { return values[a] - values[b]; });
+  }
+  for (var iter = 0; iter < maxIter; iter++) {
+    reorder();
+    if (Math.abs(values[order[n]] - values[order[0]]) < 1e-8) break;
+    var cent = new Array(n).fill(0);
+    for (var i = 0; i < n; i++) { var s = simplex[order[i]]; for (var j = 0; j < n; j++) cent[j] += s[j]; }
+    for (var j = 0; j < n; j++) cent[j] /= n;
+    var xw = simplex[order[n]];
+    var xr = new Array(n);
+    for (var j = 0; j < n; j++) xr[j] = cent[j] + alpha * (cent[j] - xw[j]);
+    var fr = f(xr);
+    if (fr < values[order[n - 1]] && fr >= values[order[0]]) {
+      simplex[order[n]] = xr; values[order[n]] = fr; continue;
+    }
+    if (fr < values[order[0]]) {
+      var xe = new Array(n);
+      for (var j = 0; j < n; j++) xe[j] = cent[j] + gamma * (xr[j] - cent[j]);
+      var fe = f(xe);
+      if (fe < fr) { simplex[order[n]] = xe; values[order[n]] = fe; }
+      else { simplex[order[n]] = xr; values[order[n]] = fr; }
+      continue;
+    }
+    var xc = new Array(n);
+    for (var j = 0; j < n; j++) xc[j] = cent[j] + rho * (xw[j] - cent[j]);
+    var fc = f(xc);
+    if (fc < values[order[n]]) { simplex[order[n]] = xc; values[order[n]] = fc; continue; }
+    var xb = simplex[order[0]];
+    for (var i = 1; i <= n; i++) {
+      var ss = simplex[order[i]];
+      for (var j = 0; j < n; j++) ss[j] = xb[j] + sigma * (ss[j] - xb[j]);
+      values[order[i]] = f(ss);
+    }
+  }
+  reorder();
+  return { x: simplex[order[0]], f: values[order[0]] };
+}
+
+function ellipseFitLoss(params, hullVerts, border, numPts, rMin, aspectMax) {
+  var a = params[2], b = params[3];
+  if (a <= 1e-9 || b <= 1e-9) return 1e12;
+  var pts = ellipsePoints(params, numPts);
+  var sumSq = 0, nInside = 0;
+  for (var i = 0; i < numPts; i++) {
+    if (!pointInBorder(pts[i][0], pts[i][1], border)) continue;
+    nInside++;
+    var d = distToPolygonBoundary(pts[i], hullVerts);
+    sumSq += d * d;
+  }
+  if (nInside === 0) return 1e12;
+  var ar = a > b ? a / b : b / a;
+  var lossAspect = ar > aspectMax ? (ar - aspectMax) : 0;
+  var lossSize = 0;
+  if (a < rMin) lossSize += (rMin - a) / rMin;
+  if (b < rMin) lossSize += (rMin - b) / rMin;
+  return sumSq / nInside + lossAspect + lossSize;
+}
+
+var YELLOW_PATTERNS = [
+  /בדקות הקרובות צפויות להתקבל התרעות/,
+  /לשפר את המיקום למיגון/
+];
+function isYellowTitle(title) {
+  if (!title) return false;
+  var norm = String(title).replace(/\s+/g, ' ').trim();
+  for (var i = 0; i < YELLOW_PATTERNS.length; i++) {
+    if (YELLOW_PATTERNS[i].test(norm)) return true;
+  }
+  return false;
+}
+
+function parseAlertDateMs(s) {
+  if (!s) return null;
+  var d = new Date(String(s).replace(' ', 'T'));
+  var t = d.getTime();
+  return isNaN(t) ? null : t;
+}
+
+function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory, windowMs) {
+  if (!earliestRedMs) return false;
+  var lo = earliestRedMs - windowMs;
+  var hi = earliestRedMs;
+  for (var name in locationHistory) {
+    var arr = locationHistory[name]; if (!arr) continue;
+    for (var j = 0; j < arr.length; j++) {
+      var e = arr[j]; if (!e || !isYellowTitle(e.title)) continue;
+      var ts = parseAlertDateMs(e.alertDate);
+      if (ts && ts >= lo && ts <= hi) return true;
+    }
+  }
+  if (extHistory) {
+    for (var i = 0; i < extHistory.length; i++) {
+      var e = extHistory[i]; if (!e || !isYellowTitle(e.title)) continue;
+      var ts = typeof e.alertDate === 'number' ? e.alertDate : parseAlertDateMs(e.alertDate);
+      if (ts && ts >= lo && ts <= hi) return true;
+    }
+  }
+  return false;
+}
+
+function eastwardVector(theta) {
+  var dLat = Math.cos(theta);
+  var dLng = Math.sin(theta);
+  if (dLng < 0) { dLat = -dLat; dLng = -dLng; }
+  var bearingDeg = Math.atan2(dLng, dLat) * 180 / Math.PI;
+  if (bearingDeg < 0) bearingDeg += 360;
+  return { dLat: dLat, dLng: dLng, bearing: bearingDeg };
 }
 
 function sourceExtensionDeg(bearingDeg) {
   var b = ((bearingDeg % 360) + 360) % 360;
-  if (b >= 340 || b < 20) return 2;
-  if (b >= 20 && b < 55) return 5.5;
   if (b >= 55 && b < 120) return 25;
   if (b >= 120 && b < 165) return 22;
-  if (b >= 165 && b < 210) return 20;
-  if (b >= 210 && b < 250) return 1.5;
-  return 2;
+  if (b >= 165 && b < 195) return 20;
+  return 10;
 }
-
-function bearingDiff(a, b) {
-  var d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-}
-
-// Helper: mock Leaflet polygon
-function mockPoly(coords) {
-  // coords: [[lat, lng], ...]
-  var latlngs = coords.map(function(c) { return { lat: c[0], lng: c[1] }; });
-  return { getLatLngs: function() { return [latlngs]; } };
-}
-
-// Direction-detection logic extracted from updatePredictionLines
-var ISRAEL_CENTER = [31.5, 34.8];
-function detectSourceDirection(cluster, line, clusterSpan) {
-  var cx = line.center[0], cy = line.center[1];
-  var dx = line.direction[0], dy = line.direction[1];
-
-  var posBearingNorm = ((Math.atan2(dy, dx) * 180 / Math.PI % 360) + 360) % 360;
-  var negBearingNorm = (posBearingNorm + 180) % 360;
-  var sourceSign;
-  var usedNorthernBias = false;
-
-  if (cx > 32.5 && clusterSpan < 0.5) {
-    sourceSign = bearingDiff(posBearingNorm, 0) <= bearingDiff(negBearingNorm, 0) ? 1 : -1;
-    usedNorthernBias = true;
-  } else {
-    var distFromCenter = Math.sqrt((cx - ISRAEL_CENTER[0]) * (cx - ISRAEL_CENTER[0]) +
-                                   (cy - ISRAEL_CENTER[1]) * (cy - ISRAEL_CENTER[1]));
-    if (distFromCenter > 0.05) {
-      var clusterBearing = Math.atan2(cy - ISRAEL_CENTER[1], cx - ISRAEL_CENTER[0]) * 180 / Math.PI;
-      var clusterBearingNorm = ((clusterBearing % 360) + 360) % 360;
-      sourceSign = bearingDiff(posBearingNorm, clusterBearingNorm) <=
-                   bearingDiff(negBearingNorm, clusterBearingNorm) ? 1 : -1;
-    } else {
-      sourceSign = 1;
-    }
-  }
-
-  var sourceDx = sourceSign * dx, sourceDy = sourceSign * dy;
-  var sourceBearingNorm = ((Math.atan2(sourceDy, sourceDx) * 180 / Math.PI % 360) + 360) % 360;
-  if (!usedNorthernBias && sourceBearingNorm >= 260 && sourceBearingNorm <= 320) {
-    sourceDx = -sourceDx; sourceDy = -sourceDy;
-    sourceBearingNorm = (sourceBearingNorm + 180) % 360;
-  }
-
-  return { sourceSign: sourceSign, bearing: sourceBearingNorm, usedNorthernBias: usedNorthernBias };
-}
-
-// Helper: compute cluster span along PCA axis (mirrors updatePredictionLines logic)
-function computeClusterSpan(points, line) {
-  var cx = line.center[0], cy = line.center[1];
-  var dx = line.direction[0], dy = line.direction[1];
-  var minP = Infinity, maxP = -Infinity;
-  for (var i = 0; i < points.length; i++) {
-    var p = (points[i][0] - cx) * dx + (points[i][1] - cy) * dy;
-    if (p < minP) minP = p;
-    if (p > maxP) maxP = p;
-  }
-  return maxP - minP;
-}
-
 
 // ══════════════════════════════════════════════════════════════════════
 //  TESTS
 // ══════════════════════════════════════════════════════════════════════
 
-section('polygonCentroid');
+section('convexHull — basic cases');
 (function() {
-  var poly = mockPoly([[30, 34], [32, 34], [32, 36], [30, 36]]);
-  var c = polygonCentroid(poly);
-  assert(approx(c[0], 31) && approx(c[1], 35), 'centroid of square at (31, 35)');
+  // Square → all four corners on hull
+  var square = [[0,0],[0,1],[1,0],[1,1],[0.5,0.5]];
+  var hull = convexHull(square);
+  assert(hull.length === 4, 'square: hull has 4 vertices, got ' + hull.length);
 
-  var empty = { getLatLngs: function() { return []; } };
-  assert(polygonCentroid(empty) === null, 'empty polygon returns null');
+  // Collinear → hull still works (middle point removed)
+  var line = [[0,0],[1,0],[2,0],[3,0]];
+  var hLine = convexHull(line);
+  assert(hLine.length === 2, 'collinear points → hull has 2 vertices');
 
-  var single = { getLatLngs: function() { return [[{ lat: 5, lng: 6 }]]; } };
-  var sc = polygonCentroid(single);
-  assert(sc && approx(sc[0], 5) && approx(sc[1], 6), 'single-point polygon');
+  // Single-point passthrough
+  var one = [[5,5]];
+  assert(convexHull(one).length === 1, 'single point passes through');
+
+  // Elongated set along diagonal
+  var diag = [[0,0],[1,0.1],[2,0.05],[3,0.1],[4,0]];
+  var hd = convexHull(diag);
+  // All extreme points should be on hull; the middle with similar y might not be
+  assert(hd.length >= 3, 'elongated set: hull has ≥ 3 vertices');
+
+  // Hull encloses all input points (convexity check: each point is inside or on hull)
+  var pts = [[1,2],[3,4],[2,1],[4,2],[3,3],[2,3]];
+  var h = convexHull(pts);
+  assert(h.length >= 3, 'random points → hull has ≥ 3 vertices');
 })();
 
-section('polygonArea');
+section('pointInBorder — ray-casting');
 (function() {
-  // 2x2 degree square → area = 4 sq degrees
-  var sq = mockPoly([[0, 0], [2, 0], [2, 2], [0, 2]]);
-  assert(approx(polygonArea(sq), 4, 0.01), '2x2 square area = 4');
+  // Square border at [0,0]–[10,10] in [lat,lng]
+  var squareBorder = {
+    bbox: { minLat: 0, maxLat: 10, minLng: 0, maxLng: 10 },
+    points: [[0,0],[10,0],[10,10],[0,10]]
+  };
+  assert(pointInBorder(5, 5, squareBorder), 'center is inside');
+  assert(!pointInBorder(15, 5, squareBorder), 'outside (lat too high)');
+  assert(!pointInBorder(5, -1, squareBorder), 'outside (lng negative)');
+  assert(!pointInBorder(-1, 5, squareBorder), 'outside (lat negative)');
 
-  // 1x1 degree square → area = 1
-  var sm = mockPoly([[10, 10], [11, 10], [11, 11], [10, 11]]);
-  assert(approx(polygonArea(sm), 1, 0.01), '1x1 square area = 1');
+  // Triangle border: (0,0),(10,0),(5,10)
+  var triBorder = {
+    bbox: { minLat: 0, maxLat: 10, minLng: 0, maxLng: 10 },
+    points: [[0,0],[10,0],[5,10]]
+  };
+  assert(pointInBorder(5, 4, triBorder), 'center-ish of triangle is inside');
+  assert(!pointInBorder(1, 9, triBorder), 'top-left corner of bbox is outside triangle');
+  assert(pointInBorder(1, 1, triBorder), 'bottom-left corner: inside triangle');
 
-  // Triangle with base 2, height 1 → area = 1
-  var tri = mockPoly([[0, 0], [2, 0], [1, 1]]);
-  assert(approx(polygonArea(tri), 1, 0.01), 'triangle area = 1');
-
-  // Degenerate: 2 points
-  var degen = mockPoly([[0, 0], [1, 1]]);
-  assert(polygonArea(degen) === 0, 'degenerate polygon (2 points) = 0');
+  // Bbox short-circuit: point well outside bbox
+  assert(!pointInBorder(100, 100, squareBorder), 'far outside bbox → false');
 })();
 
-section('clusterPoints (DBSCAN)');
+section('distToSegment');
 (function() {
-  // Two tight groups far apart
-  var pts = [[0, 0], [0.01, 0.01], [0.02, 0],   // group A near origin
-             [5, 5], [5.01, 5.01], [5.02, 5]];   // group B far away
-  var clusters = clusterPoints(pts, 0.35);
-  assert(clusters.length === 2, 'two distant groups → 2 clusters');
-
-  // All within threshold (chain connectivity)
-  var close = [[0, 0], [0.1, 0], [0.2, 0], [0.3, 0]];
-  var c2 = clusterPoints(close, 0.35);
-  assert(c2.length === 1, 'chain within threshold → 1 cluster');
-
-  // Single point: DBSCAN with minPts=2 cannot form a core point → noise → returns []
-  var single = [[1, 1]];
-  assert(clusterPoints(single, 0.35).length === 0, 'single point → 0 clusters (noise in DBSCAN)');
-
-  // Points just outside threshold should stay separate (each pair is noise)
-  var sep = [[0, 0], [0.5, 0]];
-  assert(clusterPoints(sep, 0.35).length === 0, 'two points beyond threshold → 0 clusters (both noise)');
-
-  // Three-element points (with weight) cluster by first two coords
-  var weighted = [[0, 0, 0.5], [0.1, 0, 0.8], [5, 5, 1.2]];
-  var c3 = clusterPoints(weighted, 0.35);
-  // [0,0] and [0.1,0] are within eps and form a core cluster; [5,5] is noise but
-  // cluster > 0 so it gets assigned to nearest cluster
-  assert(c3.length === 1, 'weighted: two close + one far → 1 cluster (far point assigned to nearest)');
-
-  // Two close pairs far from each other
-  var twoPairs = [[0, 0, 0.5], [0.1, 0, 0.8], [5, 5, 1.0], [5.1, 5, 1.2]];
-  var c4 = clusterPoints(twoPairs, 0.35);
-  assert(c4.length === 2, 'two close pairs far apart → 2 clusters');
+  // Projection onto segment interior
+  assert(approx(distToSegment([1,0], [0,0], [2,0]), 0), 'projection to segment = 0 (on segment)');
+  assert(approx(distToSegment([1,1], [0,0], [2,0]), 1), 'perpendicular distance = 1');
+  // Clamps to endpoint
+  assert(approx(distToSegment([-1,0], [0,0], [2,0]), 1), 'clamps to start endpoint');
+  assert(approx(distToSegment([3,0], [0,0], [2,0]), 1), 'clamps to end endpoint');
+  // Degenerate segment (a == b)
+  assert(approx(distToSegment([3,4], [0,0], [0,0]), 5), 'degenerate segment → point distance');
 })();
 
-section('clusterPoints — all-noise guard');
+section('distToPolygonBoundary');
 (function() {
-  // All points isolated (no two within eps) → all noise → cluster count = 0 → returns []
-  var isolated = [[0, 0], [1, 1], [3, 3], [6, 6]];
-  var result = clusterPoints(isolated, 0.35);
-  assert(result.length === 0, 'all isolated points → empty array (all-noise guard)');
-
-  // Verify with single point as well
-  var one = [[10, 20]];
-  assert(clusterPoints(one, 0.5).length === 0, 'single isolated point → empty array');
+  // Square with side length 2 centered at origin: sides at ±1
+  var square = [[-1,-1],[-1,1],[1,1],[1,-1]];
+  // Center is 1.0 away from each side
+  assert(approx(distToPolygonBoundary([0,0], square), 1, 0.01), 'center of unit square → dist 1');
+  // On boundary
+  assert(approx(distToPolygonBoundary([1,0], square), 0, 0.01), 'on boundary → dist 0');
 })();
 
-section('fitLine — unweighted');
+section('ellipsePoints — parametric equations');
 (function() {
-  // Horizontal points → direction should be [1, 0] or [-1, 0]
-  var horiz = [[0, 0], [1, 0], [2, 0], [3, 0]];
-  var line = fitLine(horiz);
-  assert(line !== null, 'returns result for 4 horizontal points');
-  assert(approx(line.center[0], 1.5) && approx(line.center[1], 0), 'center at (1.5, 0)');
-  assert(approx(Math.abs(line.direction[0]), 1, 0.01) && approx(line.direction[1], 0, 0.01),
-    'direction is horizontal');
-  assert(line.lambda2 < 1e-10, 'lambda2 ≈ 0 for collinear points');
-
-  // Vertical points
-  var vert = [[0, 0], [0, 1], [0, 2]];
-  var vl = fitLine(vert);
-  assert(approx(Math.abs(vl.direction[1]), 1, 0.01) && approx(vl.direction[0], 0, 0.01),
-    'vertical direction');
-
-  // Diagonal
-  var diag = [[0, 0], [1, 1], [2, 2], [3, 3]];
-  var dl = fitLine(diag);
-  assert(approx(Math.abs(dl.direction[0]), Math.abs(dl.direction[1]), 0.01), '45° diagonal');
-
-  // Single point → null
-  assert(fitLine([[0, 0]]) === null, 'single point returns null');
-  assert(fitLine([]) === null, 'empty returns null');
-})();
-
-section('fitLine — area-weighted');
-(function() {
-  // Three points: two small at y=0, one large at y=1.
-  // Unweighted center would be at y=0.33; weighted should shift toward the large one.
-  var pts = [[0, 0, 0.1], [2, 0, 0.1], [1, 1, 10]];
-  var line = fitLine(pts);
-  assert(line.center[1] > 0.8, 'weighted center shifts toward heavy point (y=' + line.center[1].toFixed(2) + ')');
-  assert(approx(line.totalWeight, 10.2, 0.01), 'totalWeight = 10.2');
-
-  // Equal weights should match unweighted
-  var eq = [[0, 0, 1], [1, 0, 1], [2, 0, 1]];
-  var eqLine = fitLine(eq);
-  var noW = fitLine([[0, 0], [1, 0], [2, 0]]);
-  assert(approx(eqLine.center[0], noW.center[0]) && approx(eqLine.center[1], noW.center[1]),
-    'equal weights matches unweighted center');
-
-  // Heavy point at one end should pull center
-  var asym = [[0, 0, 1], [1, 0, 1], [2, 0, 100]];
-  var al = fitLine(asym);
-  assert(al.center[0] > 1.5, 'heavy endpoint pulls center (x=' + al.center[0].toFixed(2) + ')');
-})();
-
-section('bearingDiff');
-(function() {
-  assert(approx(bearingDiff(0, 0), 0), '0° vs 0° = 0');
-  assert(approx(bearingDiff(0, 180), 180), '0° vs 180° = 180');
-  assert(approx(bearingDiff(10, 350), 20), '10° vs 350° = 20 (wraps)');
-  assert(approx(bearingDiff(350, 10), 20), '350° vs 10° = 20 (wraps)');
-  assert(approx(bearingDiff(90, 270), 180), '90° vs 270° = 180');
-  assert(approx(bearingDiff(45, 135), 90), '45° vs 135° = 90');
-})();
-
-section('sourceExtensionDeg — bearing to country mapping');
-(function() {
-  // Lebanon (N)
-  assert(sourceExtensionDeg(0) === 2, 'bearing 0° → Lebanon (2)');
-  assert(sourceExtensionDeg(350) === 2, 'bearing 350° → Lebanon (2)');
-  assert(sourceExtensionDeg(10) === 2, 'bearing 10° → Lebanon (2)');
-
-  // Syria (NE)
-  assert(sourceExtensionDeg(30) === 5.5, 'bearing 30° → Syria (5.5)');
-  assert(sourceExtensionDeg(45) === 5.5, 'bearing 45° → Syria (5.5)');
-
-  // Iran (E)
-  assert(sourceExtensionDeg(60) === 25, 'bearing 60° → Iran (25)');
-  assert(sourceExtensionDeg(90) === 25, 'bearing 90° → Iran (25)');
-
-  // Iran/Yemen (SE)
-  assert(sourceExtensionDeg(140) === 22, 'bearing 140° → Iran/Yemen (22)');
-
-  // Yemen (S)
-  assert(sourceExtensionDeg(180) === 20, 'bearing 180° → Yemen (20)');
-  assert(sourceExtensionDeg(200) === 20, 'bearing 200° → Yemen (20)');
-
-  // Gaza (SW)
-  assert(sourceExtensionDeg(220) === 1.5, 'bearing 220° → Gaza (1.5)');
-  assert(sourceExtensionDeg(240) === 1.5, 'bearing 240° → Gaza (1.5)');
-
-  // Mediterranean fallback
-  assert(sourceExtensionDeg(270) === 2, 'bearing 270° → Mediterranean (2)');
-  assert(sourceExtensionDeg(300) === 2, 'bearing 300° → Mediterranean (2)');
-
-  // Negative bearing normalization: -90° → 270° → Mediterranean
-  assert(sourceExtensionDeg(-90) === 2, 'bearing -90° normalizes to 270° → Mediterranean (2)');
-})();
-
-section('direction detection — cluster NE of center (Iran scenario)');
-(function() {
-  // Cluster in northern Israel, NE of center. PCA axis runs NE-SW.
-  // Source should point NE (toward Iran).
-  var cluster = [
-    [32.5, 35.5, 1], [32.7, 35.7, 1], [32.9, 35.9, 1],
-    [33.1, 36.1, 1], [33.3, 36.3, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  var result = detectSourceDirection(cluster, line, span);
-  // NE bearing is roughly 0-90°
-  assert(result.bearing >= 0 && result.bearing < 90,
-    'Iran attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be NE');
-})();
-
-section('direction detection — cluster S of center (Yemen scenario)');
-(function() {
-  // Cluster in southern Israel, S of center. PCA axis runs N-S.
-  var cluster = [
-    [30.0, 34.9, 1], [29.8, 34.9, 1], [29.5, 34.8, 1],
-    [29.2, 34.8, 1], [29.0, 34.7, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  var result = detectSourceDirection(cluster, line, span);
-  // S bearing is roughly 150-210°
-  assert(result.bearing >= 150 && result.bearing <= 210,
-    'Yemen attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be S');
-})();
-
-section('direction detection — cluster W of center (Gaza scenario)');
-(function() {
-  // Cluster near Gaza border, SW of center. PCA axis runs NE-SW.
-  var cluster = [
-    [31.4, 34.4, 1], [31.3, 34.3, 1], [31.2, 34.2, 1],
-    [31.1, 34.1, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  var result = detectSourceDirection(cluster, line, span);
-  // SW bearing is roughly 210-250°
-  assert(result.bearing >= 200 && result.bearing <= 260,
-    'Gaza attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be SW');
-})();
-
-section('direction detection — Mediterranean safety net');
-(function() {
-  // Artificially force a cluster that would point toward Mediterranean (W/NW).
-  // Center near Israel center, line pointing WNW.
-  // Since bearing ~290° is in [260, 320], it should flip to ~110° (ESE).
-  var cluster = [
-    [31.5, 34.0, 1], [31.6, 33.8, 1], [31.4, 33.6, 1], [31.5, 33.4, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  var result = detectSourceDirection(cluster, line, span);
-  // After flip, should NOT be in Mediterranean range
-  assert(result.bearing < 260 || result.bearing > 320,
-    'Mediterranean safety net: bearing=' + result.bearing.toFixed(0) + '° flipped away from sea');
-  assert(!result.usedNorthernBias, 'Mediterranean safety net: did not use northern bias');
-})();
-
-section('direction detection — cluster N of center (Lebanon scenario, northern bias)');
-(function() {
-  // Cluster in far north with small span (< 0.5) → northern bias applies.
-  // PCA axis runs roughly N-S. Northern bias prefers the direction closer to 0° (north).
-  var cluster = [
-    [33.0, 35.2, 1], [33.1, 35.25, 1], [33.2, 35.2, 1],
-    [33.3, 35.15, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  var result = detectSourceDirection(cluster, line, span);
-  // cx > 32.5 and span < 0.5 → northern bias should be used
-  assert(result.usedNorthernBias === true,
-    'Lebanon cluster: usedNorthernBias=' + result.usedNorthernBias);
-  // N bearing is roughly 340-360 or 0-20
-  assert((result.bearing >= 320 && result.bearing <= 360) || result.bearing < 60,
-    'Lebanon attack cluster: bearing=' + result.bearing.toFixed(0) + '° should be N/NNE');
-})();
-
-section('direction detection — northern bias skips Mediterranean safety net');
-(function() {
-  // A cluster at lat > 32.5 with small span that would point toward Mediterranean
-  // should NOT have its bearing flipped because usedNorthernBias skips the safety net.
-  var cluster = [
-    [33.0, 34.9, 1], [33.1, 34.8, 1], [33.2, 34.7, 1], [33.15, 34.85, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  // Verify northern bias applies
-  assert(line.center[0] > 32.5 && span < 0.5,
-    'setup: cx > 32.5 and span < 0.5 for northern bias');
-  var result = detectSourceDirection(cluster, line, span);
-  assert(result.usedNorthernBias === true,
-    'northern bias active: usedNorthernBias=' + result.usedNorthernBias);
-  // The key property: even if bearing ended up in [260, 320], it should NOT be flipped
-  // because the code checks `if (!usedNorthernBias && ...)` before flipping.
-  // We verify the bearing is reasonable (N-ish for this cluster) rather than flipped.
-})();
-
-section('direction detection — large span disables northern bias');
-(function() {
-  // Cluster at lat > 32.5 but with span >= 0.5 → falls through to center-based logic
-  var cluster = [
-    [33.0, 35.0, 1], [33.3, 35.3, 1], [33.6, 35.6, 1],
-    [33.9, 35.9, 1], [34.2, 36.2, 1]
-  ];
-  var line = fitLine(cluster);
-  var span = computeClusterSpan(cluster, line);
-  assert(span >= 0.5, 'setup: cluster span >= 0.5 (got ' + span.toFixed(2) + ')');
-  var result = detectSourceDirection(cluster, line, span);
-  assert(result.usedNorthernBias === false,
-    'large span: usedNorthernBias=' + result.usedNorthernBias + ' (should be false)');
-})();
-
-section('full pipeline — elongation filter');
-(function() {
-  // Round cluster (equal spread in all directions) should be filtered out
-  var round = [[0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1],
-               [0.5, 0, 1], [0, 0.5, 1], [1, 0.5, 1], [0.5, 1, 1]];
-  var line = fitLine(round);
-  var elongation = line.lambda2 > 1e-12 ? line.lambda1 / line.lambda2 : Infinity;
-  assert(elongation < 2.5, 'round cluster has low elongation (' + elongation.toFixed(2) + ')');
-
-  // Elongated cluster should pass
-  var elong = [[0, 0, 1], [1, 0.01, 1], [2, -0.01, 1], [3, 0.02, 1], [4, 0, 1]];
-  var el = fitLine(elong);
-  var elr = el.lambda2 > 1e-12 ? el.lambda1 / el.lambda2 : Infinity;
-  assert(elr > 2.5, 'elongated cluster passes filter (' + elr.toFixed(0) + ')');
-})();
-
-section('full pipeline — minimum span filter');
-(function() {
-  // Tiny cluster (all within 0.05° of each other) — span should be < 0.1
-  var tiny = [[31.5, 34.8, 1], [31.52, 34.81, 1], [31.51, 34.79, 1]];
-  var line = fitLine(tiny);
-  var cx = line.center[0], cy = line.center[1];
-  var dx = line.direction[0], dy = line.direction[1];
-  var minP = Infinity, maxP = -Infinity;
-  for (var i = 0; i < tiny.length; i++) {
-    var p = (tiny[i][0] - cx) * dx + (tiny[i][1] - cy) * dy;
-    if (p < minP) minP = p;
-    if (p > maxP) maxP = p;
+  // Circle (a = b, theta = 0): all points at distance a from center
+  var r = 2;
+  var params = [5, 5, r, r, 0];
+  var pts = ellipsePoints(params, 100);
+  for (var i = 0; i < pts.length; i++) {
+    var dl = pts[i][0] - 5, dg = pts[i][1] - 5;
+    assert(approx(Math.sqrt(dl*dl + dg*dg), r, 0.01),
+      'circle point ' + i + ' at radius ' + r);
+    if (!approx(Math.sqrt(dl*dl + dg*dg), r, 0.01)) break; // stop on first fail
   }
-  assert(maxP - minP < 0.1, 'tiny cluster span (' + (maxP - minP).toFixed(3) + ') < 0.1 threshold');
+
+  // Ellipse (a=3, b=1, theta=0): parametric extremes at (cx±3, cy) and (cx, cy±1)
+  var params2 = [0, 0, 3, 1, 0];
+  var pts2 = ellipsePoints(params2, 4);
+  // phi=0 → (cx+a, cy); phi=pi/2 → (cx, cy+b); etc.
+  assert(approx(pts2[0][0], 3, 0.01) && approx(pts2[0][1], 0, 0.01), 'phi=0 → (cx+a, cy)');
+  assert(approx(pts2[1][0], 0, 0.01) && approx(pts2[1][1], 1, 0.01), 'phi=pi/2 → (cx, cy+b)');
+})();
+
+section('ellipseInitialGuess — PCA-based');
+(function() {
+  // Perfectly horizontal points: major axis should align with lat (lat variance dominates)
+  var horiz = [];
+  for (var i = 0; i < 10; i++) horiz.push([i * 0.1, 0]);
+  var g = ellipseInitialGuess(horiz);
+  assert(approx(g[0], 0.45, 0.01) && approx(g[1], 0, 0.01),
+    'horizontal: center at (0.45, 0)');
+  // theta ≈ 0 (aligned with lat axis)
+  assert(approx(g[4], 0, 0.1), 'horizontal: theta ≈ 0, got ' + g[4].toFixed(3));
+  // a > b (elongated along lat)
+  assert(g[2] > g[3], 'horizontal: a > b');
+
+  // Perfectly vertical points: major axis along lng
+  var vert = [];
+  for (var i = 0; i < 10; i++) vert.push([0, i * 0.1]);
+  var gv = ellipseInitialGuess(vert);
+  // theta ≈ ±pi/2
+  assert(Math.abs(Math.abs(gv[4]) - Math.PI / 2) < 0.1,
+    'vertical: theta ≈ ±pi/2, got ' + gv[4].toFixed(3));
+  assert(gv[2] > gv[3], 'vertical: a > b');
+
+  // Non-degenerate ellipse with known tilt
+  var tilted = [];
+  for (var i = 0; i < 20; i++) {
+    var phi = (i / 20) * 2 * Math.PI;
+    tilted.push([3 * Math.cos(phi) * Math.cos(0.5) - 1 * Math.sin(phi) * Math.sin(0.5),
+                 3 * Math.cos(phi) * Math.sin(0.5) + 1 * Math.sin(phi) * Math.cos(0.5)]);
+  }
+  var gt = ellipseInitialGuess(tilted);
+  // Center should be near (0,0)
+  assert(approx(gt[0], 0, 0.1) && approx(gt[1], 0, 0.1),
+    'tilted ellipse: center near origin, got (' + gt[0].toFixed(2) + ',' + gt[1].toFixed(2) + ')');
+})();
+
+section('nelderMead — simple 2D minimization');
+(function() {
+  // Minimize (x-3)^2 + (y-7)^2, minimum at (3,7)
+  var f = function(p) { return (p[0]-3)*(p[0]-3) + (p[1]-7)*(p[1]-7); };
+  var res = nelderMead(f, [0, 0], [1, 1], 500);
+  assert(approx(res.x[0], 3, 0.01) && approx(res.x[1], 7, 0.01),
+    'quadratic min at (3,7): got (' + res.x[0].toFixed(3) + ',' + res.x[1].toFixed(3) + ')');
+  assert(res.f < 0.001, 'loss ≈ 0 at minimum');
+
+  // Minimize Rosenbrock (harder): f(x,y) = (1-x)^2 + 100*(y-x^2)^2, min at (1,1)
+  var rosenbrock = function(p) {
+    return (1 - p[0]) * (1 - p[0]) + 100 * (p[1] - p[0]*p[0]) * (p[1] - p[0]*p[0]);
+  };
+  var rRes = nelderMead(rosenbrock, [0, 0], [0.5, 0.5], 2000);
+  assert(approx(rRes.x[0], 1, 0.05) && approx(rRes.x[1], 1, 0.05),
+    'Rosenbrock min ≈ (1,1): got (' + rRes.x[0].toFixed(3) + ',' + rRes.x[1].toFixed(3) + ')');
+})();
+
+section('ellipseFitLoss — loss is zero when ellipse matches hull exactly');
+(function() {
+  // Build a square hull; an ellipse that inscribes the square should have low loss
+  // when ellipse points all lie near the square boundary.
+  var bigBorder = {
+    bbox: { minLat: -100, maxLat: 100, minLng: -100, maxLng: 100 },
+    points: [[-100,-100],[100,-100],[100,100],[-100,100]]
+  };
+  // Circle hull (hull ≈ circle of radius 2 at origin)
+  var hull = [];
+  for (var i = 0; i < 20; i++) {
+    var phi = (i / 20) * 2 * Math.PI;
+    hull.push([2 * Math.cos(phi), 2 * Math.sin(phi)]);
+  }
+  // Perfect fit: circle at origin with radius 2
+  var params = [0, 0, 2, 2, 0];
+  var loss = ellipseFitLoss(params, hull, bigBorder, 40, 0.1, 4);
+  assert(loss < 0.01, 'circle fits circle hull: loss ≈ 0, got ' + loss.toFixed(4));
+
+  // Ellipse completely outside border → loss = 1e12
+  var tinyBorder = {
+    bbox: { minLat: 90, maxLat: 91, minLng: 90, maxLng: 91 },
+    points: [[90,90],[91,90],[91,91],[90,91]]
+  };
+  var lossOuts = ellipseFitLoss(params, hull, tinyBorder, 40, 0.1, 4);
+  assert(lossOuts === 1e12, 'ellipse outside border → loss = 1e12');
+})();
+
+section('ellipseFitLoss — border truncation reduces loss');
+(function() {
+  // Simulate a truncated cluster near Israel's western coast.
+  // Hull is a half-ellipse cut by the sea; the border excludes the sea half.
+  // Expected: fitting with border should produce lower loss than fitting to a
+  // full ellipse that tries to match the cut-off half.
+
+  // Rectangular "country" border (land side): lat [30,34], lng [35,40]
+  var landBorder = {
+    bbox: { minLat: 30, maxLat: 34, minLng: 35, maxLng: 40 },
+    points: [[30,35],[34,35],[34,40],[30,40]]
+  };
+  // True ellipse centered at (32, 35) with a=2 (NS), b=1 (EW), theta=0
+  // The western half (lng < 35) is "over the sea" and absent from the hull.
+  var hullOnLand = [];
+  for (var i = 0; i < 20; i++) {
+    var phi = -Math.PI / 2 + (i / 19) * Math.PI; // phi from -90° to 90° (eastern half only)
+    var lat = 32 + 2 * Math.cos(phi);
+    var lng = 35 + 1 * Math.sin(phi);
+    if (lng >= 35) hullOnLand.push([lat, lng]);
+  }
+  assert(hullOnLand.length >= 5, 'setup: hull has points on land');
+
+  // The true ellipse (if all points were visible) has its center at (32, 35).
+  // With truncation, PCA-only would miss the center; border-aware fit should find it.
+  var trueParams = [32, 35, 2, 1, 0];
+  var fullBorder = {
+    bbox: { minLat: 25, maxLat: 40, minLng: 30, maxLng: 45 },
+    points: [[25,30],[40,30],[40,45],[25,45]]
+  };
+  var lossTrue = ellipseFitLoss(trueParams, hullOnLand, landBorder, 40, 0.1, 4);
+  // The "true" ellipse should have finite, bounded loss against the land-only hull.
+  // (The loss won't be near-zero because the border clips part of the ellipse, but it
+  // should be much lower than a completely wrong ellipse.)
+  assert(lossTrue < 5, 'true ellipse has bounded loss against truncated hull: ' + lossTrue.toFixed(4));
+})();
+
+section('isYellowTitle — Iran/Yemen early warning detection');
+(function() {
+  assert(isYellowTitle('בדקות הקרובות צפויות להתקבל התרעות באזורך'), 'early warning title matches');
+  assert(isYellowTitle('בדקות  הקרובות  צפויות  להתקבל  התרעות'), 'double-space variant matches');
+  assert(isYellowTitle('על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך...'), 'preparedness notice matches');
+  assert(!isYellowTitle('ירי רקטות וטילים'), 'rocket alert is not yellow');
+  assert(!isYellowTitle('ירי רקטות וטילים - האירוע הסתיים'), 'all-clear is not yellow');
+  assert(!isYellowTitle(''), 'empty string is not yellow');
+  assert(!isYellowTitle(null), 'null is not yellow');
+  assert(!isYellowTitle('יש לשהות בסמיכות למרחב המוגן'), 'stay-near-shelter is not Iran/Yemen yellow');
+})();
+
+section('hasPrecedingYellow — gate logic');
+(function() {
+  var WINDOW = 5 * 60 * 1000;
+  // Use explicit UTC anchor and include Z so parseAlertDateMs is timezone-agnostic.
+  var base = new Date('2026-04-10T12:00:00Z').getTime();
+  var fmtDate = function(ts) { return new Date(ts).toISOString().slice(0, 19) + 'Z'; };
+
+  var historyWithYellow = {
+    'תל אביב': [
+      { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 2 * 60 * 1000) },
+      { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
+    ]
+  };
+  assert(hasPrecedingYellow(base, historyWithYellow, null, WINDOW), 'yellow 2 min before red → gate passes');
+
+  var historyJustOutside = {
+    'תל אביב': [
+      { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 6 * 60 * 1000) },
+      { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
+    ]
+  };
+  assert(!hasPrecedingYellow(base, historyJustOutside, null, WINDOW), 'yellow 6 min before red → gate fails');
+
+  var historyOnlyRed = {
+    'תל אביב': [
+      { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
+    ]
+  };
+  assert(!hasPrecedingYellow(base, historyOnlyRed, null, WINDOW), 'no yellow at all → gate fails');
+
+  // Yellow on a different location still passes (covers the whole country scan)
+  var historyOtherLocation = {
+    'באר שבע': [
+      { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 3 * 60 * 1000) }
+    ],
+    'תל אביב': [
+      { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
+    ]
+  };
+  assert(hasPrecedingYellow(base, historyOtherLocation, null, WINDOW), 'yellow on different location → gate passes');
+
+  // Empty history
+  assert(!hasPrecedingYellow(base, {}, null, WINDOW), 'empty history → gate fails');
+  assert(!hasPrecedingYellow(null, historyWithYellow, null, WINDOW), 'null earliestRed → gate fails');
+
+  // extendedHistory path (timeline mode): yellow stored as ms timestamp
+  var extHistYellow = [
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 4 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+  ];
+  assert(hasPrecedingYellow(base, {}, extHistYellow, WINDOW), 'extendedHistory ms yellow 4 min before red → gate passes');
+
+  var extHistTooOld = [
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 8 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+  ];
+  assert(!hasPrecedingYellow(base, {}, extHistTooOld, WINDOW), 'extendedHistory ms yellow 8 min before → gate fails');
+})();
+
+section('eastwardVector — always returns positive-lng direction');
+(function() {
+  // theta = pi/4 (NE) → dLng = sin(pi/4) > 0 → bearing ≈ 45°
+  var v = eastwardVector(Math.PI / 4);
+  assert(v.dLng > 0, 'NE: dLng > 0');
+  assert(approx(v.bearing, 45, 0.5), 'NE: bearing ≈ 45°, got ' + v.bearing.toFixed(1));
+
+  // theta = -pi/4 (NW direction in (lat,lng) space); flip to SE (also eastward, dLng > 0).
+  // Direction (cos(-pi/4), sin(-pi/4)) = (0.707, -0.707) flips to (-0.707, 0.707) → bearing 135°.
+  var vFlip = eastwardVector(-Math.PI / 4);
+  assert(vFlip.dLng > 0, 'flipped NW→SE: dLng > 0');
+  assert(approx(vFlip.bearing, 135, 0.5), 'flipped: bearing ≈ 135° (SE), got ' + vFlip.bearing.toFixed(1));
+
+  // theta = pi/2 (due east along lng): bearing = 90°
+  var vE = eastwardVector(Math.PI / 2);
+  assert(approx(vE.bearing, 90, 0.5), 'due east: bearing = 90°');
+
+  // theta = -pi/2 → flip → due east
+  var vW = eastwardVector(-Math.PI / 2);
+  assert(approx(vW.bearing, 90, 0.5), 'west flipped to east: bearing = 90°');
+
+  // theta = 0 → due north along lat (lng component = 0). In east-only convention:
+  // dLng = sin(0) = 0, so we don't flip (dLng >= 0). bearing = atan2(0,1) = 0 → north.
+  // This edge case means the ellipse is perfectly N-S and no east direction exists.
+  var vN = eastwardVector(0);
+  assert(approx(vN.bearing, 0, 0.5), 'due north: bearing = 0° (N-S edge case)');
+})();
+
+section('sourceExtensionDeg — bearing to country distance');
+(function() {
+  // Iran (roughly east, 55–120°)
+  assert(sourceExtensionDeg(90) === 25, 'bearing 90° → Iran (25)');
+  assert(sourceExtensionDeg(60) === 25, 'bearing 60° → Iran (25)');
+  assert(sourceExtensionDeg(119) === 25, 'bearing 119° → Iran (25)');
+
+  // Iran/Yemen SE (120–165°)
+  assert(sourceExtensionDeg(140) === 22, 'bearing 140° → Iran/Yemen SE (22)');
+
+  // Yemen S (165–195°)
+  assert(sourceExtensionDeg(180) === 20, 'bearing 180° → Yemen (20)');
+  assert(sourceExtensionDeg(170) === 20, 'bearing 170° → Yemen (20)');
+
+  // Fallback (other bearings — shouldn't fire for valid Iran/Yemen, but handled)
+  assert(sourceExtensionDeg(45) === 10, 'bearing 45° → fallback (10)');
+  assert(sourceExtensionDeg(200) === 10, 'bearing 200° → fallback (10)');
+})();
+
+section('full pipeline — ellipse fit converges on synthetic truncated data');
+(function() {
+  // Simulate an alert cluster that would span [31,32] lat x [35,37] lng but is
+  // cut at lng=35 (western border). We build a hull from points with lng >= 35
+  // and check that the fit center is reasonably close to the true ellipse center.
+
+  // True ellipse: cx=31.5, cy=35, a=1 (lat), b=1 (lng), theta=pi/4
+  var cx_true = 31.5, cy_true = 35.5, a_true = 0.8, b_true = 0.3, theta_true = 0.6;
+  var fullPts = [];
+  for (var i = 0; i < 40; i++) {
+    var phi = (i / 40) * 2 * Math.PI;
+    var cp = Math.cos(phi), sp = Math.sin(phi);
+    var cosT = Math.cos(theta_true), sinT = Math.sin(theta_true);
+    var lat = cx_true + a_true * cp * cosT - b_true * sp * sinT;
+    var lng = cy_true + a_true * cp * sinT + b_true * sp * cosT;
+    fullPts.push([lat, lng]);
+  }
+  // Land border: cut anything west of lng=35.2 (removes ~1/4 of the ellipse)
+  var border = {
+    bbox: { minLat: 28, maxLat: 36, minLng: 35.2, maxLng: 42 },
+    points: [[28,35.2],[36,35.2],[36,42],[28,42]]
+  };
+  var landPts = fullPts.filter(function(p) { return p[1] >= 35.2; });
+  var hull = convexHull(landPts);
+  assert(hull.length >= 4, 'hull has enough points: ' + hull.length);
+
+  // Compute initial guess and check it's reasonable
+  var guess = ellipseInitialGuess(hull);
+  assert(guess[0] > 30 && guess[0] < 33, 'initial guess center lat in range');
+
+  // Loss function at true params vs a bad guess
+  var lossTrue = ellipseFitLoss(
+    [cx_true, cy_true, a_true, b_true, theta_true],
+    hull, border, 40, 0.05, 4
+  );
+  var lossBad = ellipseFitLoss(
+    [cx_true + 2, cy_true + 2, a_true, b_true, theta_true],
+    hull, border, 40, 0.05, 4
+  );
+  assert(lossTrue < lossBad, 'true params have lower loss than shifted params');
+  assert(lossTrue < 5, 'true ellipse loss is finite and bounded: ' + lossTrue.toFixed(4));
 })();
 
 // ── Summary ──────────────────────────────────────────────────────────
