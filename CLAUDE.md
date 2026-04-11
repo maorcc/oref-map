@@ -52,8 +52,8 @@ When the user asks to change or extend the PMTiles coverage:
 
 1. **Download a new PMTiles file** using the `pmtiles` CLI (install: `brew install protomaps/homebrew-go-pmtiles/go-pmtiles`). It extracts only the needed bbox via HTTP range requests — no full 120 GB download:
    ```bash
-   pmtiles extract https://build.protomaps.com/20260404.pmtiles middle-east.pmtiles \
-     --bbox=32,10,65,42 --maxzoom=15 --download-threads=4
+   pmtiles extract https://build.protomaps.com/20260409.pmtiles middle-east.pmtiles \
+     --bbox=22,3,73,50 --maxzoom=10 --download-threads=4
    ```
    Replace `20260404` with a recent date from https://maps.protomaps.com/builds/.
    The bbox format is `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`.

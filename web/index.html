@@ -33,7 +33,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
-#map { width: 100%; height: 100%; direction: ltr; }
+#map { width: 100%; height: 100%; direction: ltr; background: #aad3df; }
 .maplibregl-canvas:focus { outline: none; }
 .maplibregl-ctrl-zoom { border-radius: 6px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border: none !important; }
 .maplibregl-ctrl-group { border-radius: 6px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border: none !important; }
@@ -144,11 +144,12 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
   display: none;
   position: fixed;
   z-index: 1010;
-  background: rgba(255,255,255,0.97);
+  background: #f7f7f5;
   box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
   direction: rtl;
   flex-direction: column;
   transition: transform 0.28s ease;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 /* Slim: compact box at bottom-right (mobile default) */
 #unified-panel.slim {
@@ -193,15 +194,15 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
   direction: rtl;
   flex-shrink: 0;
 }
-#up-location-name { font-size: 15px; flex: 1; }
+#up-location-name { font-size: 15px; }
 #up-fav-star {
   cursor: pointer; font-size: 18px; color: #ccc;
   vertical-align: middle; user-select: none;
+  margin-inline-end: auto;
 }
 #up-location-close {
   background: none; border: none; cursor: pointer;
   font-size: 20px; color: #888; line-height: 1; padding: 4px;
-  margin-inline-start: auto;
 }
 #up-location-close:hover { color: #333; }
 
@@ -864,9 +865,9 @@ body.idle #right-panel {
   <div id="up-handle"></div>
   <div id="up-location">
     <div id="up-location-header">
-      <button id="up-location-close" aria-label="סגור">&times;</button>
       <b id="up-location-name"></b>
       <span id="up-fav-star"></span>
+      <button id="up-location-close" aria-label="סגור">&times;</button>
     </div>
     <div id="up-event-list"></div>
   </div>
@@ -1216,10 +1217,14 @@ body.idle #right-panel {
     style: MAP_STYLE,
     center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], // MapLibre uses [lng, lat]
     zoom: DEFAULT_ZOOM,
-    maxBounds: [[32.0, 11.0], [65.0, 42.0]],
+    maxBounds: [[25.0, 6.0], [70.0, 44.0]],
+    touchPitch: false,
     maxTileCacheZoomLevels: 8,
     fadeDuration: 0
   });
+
+  map.dragRotate.disable();
+  map.touchZoomRotate.disableRotation();
 
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
 
@@ -1888,6 +1893,7 @@ body.idle #right-panel {
   var closeTimelinePanel = function() {}; // set by initTimeline
   var openTimelineToLastEvent = function() {}; // set by initTimeline
   var rebuildTimelineFn = function() {}; // set by initTimeline
+  var openTimelineFn = function() {}; // set by initTimeline
   var timelineDate = null;         // 'YYYY-MM-DD' string, null = today
   var dayHistoryReady = false;     // true once day-history fetch completes
   var historyPollId = null;        // setInterval ID for fetchHistory
@@ -2366,6 +2372,7 @@ body.idle #right-panel {
   }
 
   function _applyPanelHighlight(name) {
+    if (_panelLabelPopup) { _panelLabelPopup.remove(); _panelLabelPopup = null; }
     var id = nameToId[name];
     if (id === undefined) return;
     _panelHighlightName = name;
@@ -2382,7 +2389,7 @@ body.idle #right-panel {
     if (center) {
       _panelLabelPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'selected-label', offset: [0, -4] })
         .setLngLat(center)
-        .setHTML('<b>' + name + '</b>')
+        .setDOMContent((function() { var b = document.createElement('b'); b.textContent = name; return b; })())
         .addTo(map);
     }
   }
@@ -2390,13 +2397,16 @@ body.idle #right-panel {
   function _removePanelHighlight() {
     if (_panelLabelPopup) { _panelLabelPopup.remove(); _panelLabelPopup = null; }
     if (!_panelHighlightName) return;
-    var id = nameToId[_panelHighlightName];
-    if (id !== undefined) {
-      if (_panelHighlightSaved && Object.keys(_panelHighlightSaved).length > 0) {
-        map.setFeatureState({ source: 'alerts-source', id: id }, _panelHighlightSaved);
-      } else {
-        map.removeFeatureState({ source: 'alerts-source', id: id });
-      }
+    var name = _panelHighlightName;
+    var entry = locationStates[name];
+    if (entry) {
+      var now = Date.now();
+      var opacity = entry.state === 'green'
+        ? 0.5 * Math.max(0, 1 - ((now - entry.since) / GREEN_FADE_MS))
+        : 0.3;
+      applyFeatureStyle(name, entry.state, opacity);
+    } else {
+      resetFeatureStyle(name);
     }
     _panelHighlightName = null;
     _panelHighlightSaved = null;
@@ -2443,11 +2453,14 @@ body.idle #right-panel {
 
   function renderEventList() {
     var listEl = document.getElementById('up-event-list');
+    listEl.innerHTML = '';
     if (_locationEventList.length === 0) {
-      listEl.innerHTML = '<div class="up-empty">\u05D0\u05D9\u05DF \u05D0\u05D9\u05E8\u05D5\u05E2\u05D9\u05DD</div>';
+      var emptyEl = document.createElement('div');
+      emptyEl.className = 'up-empty';
+      emptyEl.textContent = 'אין אירועים';
+      listEl.appendChild(emptyEl);
       return;
     }
-    var html = '';
     for (var i = 0; i < _locationEventList.length; i++) {
       var e = _locationEventList[i];
       var color = COLORS[e.state] || '#888';
@@ -2457,12 +2470,21 @@ body.idle #right-panel {
       // Group separator: if next entry is non-green and this entry is green
       var nextE = _locationEventList[i + 1];
       var sepClass = (nextE && e.state === 'green' && nextE.state !== 'green') ? ' up-event-sep' : '';
-      html += '<div class="up-event-row' + sepClass + '" data-ts="' + e.alertDate + '" data-idx="' + i + '">' +
-        '<span class="up-event-time" style="color:' + color + '">' + timeStr + '</span>' +
-        '<span class="up-event-label">' + label + '</span>' +
-      '</div>';
+      var row = document.createElement('div');
+      row.className = 'up-event-row' + sepClass;
+      row.dataset.ts = e.alertDate;
+      row.dataset.idx = String(i);
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'up-event-time';
+      timeSpan.style.color = color;
+      timeSpan.textContent = timeStr;
+      var labelSpan = document.createElement('span');
+      labelSpan.className = 'up-event-label';
+      labelSpan.textContent = label;
+      row.appendChild(timeSpan);
+      row.appendChild(labelSpan);
+      listEl.appendChild(row);
     }
-    listEl.innerHTML = html;
   }
 
   function updateFavStar(name) {
@@ -2516,7 +2538,7 @@ body.idle #right-panel {
   function openFullPanel(name) {
     _removePanelHighlight();
     if (unifiedPanelState === 'closed') {
-      openSlimPanel();
+      openTimelineFn(); // opens slim + triggers rebuildTimeline
     }
     var panel = document.getElementById('unified-panel');
     // Animate height on desktop (slim → full)
@@ -3298,7 +3320,7 @@ body.idle #right-panel {
     container.classList.add('has-data');
 
     var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
-    var PLAY_SPEED = 600;
+    var PLAY_SPEED = 510;
 
     function updateDateNav() {
       var d = timelineDate || todayDateStr();
@@ -3519,6 +3541,8 @@ body.idle #right-panel {
         onDayHistoryReady();
       }
     };
+
+    openTimelineFn = openTimeline;
 
     openTimelineToLastEvent = function() {
       if (extendedHistory.length === 0) return;
@@ -3913,7 +3937,7 @@ body.idle #right-panel {
         if (selectedLocation && _locationEventList.length > 0) {
           var evIdx = -1;
           for (var ei = _locationEventList.length - 1; ei >= 0; ei--) {
-            if (_locationEventList[ei].ts <= newTime) { evIdx = ei; break; }
+            if (_locationEventList[ei].alertDate <= newTime) { evIdx = ei; break; }
           }
           if (evIdx !== _currentEventIdx) {
             syncScrollToTime(newTime);

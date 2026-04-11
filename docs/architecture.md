@@ -127,20 +127,21 @@ Location polygons are pre-computed offline and shipped as `web/locations_polygon
 
 The basemap is a self-hosted Protomaps vector tile file stored on Cloudflare R2 and served via the R2 public bucket URL:
 
-```
+```text
 https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east.pmtiles
 ```
 
 **Current file coverage:**
+
 | Property | Value |
 |----------|-------|
 | File | `middle-east.pmtiles` |
-| Bounds (lng) | 32.0 – 65.0 |
-| Bounds (lat) | 11.0 – 39.0 |
+| Bounds (lng) | 22.0 – 73.0 |
+| Bounds (lat) | 3.0 – 50.0 |
 | Zoom | 0 – 10 |
-| Built | 2026-04-07 (Planetiler 0.10.1, OSM data 2026-04-06) |
+| Built | 2026-04-11 (pmtiles extract, OSM data 2026-04-09) |
 
-This covers Israel, Lebanon, Syria, Jordan, Iraq, Iran, Saudi Arabia, Egypt (Sinai), the Gulf states, and Yemen.
+This covers Israel, Lebanon, Syria, Jordan, Iraq, Iran, Saudi Arabia, Egypt, Libya (east), the Gulf states, Yemen, Horn of Africa, Turkey, the Caucasus, and Pakistan border.
 
 #### Inspecting the current file
 
@@ -158,8 +159,8 @@ Install: `brew install protomaps/homebrew-go-pmtiles/go-pmtiles`
 
 Find a recent build date at https://maps.protomaps.com/builds/, then run:
 ```bash
-pmtiles extract https://build.protomaps.com/20260404.pmtiles middle-east.pmtiles \
-  --bbox=32,10,65,42 --maxzoom=15 --download-threads=4
+pmtiles extract https://build.protomaps.com/20260409.pmtiles middle-east.pmtiles \
+  --bbox=22,3,73,50 --maxzoom=10 --download-threads=4
 ```
 bbox format: `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`. Replace the date with the one from the builds index. The command fetches only the tiles in the bbox via HTTP range requests (a few GB, not 120 GB).
 
@@ -170,7 +171,7 @@ bbox format: `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`. Replace the date with the one fr
 java -jar planetiler.jar \
   --download \
   --area=middle-east \
-  --bounds=32,10,65,42 \
+  --bounds=22,3,73,50 \
   --output=middle-east-extended.pmtiles
 ```
 
@@ -236,7 +237,7 @@ The Oref extended history API only exposes the latest ~3,000 entries (~1–2 hou
 
 ### Architecture
 
-```
+```text
   every 2 min (cron, multi-attempt per 15-min window)
   [Ingestion Worker] ──fetch──> [proxy1 Worker] ──fetch──> [oref API]
                                 (placement: israelcentral,
@@ -260,7 +261,7 @@ Each day file covers events from `(D-1)T23:00` to `DT22:59` (Israel time). Event
 
 Each entry occupies one line ending with `,\n`:
 
-```
+```json
 {"data":"חיפה","alertDate":"2026-03-15T14:23:00","category_desc":"ירי רקטות וטילים","rid":495134},
 {"data":"תל אביב","alertDate":"2026-03-15T14:23:01","category_desc":"ירי רקטות וטילים","rid":495135},
 ```
