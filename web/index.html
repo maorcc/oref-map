@@ -4096,10 +4096,8 @@ body.idle #right-panel {
 
       // Build polygons; start polling only after nameToId is populated
       buildPolygons(data, function() {
-        livePollId    = setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-        historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-        fadePollId    = setInterval(fadeGreenMarkers, FADE_TICK_MS);
         pollingStarted = true;
+        // Always do the initial data fetch to populate state and set initialized=true
         fetchLiveAlerts();
         fetchHistory(function() {
           initialized = true;
@@ -4107,6 +4105,13 @@ body.idle #right-panel {
         });
         fetchExtendedHistory(function() { rebuildTimelineFn(); });
         if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+        // Only start interval timers if the tab is currently visible;
+        // if hidden, visibilitychange → visible will call resumePolling()
+        if (document.visibilityState !== 'hidden') {
+          livePollId    = setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+          historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+          fadePollId    = setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        }
       });
 
     }).catch(function(err) {
@@ -4358,7 +4363,7 @@ body.idle #right-panel {
     // If hidden for >30s, reload instead of resuming (existing mobile behavior)
     try {
       var lastPoll = Number(sessionStorage.getItem('oref-last-poll')) || 0;
-      if (Date.now() - lastPoll >= 30000) {
+      if (lastPoll > 0 && Date.now() - lastPoll >= 30000) {
         var lastReload = Number(sessionStorage.getItem('oref-reload-ts')) || 0;
         if (Date.now() - lastReload >= 60000) {
           sessionStorage.setItem('oref-reload-ts', String(Date.now()));
