@@ -5,6 +5,16 @@ import { appendFile } from 'fs/promises';
 const PORT = 3001;
 const DEBUG       = process.argv.includes('--debug');
 const LOG_HISTORY = process.argv.includes('--log-history');
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://oref-map.org',
+  'http://localhost:8788',
+  'http://127.0.0.1:8788',
+  'http://dev.local:8788',
+];
+const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(','))
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 const OREF_HEADERS = {
   'Referer': 'https://www.oref.org.il/',
@@ -52,7 +62,7 @@ function loadDebugData() {
         desc:  firstTitle,
         data:  byTitle[firstTitle].locations,
       })
-    : '\ufeff';
+    : '[]';
 
   return {
     extended: raw,
@@ -63,6 +73,7 @@ function loadDebugData() {
 
 const USAGE_LOG   = new URL('./usage.log',    import.meta.url).pathname;
 const HISTORY_LOG = new URL('./history.jsonl', import.meta.url).pathname;
+const ERROR_LOG   = new URL('./error.log',    import.meta.url).pathname;
 
 // --- History JSONL log ---
 
@@ -99,12 +110,36 @@ function storeNewHistory(entries) {
 // --- In-memory cache ---
 
 const cache = {
-  alerts:  { body: '\ufeff', updatedAt: null },  // BOM = no active alert (Oref convention)
+  alerts:  { body: '[]', updatedAt: null },
   history: { body: '[]',     updatedAt: null },
   extended: { body: '[]',    updatedAt: null, fetchedAt: null },
 };
 
 // --- Fetch helpers ---
+
+function normalizeOrefBody(body) {
+  const text = String(body)
+    .replace(/\ufeff/g, '')
+    .replace(/\u0000/g, '')
+    .trim();
+  return text || '[]';
+}
+
+function logInvalidPayload(url, body, err) {
+  const timestamp = new Date().toISOString();
+  const message = String(err?.message ?? err);
+  const entry =
+    `[${timestamp}] invalid upstream payload from ${url}\n` +
+    `error: ${message}\n` +
+    `body:\n${body}\n\n---\n`;
+  return appendFile(ERROR_LOG, entry)
+    .catch(logErr => console.error('[error-log] write error:', logErr.message));
+}
+
+function appendErrorLog(entry) {
+  return appendFile(ERROR_LOG, entry)
+    .catch(logErr => console.error('[error-log] write error:', logErr.message));
+}
 
 async function fetchOref(url) {
   const resp = await fetch(url, { headers: OREF_HEADERS });
@@ -113,13 +148,23 @@ async function fetchOref(url) {
     err.code = String(resp.status);
     throw err;
   }
-  return resp.text();
+  const body = normalizeOrefBody(await resp.text());
+  try {
+    JSON.parse(body);
+  } catch (err) {
+    await logInvalidPayload(url, body, err);
+    throw err;
+  }
+  return body;
 }
 
 function logError(prefix, err) {
+  const timestamp = new Date().toISOString();
   const code = err?.code ?? 'UNKNOWN';
   const message = String(err?.message ?? err);
-  console.error(`[${new Date().toISOString()}] ${prefix}, code=${code}, error="${message}"`);
+  const line = `[${timestamp}] ${prefix}, code=${code}, error="${message}"`;
+  console.error(line);
+  void appendErrorLog(`${line}\n`);
 }
 
 // --- Polling ---
@@ -175,9 +220,23 @@ async function fetchExtended() {
 
 const app = express();
 
-// Allow cross-origin requests from the local web-server
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+// Allow cross-origin requests from production and explicitly allowed local dev origins.
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', 'https://oref-map.org');
+  const origin = req.headers.origin;
+  if (isAllowedOrigin(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  }
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
   next();
 });
 

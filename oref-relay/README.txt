@@ -24,3 +24,14 @@ cloudflared tunnel run orefproxy8
 sudo vi /etc/sysctl.d/30-cloudflared.conf
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
+
+Relay CORS
+==========
+The relay allows `https://oref-map.org` plus these dev origins by default:
+- `http://localhost:8788`
+- `http://127.0.0.1:8788`
+
+To override the allowlist on the VM, set `CORS_ALLOWED_ORIGINS` to a comma-separated list.
+Examples:
+- `CORS_ALLOWED_ORIGINS=https://oref-map.org,http://localhost:8788`
+- `CORS_ALLOWED_ORIGINS=https://oref-map.org,http://127.0.0.1:5173`

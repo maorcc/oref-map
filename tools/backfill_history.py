@@ -8,7 +8,7 @@ Backfill alert history into R2 bucket oref-history.
 
 For each date from WAR_START to yesterday:
 - Fetches fresh data from the oref API (city by city, mode=3)
-- Downloads the existing remote file from R2 (if any)
+- Downloads the existing remote file from R2 via the public day-history API
 - Compares by rid set and shows a diff summary
 - Saves both versions in tmp/backfill-compare/ for manual inspection
 - Prompts whether to overwrite each date with differences
@@ -20,6 +20,9 @@ Usage:
     uv run tools/backfill_history.py --today      # merge today first, then interactive
     uv run tools/backfill_history.py --yes        # overwrite all without prompting
     uv run tools/backfill_history.py --today --yes # merge today + overwrite all
+    uv run tools/backfill_history.py --dry-run    # compare only, no uploads, no prompts
+    uv run tools/backfill_history.py --yes --force # overwrite all including unsafe dates
+    uv run tools/backfill_history.py --reuse       # skip oref fetch, reuse tmp/backfill-compare/ files
 """
 
 import asyncio
@@ -36,11 +39,12 @@ import aiohttp
 
 BASE_URL = "https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx"
 LOCATIONS_URL = "https://oref-map.org/locations_polygons.json"
+DAY_HISTORY_URL = "https://oref-map.org/api/day-history"
 HEADERS = {
     "Referer": "https://www.oref.org.il/",
     "X-Requested-With": "XMLHttpRequest",
 }
-CONCURRENCY = 10
+CONCURRENCY = 30
 
 
 def r2_date_key(alert_date: str) -> str:
@@ -51,8 +55,13 @@ def r2_date_key(alert_date: str) -> str:
     return d.isoformat()
 
 
-RETRIES = 3
-RETRY_DELAYS = [2, 5, 15]
+def ascii_to_geresh(name: str) -> str:
+    """Convert ASCII apostrophes to Hebrew geresh/gershayim (oref API migration)."""
+    return name.replace("''", "\u05F4").replace("'", "\u05F3")
+
+
+RETRIES = 5
+RETRY_DELAYS = [2, 5, 15, 30]
 WAR_START = "2026-02-28"
 BUCKET = "oref-history"
 COMPARE_DIR = Path("tmp/backfill-compare")
@@ -79,26 +88,24 @@ async def fetch_city(
                     print(f"  RETRY {attempt + 1} {city}: {e!r}")
                     await asyncio.sleep(RETRY_DELAYS[attempt])
                 else:
-                    print(f"  ERR {city}: {e!r}")
-                    return []
-    return []
+                    raise RuntimeError(f"city {city!r} failed after {RETRIES} attempts: {e!r}") from e
 
 
 async def fetch_cities(session: aiohttp.ClientSession) -> list[str]:
     async with session.get(LOCATIONS_URL) as resp:
         data = await resp.json(content_type=None)
-    return list(data.keys())
+    return [k for k in data if not k.startswith("_")]
 
 
 def parse_jsonl(path: Path) -> list[dict]:
     entries = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = line.strip().rstrip(",")
         if line:
             try:
                 entries.append(json.loads(line))
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                raise ValueError(f"{path}:{lineno}: invalid JSONL: {e}") from e
     return entries
 
 
@@ -106,17 +113,33 @@ def to_jsonl(entries: list[dict]) -> str:
     return "".join(json.dumps(e, ensure_ascii=False) + ",\n" for e in entries)
 
 
-def download_remote(day: str, dest: Path) -> list[dict]:
-    """Download YYYY-MM-DD.jsonl from R2. Returns parsed entries, or [] if not found."""
-    result = subprocess.run(
-        ["npx", "--yes", "wrangler", "r2", "object", "get", f"{BUCKET}/{day}.jsonl",
-         "--file", str(dest), "--remote"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0 or not dest.exists() or dest.stat().st_size == 0:
-        return []
-    return parse_jsonl(dest)
+async def fetch_remote(
+    session: aiohttp.ClientSession,
+    day: str,
+    dest: Path,
+) -> list[dict]:
+    """Fetch day-history from the public API. Returns entries or [] if not found.
+    Retries on network errors. Raises on unexpected HTTP errors (fail fast)."""
+    for attempt in range(RETRIES):
+        try:
+            timeout = aiohttp.ClientTimeout(total=20)
+            async with session.get(f"{DAY_HISTORY_URL}?date={day}", timeout=timeout) as resp:
+                if resp.status == 404:
+                    dest.write_text("", encoding="utf-8")
+                    return []
+                if resp.status != 200:
+                    raise RuntimeError(f"day-history {day}: unexpected HTTP {resp.status}")
+                data = await resp.json(content_type=None)
+            dest.write_text(to_jsonl(data), encoding="utf-8")
+            return data
+        except RuntimeError:
+            raise  # don't retry explicit HTTP errors
+        except Exception as e:
+            if attempt < RETRIES - 1:
+                print(f"  RETRY {attempt + 1} day-history {day}: {e!r}")
+                await asyncio.sleep(RETRY_DELAYS[attempt])
+            else:
+                raise RuntimeError(f"day-history {day} failed after {RETRIES} attempts: {e!r}") from e
 
 
 def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
@@ -138,7 +161,6 @@ def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
         Path(tmp_path).unlink(missing_ok=True)
 
 
-
 def merge_entries(backfill: list[dict], remote: list[dict]) -> list[dict]:
     """Union of both entry sets by rid, sorted by alertDate."""
     by_rid = {e["rid"]: e for e in remote}
@@ -147,11 +169,44 @@ def merge_entries(backfill: list[dict], remote: list[dict]) -> list[dict]:
     return sorted(by_rid.values(), key=lambda e: e["alertDate"])
 
 
+def has_special_chars(name: str) -> bool:
+    return "'" in name or "\u05F3" in name or "\u05F4" in name
+
+
+def classify_diff(
+    only_remote: list[dict],
+    only_new: list[dict],
+) -> tuple[str, str]:
+    """Return (verdict, explanation).
+    verdict: "safe" | "unsafe" | "caution"
+    """
+    if not only_remote:
+        return "safe", "no entries will be lost"
+    cities = {e["data"] for e in only_remote}
+    special = sum(1 for c in cities if has_special_chars(c))
+    if special == len(cities):
+        return "unsafe", (
+            f"{len(only_remote)} entries from {len(cities)} apostrophe/geresh cities "
+            "will be permanently lost (oref API name migration)"
+        )
+    return "caution", (
+        f"{len(only_remote)} entries from {len(cities)} cities will be lost "
+        f"({special} apostrophe, cause unknown for rest)"
+    )
+
+
 async def main() -> None:
     start_time = datetime.now()
     t0 = time.monotonic()
     update_today = "--today" in sys.argv
     auto_yes = "--yes" in sys.argv
+    dry_run = "--dry-run" in sys.argv
+    force = "--force" in sys.argv
+    reuse = "--reuse" in sys.argv
+
+    if reuse and update_today:
+        print("Error: --reuse is not compatible with --today", file=sys.stderr)
+        sys.exit(1)
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     today_str = date.today().isoformat()
 
@@ -180,38 +235,72 @@ async def main() -> None:
         print(f"--today: will also merge {today_str} (no prompt)")
     COMPARE_DIR.mkdir(parents=True, exist_ok=True)
 
-    async with aiohttp.ClientSession() as session:
-        print("Fetching city list...")
-        cities = await fetch_cities(session)
-        print(f"  {len(cities)} cities")
+    fetch_elapsed: float | None = None
 
-        print(f"Fetching history for all cities (concurrency={CONCURRENCY})...")
-        semaphore = asyncio.Semaphore(CONCURRENCY)
-        tasks = [fetch_city(session, semaphore, city) for city in cities]
-        results = await asyncio.gather(*tasks)
+    if reuse:
+        print("--reuse: loading from tmp/backfill-compare/ (skipping oref fetch)")
+        by_date: dict[str, list] = {}
+        for new_file in sorted(COMPARE_DIR.glob("*.new.jsonl")):
+            day = new_file.name.replace(".new.jsonl", "")
+            by_date[day] = parse_jsonl(new_file)
+        remote_by_date: dict[str, list] = {}
+        for day in all_dates:
+            remote_file = COMPARE_DIR / f"{day}.remote.jsonl"
+            if not remote_file.exists():
+                print(f"Error: --reuse missing {remote_file}; run without --reuse first", file=sys.stderr)
+                sys.exit(1)
+            remote_by_date[day] = parse_jsonl(remote_file)
+        total = sum(len(v) for v in by_date.values())
+        print(f"  Loaded {total} entries across {len(by_date)} dates")
+    else:
+        async with aiohttp.ClientSession() as session:
+            print("Fetching city list...")
+            cities = await fetch_cities(session)
+            extra = [ascii_to_geresh(c) for c in cities if "'" in c]
+            cities = cities + extra
+            print(f"  {len(cities)} cities ({len(extra)} geresh variants)")
 
-    print("Deduplicating and grouping by date...")
-    seen_rids: set = set()
-    by_date: dict[str, list] = {}
-    for city_entries in results:
-        for e in city_entries:
-            rid = e.get("rid")
-            if rid in seen_rids:
-                continue
-            seen_rids.add(rid)
-            alert_date = e.get("alertDate", "")
-            if not alert_date or alert_date[:10] < WAR_START:
-                continue
-            entry = {
-                "data": e["data"],
-                "alertDate": alert_date,
-                "category_desc": e["category_desc"],
-                "rid": rid,
-            }
-            by_date.setdefault(r2_date_key(alert_date), []).append(entry)
+            print(f"Fetching history for all cities (concurrency={CONCURRENCY})...")
+            semaphore = asyncio.Semaphore(CONCURRENCY)
+            tasks = [fetch_city(session, semaphore, city) for city in cities]
+            t_fetch = time.monotonic()
+            results = await asyncio.gather(*tasks)
+            fetch_elapsed = time.monotonic() - t_fetch
+            print(f"  Oref fetch done in {fetch_elapsed:.1f}s")
 
-    total = sum(len(v) for v in by_date.values())
-    print(f"  {total} unique entries across {len(by_date)} dates")
+            # Fetch all remote files in parallel
+            dates_to_fetch = all_dates + ([today_str] if update_today else [])
+            print(f"\nFetching {len(dates_to_fetch)} remote files from R2...")
+            remote_tasks = [
+                fetch_remote(session, day, COMPARE_DIR / f"{day}.remote.jsonl")
+                for day in dates_to_fetch
+            ]
+            remote_results = await asyncio.gather(*remote_tasks)
+            remote_by_date = dict(zip(dates_to_fetch, remote_results, strict=True))
+            print("  Done.")
+
+        print("Deduplicating and grouping by date...")
+        seen_rids: set = set()
+        by_date = {}
+        for city_entries in results:
+            for e in city_entries:
+                rid = e.get("rid")
+                if rid in seen_rids:
+                    continue
+                seen_rids.add(rid)
+                alert_date = e.get("alertDate", "")
+                if not alert_date or alert_date[:10] < WAR_START:
+                    continue
+                entry = {
+                    "data": e["data"],
+                    "alertDate": alert_date,
+                    "category_desc": e["category_desc"],
+                    "rid": rid,
+                }
+                by_date.setdefault(r2_date_key(alert_date), []).append(entry)
+
+        total = sum(len(v) for v in by_date.values())
+        print(f"  {total} unique entries across {len(by_date)} dates")
 
     # Stats tracking
     today_result = None  # "uploaded", "skipped", "failed", or None (not requested)
@@ -221,10 +310,6 @@ async def main() -> None:
 
     # --today: merge today's data immediately (no prompt)
     if update_today:
-        # Cutoff = last completed cron window end. Cron ingests quarter-hour blocks
-        # [XX:00, XX:15), [XX:15, XX:30), etc. — the quarter ending at :00/:15/:30/:45.
-        # Cron fires 3 min after each quarter ends,
-        # so if now >= :03, the :00 quarter is done.
         now = datetime.now()
         cutoff_minutes = [0, 15, 30, 45]
         candidates = [
@@ -250,10 +335,8 @@ async def main() -> None:
                 f" {skipped} skipped",
             )
 
-        remote_path = COMPARE_DIR / f"{today_str}.remote.jsonl"
-        print(f"{today_str} (today): downloading remote...", end=" ", flush=True)
-        remote_entries = download_remote(today_str, remote_path)
-        print(f"remote={len(remote_entries)}, backfill={len(backfill_entries)}")
+        remote_entries = remote_by_date[today_str]
+        print(f"{today_str} (today): remote={len(remote_entries)}, backfill={len(backfill_entries)}")
 
         merged = merge_entries(backfill_entries, remote_entries)
         remote_rids = {e["rid"] for e in remote_entries}
@@ -266,14 +349,16 @@ async def main() -> None:
             f" kept {kept} remote-only)",
         )
 
-        if added > 0:
+        if added > 0 and dry_run:
+            print(f"  --dry-run: would upload {today_str}.jsonl ({added} new entries)")
+            today_result = "skipped"
+        elif added > 0:
             elapsed = time.monotonic() - t0
             print(f"  Uploading {today_str}.jsonl... (elapsed: {elapsed:.0f}s)")
             data = to_jsonl(merged).encode("utf-8")
             if wrangler_put(f"{today_str}.jsonl", data, "application/jsonl"):
                 upload_time = datetime.now()
                 upload_str = upload_time.strftime("%H:%M:%S")
-                # Next cron fires at the next :03/:18/:33/:48
                 cron_minutes = [3, 18, 33, 48]
                 next_crons = [m for m in cron_minutes if m > upload_time.minute]
                 if next_crons:
@@ -310,42 +395,45 @@ async def main() -> None:
         new_entries = sorted(by_date.get(day, []), key=lambda e: e["alertDate"])
         new_rids = {e["rid"] for e in new_entries}
 
-        remote_path = COMPARE_DIR / f"{day}.remote.jsonl"
-        print(f"\n{day}: downloading remote...", end=" ", flush=True)
-        remote_entries = download_remote(day, remote_path)
+        remote_entries = remote_by_date[day]
         remote_rids = {e["rid"] for e in remote_entries}
-        print(f"remote={len(remote_rids)}, new={len(new_rids)}")
+
+        # Always save .new.jsonl so --reuse can find all dates
+        new_path = COMPARE_DIR / f"{day}.new.jsonl"
+        new_path.write_text(to_jsonl(new_entries), encoding="utf-8")
+
+        print(f"\n{day}: remote={len(remote_rids)}, new={len(new_rids)}")
 
         if not remote_entries and not new_entries:
             print("  both empty, skipping")
             skipped_identical += 1
             continue
 
-        only_in_remote = remote_rids - new_rids
-        only_in_new = new_rids - remote_rids
+        only_remote_entries = [e for e in remote_entries if e["rid"] not in new_rids]
+        only_new_entries = [e for e in new_entries if e["rid"] not in remote_rids]
 
-        if not only_in_remote and not only_in_new:
+        if not only_remote_entries and not only_new_entries:
             print("  identical, skipping")
             skipped_identical += 1
             continue
 
-        # Save new version locally for manual inspection
-        new_path = COMPARE_DIR / f"{day}.new.jsonl"
-        new_path.write_text(to_jsonl(new_entries), encoding="utf-8")
+        verdict, explanation = classify_diff(only_remote_entries, only_new_entries)
+        label = {"safe": "SAFE", "unsafe": "UNSAFE", "caution": "CAUTION"}[verdict]
+        print(f"  only_in_remote={len(only_remote_entries)}, only_in_new={len(only_new_entries)}")
+        print(f"  [{label}] {explanation}")
+        print(f"  Saved: {COMPARE_DIR}/{day}.remote.jsonl, {new_path.name}")
 
-        print(f"  only_in_remote={len(only_in_remote)}, only_in_new={len(only_in_new)}")
-        if only_in_remote:
-            print(
-                f"  WARNING: {len(only_in_remote)} entries"
-                " will be lost if overwritten",
-            )
-        print(f"  Saved: {remote_path.name}, {new_path.name}")
-
-        if auto_yes:
+        if dry_run:
+            print("  --dry-run: skipping upload")
+            skipped_declined += 1
+        elif verdict == "unsafe" and not force:
+            print(f"  Skipping {day} — unsafe (use --force to override)")
+            skipped_declined += 1
+        elif auto_yes:
             print(f"  --yes: overwriting {day}")
             to_upload.append((day, new_entries))
         else:
-            answer = input(f"  Overwrite {day}? [y/N] ").strip().lower()
+            answer = input(f"  Overwrite {day}? [{label}] [y/N] ").strip().lower()
             if answer == "y":
                 to_upload.append((day, new_entries))
             else:
@@ -372,6 +460,10 @@ async def main() -> None:
     print(f"  Started:          {start_time.strftime('%H:%M:%S')}")
     print(f"  Finished:         {end_time.strftime('%H:%M:%S')}")
     print(f"  Duration:         {elapsed:.0f}s ({elapsed / 60:.1f} min)")
+    if fetch_elapsed is not None:
+        print(f"  Oref fetch time:  {fetch_elapsed:.1f}s (concurrency={CONCURRENCY})")
+    else:
+        print("  Oref fetch time:  skipped (--reuse)")
     print(f"  API entries:      {total} across {len(by_date)} dates")
     print(f"  Date range:       {all_dates[0]} .. {all_dates[-1]}")
     if update_today:

@@ -4,14 +4,18 @@
 
 A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions handle TLV-routed users directly, non-TLV users are redirected to a placement-pinned Worker.
 
+Note: the displayed visitor count comes from the Pages Function at `/api/analytics`,
+which queries Cloudflare analytics and returns aggregated visit counts for the last
+hour and last 24 hours. The client polls this endpoint once per minute.
+
 ## Stack
 
-- **Map**: Leaflet.js (v1.9.4) + OpenStreetMap tiles
-- **Voronoi**: d3-delaunay (v6) for polygon computation, polygon-clipping (v0.15) for clipping to Israel border
+- **Map**: MapLibre GL JS + PMTiles (self-hosted Middle East extract on Cloudflare R2, Protomaps basemap with Hebrew labels)
+- **Polygons**: Pre-computed GeoJSON in `web/locations_polygons.json` loaded at startup into a MapLibre `alerts-source`
 - **API proxy (tier 1)**: Cloudflare Pages Functions (`functions/api/`) — serves TLV users directly, redirects others
 - **API proxy (tier 2)**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"` — fallback for non-TLV users
 - **History storage**: Cloudflare R2 bucket (`oref-history`) with per-day JSONL files
-- **Ingestion**: Cloudflare Worker with cron trigger (`ingestion/`) — appends to R2 every 15 minutes
+- **Ingestion**: Cloudflare Worker with cron trigger (`ingestion/`) — appends to R2 every 2 minutes with multi-attempt per 15-min window
 - **No frameworks**: Vanilla JS, CSS
 
 ## Data Sources
@@ -111,13 +115,83 @@ Unknown titles default to red and log a console warning.
 
 ## Map Rendering
 
-### Voronoi Polygons
+### Polygons
 
-All ~1,430 location coordinates from `cities_geo.json` are tessellated at startup using d3-delaunay into Voronoi cells. Cells are clipped to Israel's border polygon using polygon-clipping. Each location owns one polygon cell.
+Location polygons are pre-computed offline and shipped as `web/locations_polygons.json`. On startup the page fetches this file and loads all ~1,450 features into the MapLibre `alerts-source` GeoJSON source. Each feature's `fillColor`, `fillOpacity`, `lineColor`, and `lineOpacity` properties are updated in place via `setData()` whenever alert state changes — no layer recreation needed.
 
-- Computed once at startup, not on every alert update.
-- Only fill color and opacity change per alert event.
 - Adjacent polygons of the same color visually merge into contiguous threat zones (shared borders become invisible due to matching stroke color).
+- Per-feature state is driven by data properties, not Leaflet `setStyle`.
+- The `featureMap` lookup (`name → GeoJSON Feature`) is exposed on `AppState` for use by extensions (e.g. ellipse mode).
+
+### Basemap Tiles (PMTiles on R2)
+
+The basemap is a self-hosted Protomaps vector tile file stored on Cloudflare R2 and served via the R2 public bucket URL:
+
+```text
+https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east.pmtiles
+```
+
+**Current file coverage:**
+
+| Property | Value |
+|----------|-------|
+| File | `middle-east.pmtiles` |
+| Bounds (lng) | 22.0 – 73.0 |
+| Bounds (lat) | 3.0 – 50.0 |
+| Zoom | 0 – 10 |
+| Built | 2026-04-11 (pmtiles extract, OSM data 2026-04-09) |
+
+This covers Israel, Lebanon, Syria, Jordan, Iraq, Iran, Saudi Arabia, Egypt, Libya (east), the Gulf states, Yemen, Horn of Africa, Turkey, the Caucasus, and Pakistan border.
+
+#### Inspecting the current file
+
+```bash
+npx pmtiles show https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/middle-east.pmtiles
+```
+
+#### Regenerating with a larger bounding box
+
+The current file was generated with **Planetiler** (v0.10.1, run locally). For future updates the recommended approach is the `pmtiles` CLI, which uses HTTP range requests to extract only the needed tiles from Protomaps' hosted planet — no 120 GB download required.
+
+**Option A — `pmtiles extract` CLI (recommended for one-off changes):**
+
+Install: `brew install protomaps/homebrew-go-pmtiles/go-pmtiles`
+
+Find a recent build date at https://maps.protomaps.com/builds/, then run:
+```bash
+pmtiles extract https://build.protomaps.com/20260409.pmtiles middle-east.pmtiles \
+  --bbox=22,3,73,50 --maxzoom=10 --download-threads=4
+```
+bbox format: `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`. Replace the date with the one from the builds index. The command fetches only the tiles in the bbox via HTTP range requests (a few GB, not 120 GB).
+
+> **Do not use `slice.openstreetmap.us`** — that site downloads raw `.osm.pbf` data (OSM XML/binary), not `.pmtiles`.
+
+**Option B — Planetiler (best for full control or custom schemas):**
+```bash
+java -jar planetiler.jar \
+  --download \
+  --area=middle-east \
+  --bounds=22,3,73,50 \
+  --output=middle-east-extended.pmtiles
+```
+
+Both produce the same `protomaps` basemap schema — the map code works identically with either output.
+
+2. **Upload to R2** using Wrangler (bucket name visible in Cloudflare dashboard → R2):
+   ```bash
+   wrangler r2 object put <bucket-name>/middle-east.pmtiles \
+     --file=middle-east.pmtiles \
+     --content-type=application/vnd.mapbox-vector-tile
+   ```
+   The public URL (`pub-0cb002...r2.dev`) does not change after upload.
+
+3. **Update `maxBounds` in `web/index.html`** to match the new lat extent (e.g. `[[32.0, 10.0], [65.0, 42.0]]` for Yemen coverage).
+
+#### R2 bucket info
+
+- **Public URL**: `https://pub-0cb002f302e94002b76aa0bc30eb8763.r2.dev/`
+- **Public access**: enabled — the client fetches tiles directly from R2 at runtime via the `pmtiles://` protocol, no Worker involved.
+- Bucket name is visible in Cloudflare dashboard → R2.
 
 ### Geocoding
 
@@ -133,7 +207,7 @@ All ~1,430 location coordinates from `cities_geo.json` are tessellated at startu
 - **Legend**: Bottom-right — color key
 - **Timeline panel**: Bottom-center — date navigation + slider to scrub through any day's history
 - **About modal**: Triggered by ⓘ button or title click. Closes on backdrop click or Escape.
-- **Popups**: Click a polygon to see alert history for that location (newest first).
+- **Location panel**: Click a polygon to open a slide-in panel with alert history for that location (bottom-sheet on mobile, sidebar on desktop).
 
 All overlays use `position: fixed`, `z-index: 1000`, semi-transparent white backgrounds with `border-radius` and `box-shadow`. RTL layout throughout.
 
@@ -159,12 +233,12 @@ The original timeline fetched the extended history API (`/api/alarms-history`) o
 
 ## History Storage
 
-The Oref extended history API only exposes the latest ~3,000 entries (~1–2 hours during active days). To preserve the full record, alerts are ingested into R2 every 15 minutes and served by date.
+The Oref extended history API only exposes the latest ~3,000 entries (~1–2 hours during active days). To preserve the full record, alerts are ingested into R2 every 2 minutes (with multi-attempt per 15-minute window) and served by date.
 
 ### Architecture
 
-```
-  every 15 min (cron)
+```text
+  every 2 min (cron, multi-attempt per 15-min window)
   [Ingestion Worker] ──fetch──> [proxy1 Worker] ──fetch──> [oref API]
                                 (placement: israelcentral,
                                  different CF account)
@@ -187,7 +261,7 @@ Each day file covers events from `(D-1)T23:00` to `DT22:59` (Israel time). Event
 
 Each entry occupies one line ending with `,\n`:
 
-```
+```json
 {"data":"חיפה","alertDate":"2026-03-15T14:23:00","category_desc":"ירי רקטות וטילים","rid":495134},
 {"data":"תל אביב","alertDate":"2026-03-15T14:23:01","category_desc":"ירי רקטות וטילים","rid":495135},
 ```
@@ -202,35 +276,48 @@ For an empty file this produces `'[]'` — valid JSON.
 
 ### Ingestion worker (`ingestion/`)
 
-A Cloudflare Worker with a cron trigger every 15 minutes (at `:03`, `:18`, `:33`, `:48`).
+A Cloudflare Worker with a cron trigger every 2 minutes (`1/2 * * * *`, odd minutes: :01, :03, ..., :59).
 
-**Time window logic**: Each run ingests a fixed 15-minute quarter-hour block, determined by wall clock time (Israel time). The cron fires 3 minutes after each quarter ends, giving the API time to populate entries:
+**Multi-attempt design**: Each 15-minute window gets ~6 fetch attempts (one every 2 min) plus a final alert-check. This replaced the previous single-shot-per-window design, which silently missed entries during heavy salvos (March 28-30 incident).
 
-| Actual minute (Israel) | Window ingested |
-|---|---|
-| :01–:13 | [XX:45, XX+1:00) |
-| :17–:28 | [XX:00, XX:15) |
-| :32–:43 | [XX:15, XX:30) |
-| :47–:58 | [XX:30, XX:45) |
-| :14–:16, :29–:31, :44–:46, :59–:00 | **Dead zone** — skip |
+**Timeslot markers**: An R2 object `meta/<timeslot>` (e.g., `meta/2026-03-28T14:15`) tracks whether a window has been processed. Once a timeslot is marked, subsequent cron runs skip it immediately (single `head()` call). Markers older than 2 hours are cleaned up on alert-check runs.
 
-If the worker runs in a dead zone (ambiguous timing between two cron points), it logs and exits without processing. This handles cron drift safely.
+**Time window logic**: Each run ingests a fixed 15-minute quarter-hour block, determined by `event.scheduledTime` (Israel time):
 
-**Israel time conversion**: `alertDate` values from the API are in Israel time. Window bounds (UTC timestamps) are converted using `Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' })` for string comparison.
+| Scheduled minute (Israel) | Window ingested | Role |
+|---|---|---|
+| :01–:11 | [XX:45, XX+1:00) | Fetch attempts |
+| :13 | [XX:45, XX+1:00) | **Alert check** |
+| :15 | Dead zone | — |
+| :17–:25 | [XX:00, XX:15) | Fetch attempts |
+| :27 | [XX:00, XX:15) | **Alert check** |
+| :29, :31 | Dead zone | — |
+| :33–:41 | [XX:15, XX:30) | Fetch attempts |
+| :43 | [XX:15, XX:30) | **Alert check** |
+| :45 | Dead zone | — |
+| :47–:55 | [XX:30, XX:45) | Fetch attempts |
+| :57 | [XX:30, XX:45) | **Alert check** |
+| :59 | Dead zone | — |
+
+**Alert-check runs** (at :13, :27, :43, :57) do NOT fetch — they only check if the marker exists. If not, a Pushover notification is sent ("missed window"). This separation ensures notifications fire even if the fetch path is broken (CPU/memory crash, proxy down). Alert-check runs also clean up old markers.
+
+**Israel time conversion**: `alertDate` values from the API are in Israel time. Window bounds are converted using `Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' })` for string comparison.
 
 **R2 date key**: Events are grouped by `r2DateKey(alertDate)` — events with hour ≥ 23 go to the next day's file (see [Storage format](#storage-format)).
 
-**Processing**:
-1. Fetch from proxy1 Worker (`/api2/alarms-history`) — see [why proxy1](#why-proxy1-not-history-proxy) below
-2. Strip BOM, parse JSON (~3,000 entries, ~50KB)
-3. Filter to entries within the time window
-4. Map to 4 fields: `{ data, alertDate, category_desc, rid }`
-5. Sort by `alertDate`, group by R2 date key (events 23:xx → next day's file)
-6. For each date: read existing `.jsonl` from R2, append new entries, write back
+**Processing** (fetch attempts only):
+1. Check R2 marker — if exists, skip (already processed)
+2. Single `fetch()` to proxy1 Worker (`/api2/alarms-history`) — no in-process retries; cron cadence provides retries
+3. Strip BOM, parse JSON (~3,000 entries, ~50KB)
+4. Filter to entries within the time window
+5. Map to 4 fields: `{ data, alertDate, category_desc, rid }`
+6. Sort by `alertDate`, group by R2 date key (events 23:xx → next day's file)
+7. For each date: read existing `.jsonl` from R2, append new entries, write back
+8. Write timeslot marker to R2
 
-**Observability**: `[observability] enabled = true` in wrangler.toml persists logs to the Cloudflare dashboard. Console logs include window boundaries, entry counts, and R2 write details for each cron run.
+**Observability**: `[observability] enabled = true` in wrangler.toml persists logs to the Cloudflare dashboard. Console logs include timeslot, window boundaries, entry counts, R2 write details, marker status, and cleanup counts.
 
-**Error handling**: On fetch failure after 3 retries (delays: 5s, 15s, 45s), sends a Pushover notification and aborts. R2 write failures and CPU limit crashes are **not** notified — check dashboard logs.
+**Error handling**: On fetch failure, the run exits silently — the next cron fires 2 minutes later. If all attempts fail, the alert-check sends a Pushover notification. R2 write failures and CPU limit crashes are **not** notified — check dashboard logs.
 
 ### Day-history API (`functions/api/day-history.js`)
 

@@ -1,0 +1,15 @@
+[project]
+name = "oref-map"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "aiohttp>=3.13.3",
+    "alphashape>=1.3.1",
+    "matplotlib>=3.10.8",
+    "numpy>=2.4.4",
+    "opencv-python>=4.13.0.92",
+    "pandas>=3.0.2",
+    "scikit-learn>=1.8.0",
+    "shapely>=2.1.2",
+]

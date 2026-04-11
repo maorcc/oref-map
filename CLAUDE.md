@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project
 
-`oref-map` is a live alert map of Israel ("מפת העורף") showing colored Voronoi area polygons for alert statuses per location. It uses Leaflet + OpenStreetMap + d3-delaunay + polygon-clipping. Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
+`oref-map` is a live alert map of Israel ("מפת העורף") showing colored area polygons for alert statuses per location. It uses MapLibre GL JS + self-hosted PMTiles (Protomaps, Cloudflare R2). Polygons are pre-computed GeoJSON (`locations_polygons.json`). Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
 
 **Public URL**: https://oref-map.org
 
@@ -32,9 +32,47 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 - `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
 - `docs/map-requirements.md` — Feature requirements doc
 
+## Docs — when to read which file
+
+Read the relevant doc before making changes in that area:
+
+| Task | Read |
+|------|------|
+| Map rendering, basemap tiles, polygon source, API proxy architecture, Cloudflare setup | `docs/architecture.md` |
+| Changing map bounds, replacing or extending PMTiles on R2, understanding tile coverage | `docs/architecture.md` § "Basemap Tiles (PMTiles on R2)" |
+| Ellipse mode behavior, geometry math, cluster algorithm | `docs/ellipse-feature.md` |
+| Alg-C ellipse service (Python backend), request/response format | `docs/ellipse-alg-C.md` |
+| Ellipse probability window metric | `docs/ellipse-probability-window.md` |
+| Feature requirements, UX decisions | `docs/map-requirements.md` |
+| Oref API endpoints, response shapes, geo-blocking | `docs/oref-sources.md` (and this file) |
+
+## Replacing the basemap tiles (one-time)
+
+When the user asks to change or extend the PMTiles coverage:
+
+1. **Download a new PMTiles file** using the `pmtiles` CLI (install: `brew install protomaps/homebrew-go-pmtiles/go-pmtiles`). It extracts only the needed bbox via HTTP range requests — no full 120 GB download:
+   ```bash
+   pmtiles extract https://build.protomaps.com/20260409.pmtiles middle-east.pmtiles \
+     --bbox=22,3,73,50 --maxzoom=10 --download-threads=4
+   ```
+   Replace `20260404` with a recent date from https://maps.protomaps.com/builds/.
+   The bbox format is `MIN_LON,MIN_LAT,MAX_LON,MAX_LAT`.
+
+2. **Upload to R2** with:
+   ```bash
+   wrangler r2 object put <bucket-name>/middle-east.pmtiles \
+     --file=<path-to-downloaded-file>.pmtiles \
+     --content-type=application/vnd.mapbox-vector-tile
+   ```
+   The bucket name is visible in Cloudflare dashboard → R2. The public URL does not change.
+
+3. **Update `maxBounds` in `web/index.html`** (search for `maxBounds`) to match the new bounding box.
+
+4. **Verify** by running `npx pmtiles show <url>` to confirm the new bounds.
+
 ## Feature flags
 
-Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?f-log&f-ellipse`). On page load, a single block of JS parses all `f-*` params and:
+Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?f-log`). On page load, a single block of JS parses all `f-*` params and:
 
 1. Populates `window.FF` — a global dict keyed by flag name (e.g. `FF.ellipse`). Boolean flags store `true`; value-carrying flags (e.g. `?f-debugapi=host`) store the string value.
 2. Adds a CSS class `f-<name>` to `<body>` — enabling pure-CSS gating.
@@ -43,7 +81,7 @@ Beta/debug features are gated behind URL parameters with an `f-` prefix (e.g. `?
 - **CSS-only** (e.g. hiding a menu item): add `class="f-gated"` to the element, then add a CSS rule `body.f-<name> #element.f-gated { display: block !important; }`.
 - **JS-only**: check `if (FF.myfeature) { ... }`.
 
-**Current flags:** `f-log` (on-screen console overlay), `f-debugapi` (force API proxy host).
+**Current flags:** `f-log` (on-screen console overlay), `f-debugapi` (force API proxy host), `f-predict` (launch source prediction lines, experimental).
 
 ## Oref API details
 

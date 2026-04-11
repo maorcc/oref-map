@@ -61,6 +61,7 @@ functions/
     alerts.js         # proxies live alerts API
     history.js        # proxies history API
     alarms-history.js # proxies extended history API
+    analytics.js      # Cloudflare analytics summary for visitor counts
 worker/
   src/index.js        # fallback proxy for non-TLV users (placement: azure:israelcentral)
   wrangler.toml       # Worker config with placement and /api2/* route
@@ -78,9 +79,13 @@ Ways to help:
 
 To run locally, see the [Development](#development) section above.
 
+## Author
+
+Created by [Maor Conforti](https://github.com/maorcc).
+
 ## Contributors
 
-Thanks to [@uripeer3](https://github.com/uripeer3), [@tomerkon](https://github.com/tomerkon), [@michalrymland](https://github.com/michalrymland), and [@ravitzm21](https://github.com/ravitzm21) for contributing to this project.
+Thanks to [@uripeer3](https://github.com/uripeer3), [@tomerkon](https://github.com/tomerkon), [@michalrymland](https://github.com/michalrymland), [@ravitzm21](https://github.com/ravitzm21), [@tomeras91](https://github.com/tomeras91), and [@talmiller2](https://github.com/talmiller2) for contributing to this project.
 
 ## Data
 

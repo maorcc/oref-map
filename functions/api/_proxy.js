@@ -3,20 +3,71 @@ const OREF_HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 };
 
-const PROXY_HOSTS = [
+const NON_TLV_PROXY_HOSTS = [
   'https://orefproxy5.oref-map.org',
-//  'https://orefproxy6.oref-map.org',
-  'https://orefproxy7.oref-map.org',
-  'https://proxy1.oref-proxy1.workers.dev',
+  //  'https://orefproxy6.oref-map.org',
+  // 'https://orefproxy7.oref-map.org',
+];
+
+// Dedicated pool for TLV traffic so Israeli edge load can be isolated from the
+// general non-TLV proxy pool.
+const TLV_PROXY_HOSTS = [
+  'https://orefproxy5.oref-map.org',
+  //  'https://oreftest.kon40.com',
+  //  'https://orefproxy6.oref-map.org',
 ];
 
 const PROXY_HOST_PATTERNS = [
   /^orefproxy\d+\.oref-map\.org$/,
   /^proxy\d+\.oref-proxy\d+\.workers\.dev$/,
+  /^oreftest\.kon40\.com$/,
 ];
 
-function randomProxy() {
-  return PROXY_HOSTS[Math.floor(Math.random() * PROXY_HOSTS.length)];
+function randomFrom(hosts) {
+  return hosts[Math.floor(Math.random() * hosts.length)];
+}
+
+function randomNonTlvProxy() {
+  return randomFrom(NON_TLV_PROXY_HOSTS);
+}
+
+function randomTlvProxy() {
+  return randomFrom(TLV_PROXY_HOSTS);
+}
+
+async function fetchOrefDirect(context, target, kind, colo) {
+  const cache = caches.default;
+  const cacheKey = new Request(context.request.url, { method: 'GET' });
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const resp = new Response(cached.body, cached);
+    resp.headers.set('X-CF-Colo', colo);
+    return resp;
+  }
+
+  const resp = await fetch(target, { headers: OREF_HEADERS });
+  const body = await resp.arrayBuffer();
+
+  const response = new Response(body, {
+    status: resp.status,
+    headers: {
+      'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
+      'Cache-Control': 's-maxage=1, max-age=2',
+      'X-CF-Colo': colo,
+      'X-Served-By': 'pages-function',
+    },
+  });
+
+  if (resp.ok) {
+    context.waitUntil(cache.put(cacheKey, response.clone()));
+
+    // Check for unknown titles in the background
+    const bodyText = new TextDecoder().decode(body);
+    context.waitUntil(checkAndNotifyUnknownTitles(bodyText, kind, context));
+  }
+
+  return response;
 }
 
 // --- Known title classification (mirrors client-side classifyTitle) ---
@@ -154,6 +205,11 @@ export async function orefProxy(context, { target, redirectSuffix, kind }) {
   const url = new URL(context.request.url);
   const debugApi = url.searchParams.get('debugapi');
 
+  // ?debugapi=oref-direct forces a direct fetch from the Pages Function.
+  if (debugApi === 'oref-direct') {
+    return fetchOrefDirect(context, target, kind, colo);
+  }
+
   // ?debugapi=<hostname> forces redirect to that proxy (if whitelisted), even from TLV
   if (debugApi) {
     const proxyHost = PROXY_HOST_PATTERNS.some(p => p.test(debugApi)) ? 'https://' + debugApi : null;
@@ -165,45 +221,18 @@ export async function orefProxy(context, { target, redirectSuffix, kind }) {
     }
   }
 
-  // Non-TLV requests redirect to the Worker; title detection only runs on the
-  // TLV path since all Israeli traffic goes through it — same titles are seen.
+  // Non-TLV requests redirect to the shared proxy pool.
   if (colo !== 'TLV') {
     return new Response(null, {
       status: 303,
-      headers: { 'Location': randomProxy() + redirectSuffix, 'X-CF-Colo': colo },
+      headers: { 'Location': randomNonTlvProxy() + redirectSuffix, 'X-CF-Colo': colo },
     });
   }
 
-  const cache = caches.default;
-  const cacheKey = new Request(context.request.url, { method: 'GET' });
-
-  const cached = await cache.match(cacheKey);
-  if (cached) {
-    const resp = new Response(cached.body, cached);
-    resp.headers.set('X-CF-Colo', colo);
-    return resp;
-  }
-
-  const resp = await fetch(target, { headers: OREF_HEADERS });
-  const body = await resp.arrayBuffer();
-
-  const response = new Response(body, {
-    status: resp.status,
-    headers: {
-      'Content-Type': resp.ok ? 'application/json; charset=utf-8' : (resp.headers.get('Content-Type') || 'text/plain'),
-      'Cache-Control': 's-maxage=1, max-age=2',
-      'X-CF-Colo': colo,
-      'X-Served-By': 'pages-function',
-    },
+  // TLV requests redirect to a dedicated proxy pool so local traffic can be
+  // isolated from the general proxy fleet.
+  return new Response(null, {
+    status: 303,
+    headers: { 'Location': randomTlvProxy() + redirectSuffix, 'X-CF-Colo': colo },
   });
-
-  if (resp.ok) {
-    context.waitUntil(cache.put(cacheKey, response.clone()));
-
-    // Check for unknown titles in the background
-    const bodyText = new TextDecoder().decode(body);
-    context.waitUntil(checkAndNotifyUnknownTitles(bodyText, kind, context));
-  }
-
-  return response;
 }

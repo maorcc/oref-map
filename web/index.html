@@ -26,19 +26,30 @@
 <meta name="twitter:title" content="מפת העורף">
 <meta name="twitter:description" content="מפת התרעות פיקוד העורף בזמן אמת">
 <meta name="twitter:image" content="https://oref-map.org/og-image.jpg">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="/prediction-mode.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/pmtiles@3/dist/pmtiles.js"></script>
+<script src="https://unpkg.com/@protomaps/basemaps@5.7.2/dist/basemaps.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; font-family: Arial, sans-serif; }
-#map { width: 100%; height: 100%; direction: ltr; }
-.leaflet-interactive:focus { outline: none; }
-.leaflet-control-zoom { border-radius: 6px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border: none !important; }
-.leaflet-control-zoom a { border: none !important; }
-.leaflet-control-zoom a:first-child { border-radius: 6px 6px 0 0 !important; }
-.leaflet-control-zoom a:last-child { border-radius: 0 0 6px 6px !important; }
-body.has-overlay .leaflet-interactive { pointer-events: none !important; }
+#map { width: 100%; height: 100%; direction: ltr; background: #aad3df; }
+.maplibregl-canvas:focus { outline: none; }
+.maplibregl-ctrl-zoom { border-radius: 6px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border: none !important; }
+.maplibregl-ctrl-group { border-radius: 6px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border: none !important; }
+.maplibregl-ctrl-group button { border: none !important; }
+.maplibregl-ctrl-group button:first-child { border-radius: 6px 6px 0 0 !important; }
+.maplibregl-ctrl-group button:last-child { border-radius: 0 0 6px 6px !important; }
+body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-events: none !important; }
+
+#site-logo {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  pointer-events: none;
+}
 @keyframes tapHintFade { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes toastFade { 0%,75% { opacity: 1; } 100% { opacity: 0; } }
 .blue-dot { display: inline-block; width: 12px; height: 12px; background: #4285F4; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(66,133,244,0.5); }
@@ -69,8 +80,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #legend-icon { display: none; line-height: 0; }
 #legend .row { display: flex; align-items: center; gap: 8px; }
 #legend .dot {
-  width: 14px; height: 14px; flex-shrink: 0;
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+  width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
 }
 .dot-red    { background: #ff0000; }
 .dot-purple { background: #9922cc; }
@@ -92,6 +102,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #status .indicator {
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   margin-left: 6px; vertical-align: middle;
+}
+#visitorCount {
+  display: none;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid #ddd;
+  font-size: 11px;
+  color: #555;
 }
 .indicator-red    { background: #ff0000; animation: pulse 3s ease-in-out infinite; }
 .indicator-purple { background: #9922cc; animation: pulse 3s ease-in-out infinite; }
@@ -119,26 +137,142 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   color: #333;
 }
 
-#page-title {
-  margin: 0;
+
+
+/* --- Unified panel (sidebar + timeline) --- */
+#unified-panel {
+  display: none;
   position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.92);
-  border-radius: 6px;
-  padding: 6px 16px;
-  font-size: 16px;
-  font-weight: bold;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-  z-index: 1000;
+  z-index: 1010;
+  background: #f7f7f5;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.15);
   direction: rtl;
-  white-space: nowrap;
+  flex-direction: column;
+  transition: transform 0.28s ease;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Slim: compact box at bottom-right (mobile default) */
+#unified-panel.slim {
+  display: flex;
+  bottom: 0; left: 0; right: 0;
+  border-radius: 12px 12px 0 0;
+}
+#unified-panel.slim #up-location { display: none; }
+#unified-panel.slim #up-handle { display: none; }
+
+/* Full: bottom sheet (mobile default) */
+#unified-panel.full {
+  display: flex;
+  bottom: 0; left: 0; right: 0;
+  max-height: 55vh;
+  border-radius: 12px 12px 0 0;
+}
+#unified-panel.full #up-event-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
-.leaflet-popup-close-button {
-  right: auto !important;
-  left: 5px !important;
+/* Handle bar (mobile close target) */
+#up-handle {
+  display: none;
+  width: 36px; height: 4px;
+  background: #ccc; border-radius: 2px;
+  margin: 8px auto 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+#unified-panel.full #up-handle { display: block; }
+
+/* Location section (header + event list) — must shrink to fit within panel */
+#up-location { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+#up-location-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 4px;
+  direction: rtl;
+  flex-shrink: 0;
+}
+#up-location-name { font-size: 15px; }
+#up-fav-star {
+  cursor: pointer; font-size: 18px; color: #ccc;
+  vertical-align: middle; user-select: none;
+  margin-inline-end: auto;
+}
+#up-location-close {
+  background: none; border: none; cursor: pointer;
+  font-size: 20px; color: #888; line-height: 1; padding: 4px;
+}
+#up-location-close:hover { color: #333; }
+
+/* Event list rows */
+#up-event-list { direction: rtl; }
+.up-event-row {
+  padding: 3px 12px;
+  display: flex; align-items: baseline; gap: 8px;
+  cursor: pointer; direction: rtl;
+}
+.up-event-row:hover { background: #f5f5f5; }
+.up-event-row.up-current { background: rgba(59,130,246,0.1); border-right: 3px solid #3b82f6; }
+.up-event-time { font-size: 12px; font-weight: bold; white-space: nowrap; }
+.up-event-label { font-size: 13px; color: #444; flex: 1; text-align: right; }
+.up-event-sep { border-bottom: 1px solid #ccc; padding-bottom: 3px; margin-bottom: 3px; }
+#up-event-list .up-empty { padding: 12px; color: #888; font-size: 13px; text-align: center; }
+
+/* Timeline section inside unified panel */
+#up-timeline {
+  flex-shrink: 0;
+  direction: ltr;
+  padding: 8px 12px 4px;
+  border-top: 1px solid #eee;
+}
+
+/* Close row at bottom of panel */
+#up-close-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 4px;
+  direction: rtl;
+  cursor: pointer;
+}
+#up-close-row:hover .btn-text { color: #111; }
+#up-close-row .tl-close { margin-right: auto; color: #888; }
+#up-close-row .tl-close:hover { color: #333; }
+
+/* Hide trigger button when panel open */
+body.panel-open #timeline-btn { display: none !important; }
+body.panel-open #legend { display: none; }
+/* Selected-location label on map */
+.selected-label .maplibregl-popup-content {
+  background: rgba(59,130,246,0.9); color: #fff;
+  padding: 3px 8px; border-radius: 4px;
+  font-size: 13px; font-weight: bold; direction: rtl;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3); pointer-events: none;
+}
+.selected-label .maplibregl-popup-tip { border-top-color: rgba(59,130,246,0.9); }
+
+/* Idle: hide slim panel but never hide full */
+body.idle #unified-panel.slim { opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+
+/* Desktop overrides */
+@media (min-width: 600px) {
+  #unified-panel.slim, #unified-panel.full {
+    right: 0; bottom: 0;
+    width: 320px;
+    box-shadow: -2px 0 12px rgba(0,0,0,0.15);
+    transition: height 0.25s ease, border-radius 0.25s ease;
+  }
+  #unified-panel.slim {
+    border-radius: 12px 0 0 0;
+  }
+  #unified-panel.full {
+    height: 100vh; height: 100dvh;
+    max-height: none; border-radius: 0;
+  }
+  #unified-panel.full #up-handle { display: none; }
+  #unified-panel.full #up-event-list { max-height: none; }
 }
 
 .modal-backdrop {
@@ -167,6 +301,27 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 .modal-content h2 { margin: 0 0 12px; font-size: 20px; }
 .modal-content p { margin: 0 0 10px; color: #444; }
 .modal-content a { color: #0066cc; }
+#about-visitors-stat {
+  display: none;
+  margin: 14px 0 0;
+  background: #f0f4fa;
+  border-radius: 10px;
+  padding: 12px 16px;
+  text-align: center;
+}
+#about-visitors-stat .stat-number {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a56db;
+  line-height: 1.2;
+}
+#about-visitors-stat .stat-label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
+}
 
 .modal-close {
   position: absolute;
@@ -236,6 +391,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 }
 /* Feature-flag-gated elements: hidden by default, shown when flag is active */
 .f-gated { display: none !important; }
+body.f-predict #menu-predict.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-row {
@@ -293,6 +449,12 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   font-weight: 500;
   white-space: nowrap;
 }
+.menu-item-value {
+  margin-right: auto;
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+}
 .menu-sub-panel {
   display: none;
   padding: 8px 16px 12px;
@@ -338,7 +500,7 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   transition: max-width 0.3s ease-out, max-height 0.3s ease-out, border-radius 0.2s ease-out, background 0.2s ease-out, opacity 0.4s ease;
 }
 @media (hover: hover) {
-  #timeline-btn:not(.open):hover {
+  #timeline-btn:hover {
     background: rgba(253, 230, 138, 0.92);
     border-color: #f59e0b;
   }
@@ -347,17 +509,8 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #timeline-btn {
   display: none;
   direction: ltr;
-  flex-direction: column-reverse;
 }
 #timeline-btn.has-data { display: flex; background: rgba(254, 243, 199, 0.92); border-color: #f59e0b; }
-#timeline-btn.open {
-  width: 620px;
-  max-width: min(calc(100vw - 48px), 620px);
-  max-height: 250px;
-  cursor: default;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.97);
-}
 #timeline-btn-row {
   display: flex;
   align-items: center;
@@ -367,33 +520,14 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   direction: rtl;
   cursor: pointer;
 }
-#timeline-btn.open #timeline-btn-row {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
-  height: auto;
-  padding: 4px 0;
-  border: none;
-  z-index: 1;
-}
 .btn-icon { font-size: 18px; line-height: 1; flex-shrink: 0; }
 .btn-text { font-size: 13px; font-weight: 500; white-space: nowrap; }
-.tl-close { display: none; font-size: 16px; cursor: pointer; color: #888; margin-right: auto; }
+.tl-close { font-size: 16px; cursor: pointer; color: #888; margin-right: auto; }
 .tl-close:hover { color: #333; }
-#timeline-btn.open .tl-close { display: inline; }
-
-#timeline-controls {
-  display: none;
-  padding: 10px 12px;
-  gap: 4px;
-  flex-direction: column;
-}
-#timeline-btn.open #timeline-controls { display: flex; }
 #timeline-transport {
   display: flex;
   align-items: center;
   gap: 6px;
-  order: 2;
 }
 #timeline-transport button {
   background: none;
@@ -413,7 +547,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
 #timeline-slider-wrap {
   position: relative;
   width: 100%;
-  order: 0;
   padding-bottom: 6px;
 }
 #timeline-ticks {
@@ -473,7 +606,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   align-items: center;
   justify-content: space-between;
   direction: ltr;
-  order: 1;
 }
 #timeline-date-nav {
   display: flex;
@@ -548,9 +680,6 @@ body.has-overlay .leaflet-interactive { pointer-events: none !important; }
   }
   #menu-btn { width: 36px; height: 36px; }
   #menu-panel { top: 56px; }
-  #timeline-btn.open {
-    max-width: calc(100vw - 24px);
-  }
   #timeline-btn-row {
     height: 36px;
     padding: 0 10px;
@@ -579,9 +708,14 @@ body.idle #right-panel {
 </style>
 </head>
 <body>
+
+<div id="site-logo">
+  <h1 style="margin:0;font-size:0">מפת העורף</h1>
+  <img src="/logo-text.png" srcset="/logo-text.png 1x, /logo-text@2x.png 2x" width="125" height="60" alt="מפת העורף">
+</div>
+
 <div id="map"></div>
 
-<h1 id="page-title">מפת העורף</h1>
 <button id="menu-btn" type="button" title="תפריט" aria-label="תפריט" aria-expanded="false">
   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
 </button>
@@ -601,7 +735,22 @@ body.idle #right-panel {
   <div id="menu-zoom" class="menu-item">
     <button class="menu-item-row" type="button">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 4.5M12 2L9.5 4.5M12 22L9.5 19.5M12 22L14.5 19.5M2 12L4.5 9.5M2 12L4.5 14.5M22 12L19.5 14.5M22 12L19.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.5" stroke="currentColor" stroke-width="2" fill="transparent"/><path d="M14.5 14.5L17.5 17.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>
-      <span class="menu-item-label">זום אוטומטי</span>
+      <span id="menu-zoom-label" class="menu-item-label">זום אוטומטי</span>
+      <span id="menu-zoom-value" class="menu-item-value" style="display:none;"></span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-wakelock" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span id="menu-wakelock-icon" class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+      <span class="menu-item-label">מנע כיבוי מסך</span>
+      <span class="menu-check"></span>
+    </button>
+  </div>
+  <div id="menu-visitors" class="menu-item">
+    <button class="menu-item-row" type="button">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+      <span class="menu-item-label">מס' משתמשים</span>
       <span class="menu-check"></span>
     </button>
   </div>
@@ -649,8 +798,15 @@ body.idle #right-panel {
         </button>
       </div>
       <div id="ext-menu">
-        <div id="menu-predict" class="menu-item">
-          <button class="menu-item-row" type="button">
+        <div id="menu-driving-mode-feature" class="menu-item">
+          <button class="menu-item-row" type="button" id="driving-mode-feature-btn">
+            <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16l1.5-5A2 2 0 0 1 8.4 9.5h7.2a2 2 0 0 1 1.9 1.5L19 16"/><rect x="4" y="13" width="16" height="5" rx="1.5"/><circle cx="7.5" cy="18.5" r="1.5"/><circle cx="16.5" cy="18.5" r="1.5"/><path d="M7 13V9.5"/><path d="M17 13V9.5"/></svg></span>
+            <span class="menu-item-label">מצב נהיגה</span>
+            <span class="menu-check"></span>
+          </button>
+        </div>
+        <div id="menu-predict" class="menu-item f-gated">
+          <button class="menu-item-row" type="button" id="predict-enable-btn">
             <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
             <span class="menu-item-label">כיוון שיגור</span>
             <span class="menu-check"></span>
@@ -665,6 +821,7 @@ body.idle #right-panel {
 <div id="status">
   <span class="indicator indicator-err" id="statusDot"></span>
   <span id="statusText">מתחבר...</span>
+  <div id="visitorCount"></div>
   <div id="historyTimeLabel" style="display:none; font-size:11px; color:#555; margin-top:5px; padding-top:5px; border-top:1px solid #ddd;"></div>
 </div>
 <div id="errorDetail"></div>
@@ -673,11 +830,16 @@ body.idle #right-panel {
   <div id="about-modal" class="modal-content">
     <button id="about-close" class="modal-close">&times;</button>
     <h2>אודות מפת העורף</h2>
-    <p>מפה המציגה בזמן אמת התרעות פיקוד העורף על גבי מפת ישראל.</p>
+    <p>הצגת אזורי ההתרעות של פיקוד העורף על גבי מפה בזמן אמת.</p>
+    <p>נוצר על ידי מאור קונפורטי והקהילה. תרומות לפרויקט יתקבלו בברכה.</p>
     <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
     <p>אין להסתמך על המידע והתכנים המוצגים באתר זה, ובכל מקרה יש לנהוג בהתאם להנחיות פיקוד העורף.</p>
     <p>קוד המקור של פרויקט זה זמין ב-<a href="https://github.com/maorcc/oref-map" target="_blank" rel="noopener">GitHub</a>.</p>
     <p>נתקלתם בבעיה או יש לכם הצעה? <a href="https://github.com/maorcc/oref-map/issues/new" target="_blank" rel="noopener">פתחו קריאה ב-GitHub</a>.</p>
+    <div id="about-visitors-stat">
+      <span class="stat-number"></span>
+      <span class="stat-label">מבקרים ב-24 השעות האחרונות</span>
+    </div>
   </div>
 </div>
 
@@ -695,26 +857,40 @@ body.idle #right-panel {
   </div>
   <div id="timeline-btn" title="ציר זמן">
     <div id="timeline-btn-row">
-      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
+      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span>
     </div>
-    <div id="timeline-controls">
-      <div id="timeline-slider-wrap">
-        <div id="timeline-ticks"></div>
-        <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+  </div>
+</div>
+<div id="unified-panel">
+  <div id="up-handle"></div>
+  <div id="up-location">
+    <div id="up-location-header">
+      <b id="up-location-name"></b>
+      <span id="up-fav-star"></span>
+      <button id="up-location-close" aria-label="סגור">&times;</button>
+    </div>
+    <div id="up-event-list"></div>
+  </div>
+  <div id="up-timeline">
+    <div id="timeline-slider-wrap">
+      <div id="timeline-ticks"></div>
+      <input type="range" id="timeline-slider" min="0" max="999" value="999" step="1">
+    </div>
+    <div id="timeline-date-row">
+      <span id="timeline-label"></span>
+      <div id="timeline-date-nav">
+        <button id="tl-date-prev" title="יום קודם">&#9666;</button>
+        <span id="tl-date-label"></span>
+        <button id="tl-date-next" title="יום הבא">&#9656;</button>
       </div>
-      <div id="timeline-date-row">
-        <span id="timeline-label"></span>
-        <div id="timeline-date-nav">
-          <button id="tl-date-prev" title="יום קודם">&#9666;</button>
-          <span id="tl-date-label"></span>
-          <button id="tl-date-next" title="יום הבא">&#9656;</button>
-        </div>
-      </div>
-      <div id="timeline-transport">
-        <button id="tl-prev" title="אירוע קודם">⏮</button>
-        <button id="tl-play" title="נגן/עצור">▶</button>
-        <button id="tl-next" title="אירוע הבא">⏭</button>
-      </div>
+    </div>
+    <div id="timeline-transport">
+      <button id="tl-prev" title="אירוע קודם">⏮</button>
+      <button id="tl-play" title="נגן/עצור">▶</button>
+      <button id="tl-next" title="אירוע הבא">⏭</button>
+    </div>
+    <div id="up-close-row">
+      <span class="btn-icon"><svg width="18" height="18" viewBox="0 0 100 100" style="vertical-align:middle"><path d="M48,8 L26,26 L48,44 L48,34 C62,34 74,46 74,60 C74,74 62,86 48,86 C38,86 30,80 26,72 L18,76 C24,88 35,96 48,96 C68,96 84,80 84,60 C84,40 68,24 48,24 L48,8Z" fill="#A1C2FA" stroke="#333" stroke-width="3" stroke-linejoin="round"/><circle cx="48" cy="60" r="26" fill="white" stroke="#333" stroke-width="3"/><g stroke="#333" stroke-width="4" stroke-linecap="round"><line x1="48" y1="60" x2="38" y2="52"/><line x1="48" y1="60" x2="32" y2="68"/></g><circle cx="48" cy="60" r="3.5" fill="#A1C2FA" stroke="#333" stroke-width="2"/><g stroke="#333" stroke-width="2.5" stroke-linecap="round"><line x1="48" y1="39" x2="48" y2="43"/><line x1="69" y1="60" x2="65" y2="60"/><line x1="48" y1="81" x2="48" y2="77"/><line x1="27" y1="60" x2="31" y2="60"/></g></svg></span><span class="btn-text">התרעות קודמות</span><span class="tl-close">✕</span>
     </div>
   </div>
 </div>
@@ -787,6 +963,29 @@ body.idle #right-panel {
     document.head.appendChild(s);
   });
 
+  // Prediction: lazy-load on first enable or auto-load if previously enabled
+  (function() {
+    var loaded = false;
+    function load(atStartup) {
+      if (loaded) return;
+      loaded = true;
+      if (atStartup) _extPending++;
+      var s = document.createElement('script');
+      s.src = '/prediction-mode.js';
+      if (atStartup) {
+        s.onload = s.onerror = function() { _extPending--; _maybeDispatchReady(); };
+      } else {
+        try { localStorage.setItem('oref-predict', 'true'); } catch (e) {}
+        s.onerror = function() { loaded = false; try { localStorage.removeItem('oref-predict'); } catch (e) {} };
+      }
+      document.head.appendChild(s);
+    }
+    if (FF.predict) {
+      try { if (localStorage.getItem('oref-predict') === 'true') load(true); } catch (e) {}
+      document.getElementById('predict-enable-btn').addEventListener('click', function() { load(false); });
+    }
+  })();
+
   // --- Debug overlay (append console.warn/error to on-screen log when ?f-log) ---
   if (FF.log) {
     var debugOverlay = document.createElement('div');
@@ -812,6 +1011,9 @@ body.idle #right-panel {
   //   var PROXY_BASE = 'https://oref-proxy.YOUR_ACCOUNT.workers.dev';
   var PROXY_BASE = '';
   var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
+  var ANALYTICS_POLL_MS = 30000;
+  var ANALYTICS_LABEL = 'מבקרים בשעה האחרונה';
+  var ANALYTICS_URL = '/api/analytics';
 
   function resetProxy() {
     PROXY_BASE = '';
@@ -840,8 +1042,74 @@ body.idle #right-panel {
     });
   }
 
+  var visitorCountEl = document.getElementById('visitorCount');
+  var visitorsEnabled = (function() {
+    try { return localStorage.getItem('oref-visitors') !== 'disabled'; } catch(e) { return true; }
+  })();
+
+  function renderVisitorCount(count) {
+    if (!visitorCountEl || !Number.isFinite(count)) return;
+    visitorCountEl.textContent = count + ' ' + ANALYTICS_LABEL;
+    visitorCountEl.style.display = 'block';
+  }
+
+  var lastVisitors24h = null;
+
+  function fetchAnalytics() {
+    return fetch(ANALYTICS_URL).then(function(resp) {
+      if (!resp.ok) throw new Error('analytics request failed');
+      return resp.json();
+    }).then(function(data) {
+      if (data && typeof data.visitors_24h === 'number') {
+        lastVisitors24h = data.visitors_24h;
+      }
+      if (visitorsEnabled && data && typeof data.visitors_1h === 'number') {
+        renderVisitorCount(data.visitors_1h);
+      }
+    }).catch(function(err) {
+      console.warn('Analytics fetch failed:', err);
+    });
+  }
+
+  var analyticsTimer = null;
+  function startAnalyticsPolling() {
+    if (analyticsTimer) return;
+    fetchAnalytics();
+    analyticsTimer = setInterval(fetchAnalytics, ANALYTICS_POLL_MS);
+  }
+  function stopAnalyticsPolling() {
+    if (analyticsTimer) {
+      clearInterval(analyticsTimer);
+      analyticsTimer = null;
+    }
+  }
+
+  function pausePolling() {
+    if (livePollId)    { clearInterval(livePollId);    livePollId    = null; }
+    if (historyPollId) { clearInterval(historyPollId); historyPollId = null; }
+    if (fadePollId)    { clearInterval(fadePollId);    fadePollId    = null; }
+    stopAnalyticsPolling();
+  }
+
+  function resumePolling() {
+    if (livePollId) return; // already running
+    fadeGreenMarkers();
+    fetchLiveAlerts();
+    livePollId = setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+    fadePollId = setInterval(fadeGreenMarkers, FADE_TICK_MS);
+    // Only restart history polling when viewing today — past-date mode stops it intentionally
+    if (isViewingToday()) {
+      fetchHistory();
+      historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+    }
+    if (visitorsEnabled) startAnalyticsPolling();
+  }
+
   // Periodically reset proxy so client can re-check if direct /api works
   setInterval(resetProxy, 300000); // 5 min
+  if (visitorsEnabled) {
+    startAnalyticsPolling();
+  }
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;
   var GREEN_FADE_MS = 120000; // 2 minutes
@@ -850,11 +1118,220 @@ body.idle #right-panel {
 
   // --- Map setup ---
   var DEFAULT_CENTER = [31.6, 34.8], DEFAULT_ZOOM = 8;
-  var map = L.map('map', { preferCanvas: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 18
-  }).addTo(map);
+  // --- MapLibre GL JS setup ---
+  var pmtilesProtocol = new pmtiles.Protocol();
+  maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
+
+  maplibregl.setRTLTextPlugin(
+    'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+    null, true
+  );
+
+  var PMTILES_URL = 'pmtiles://https://tiles.oref-map.org/middle-east.pmtiles';
+
+  // Warm MapTiler-like flavor (Protomaps LIGHT with warmer, more colorful tones)
+  var WARM_FLAVOR = Object.assign({}, basemaps.LIGHT, {
+    background:            '#f5f0e8',
+    earth:                 '#f5f0e8',
+    park_a:                '#d1e8c8',
+    park_b:                '#a8d890',
+    hospital:              '#f0e0e0',
+    industrial:            '#e0e8ec',
+    school:                '#f0e8d8',
+    wood_a:                '#c8d8b0',
+    wood_b:                '#8cc880',
+    pedestrian:            '#f0ebe0',
+    scrub_a:               '#d8e8d0',
+    scrub_b:               '#a0d090',
+    sand:                  '#f0e8c0',
+    beach:                 '#f0e8c0',
+    aerodrome:             '#e8e8f0',
+    runway:                '#f0f0f8',
+    water:                 '#aad3df',
+    buildings:             '#e8dfd6',
+    minor_service_casing:  '#e4ddd4',
+    minor_casing:          '#e4ddd4',
+    link_casing:           '#e0c840',
+    major_casing_early:    '#e0c840',
+    major_casing_late:     '#e0c840',
+    highway_casing_early:  '#e0a820',
+    highway_casing_late:   '#e0a820',
+    other:                 '#f5f0ea',
+    minor_service:         '#fafafa',
+    minor_a:               '#fafafa',
+    minor_b:               '#ffffff',
+    link:                  '#fde090',
+    major:                 '#fde090',
+    highway:               '#f8c840',
+    city_label:            '#333333',
+    city_label_halo:       '#ffffff',
+    subplace_label:        '#666666',
+    subplace_label_halo:   '#f5f0e8',
+    state_label:           '#888888',
+    state_label_halo:      '#f5f0e8',
+    boundaries:            '#555555',
+    country_label:         '#888888',
+    landcover: {
+      grassland: 'rgba(195, 235, 180, 1)',
+      barren:    'rgba(245, 235, 200, 1)',
+      urban_area:'rgba(228, 222, 212, 1)',
+      farmland:  'rgba(215, 235, 200, 1)',
+      glacier:   'rgba(255, 255, 255, 1)',
+      scrub:     'rgba(220, 235, 200, 1)',
+      forest:    'rgba(185, 225, 190, 1)'
+    }
+  });
+
+  // --- Basemap style customizations ---
+  // Modify the Protomaps layer list before passing to MapLibre so tweaks are
+  // baked into the initial style rather than applied post-load via setPaintProperty.
+  // Add future basemap tweaks here.
+  function scaleWidthExpr(expr, factor) {
+    if (typeof expr === 'number') return expr * factor;
+    if (!Array.isArray(expr) || expr[0] !== 'interpolate') return expr;
+    var scaled = [expr[0], expr[1], expr[2]];
+    for (var i = 3; i < expr.length; i += 2) {
+      scaled.push(expr[i]);
+      scaled.push(expr[i + 1] * factor);
+    }
+    return scaled;
+  }
+
+  function customizeBasemapLayers(layers) {
+    return layers.map(function(l) {
+      l = Object.assign({}, l, { paint: Object.assign({}, l.paint), layout: Object.assign({}, l.layout) });
+      // Roads: narrow to 40% of default width
+      if (l['source-layer'] === 'roads' && l.paint && l.paint['line-width']) {
+        l.paint['line-width'] = scaleWidthExpr(l.paint['line-width'], 0.4);
+      }
+      // Country borders: solid non-disputed only, thicker
+      if (l.id === 'boundaries_country') {
+        l.filter = ['all', ['<=', 'kind_detail', 2], ['!=', 'disputed', true]];
+        l.paint['line-width'] = 2;
+      }
+      // Sub-regional boundaries: only at zoom 9+
+      if (l.id === 'boundaries') {
+        l.filter = ['>', 'kind_detail', 2];
+        l.paint['line-width'] = 0.8;
+        l.paint['line-opacity'] = ['step', ['zoom'], 0, 9, 1];
+      }
+      return l;
+    });
+  }
+
+  var MAP_STYLE = {
+    version: 8,
+    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+    sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
+    sources: {
+      protomaps: {
+        type: 'vector',
+        url: PMTILES_URL,
+        attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
+      }
+    },
+    layers: customizeBasemapLayers(basemaps.layers('protomaps', WARM_FLAVOR, { lang: 'he' }))
+  };
+
+  var map = new maplibregl.Map({
+    container: 'map',
+    style: MAP_STYLE,
+    center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], // MapLibre uses [lng, lat]
+    zoom: DEFAULT_ZOOM,
+    maxBounds: [[25.0, 6.0], [70.0, 44.0]],
+    touchPitch: false,
+    maxTileCacheZoomLevels: 8,
+    fadeDuration: 0
+  });
+
+  map.dragRotate.disable();
+  map.touchZoomRotate.disableRotation();
+
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+
+  var mapLoaded = false;
+  var polygonsGeoJSON = { type: 'FeatureCollection', features: [] };
+  var featureMap = {}; // name → GeoJSON feature object
+  var pendingPolygonData = null; // set if geo data loads before map
+
+  function updateMapLibreSource() {
+    if (!mapLoaded) return;
+    var src = map.getSource('alerts-source');
+    if (src) src.setData(polygonsGeoJSON);
+  }
+
+  map.on('load', function() {
+    mapLoaded = true;
+
+    // Disputed country borders (West Bank/Gaza outline, Lebanon, Golan): visible but dashed
+    // (non-disputed borders and road widths are baked into MAP_STYLE via customizeBasemapLayers)
+    map.addLayer({
+      id: 'boundaries_disputed',
+      type: 'line',
+      source: 'protomaps',
+      'source-layer': 'boundaries',
+      filter: ['all', ['<=', 'kind_detail', 2], ['==', 'disputed', true]],
+      paint: {
+        'line-color': '#777',
+        'line-width': 1.5,
+        'line-dasharray': [4, 3]
+      }
+    }, 'boundaries_country');
+
+    map.addSource('alerts-source', { type: 'geojson', data: polygonsGeoJSON });
+
+    map.addLayer({
+      id: 'alerts-fill',
+      type: 'fill',
+      source: 'alerts-source',
+      paint: {
+        'fill-color': ['coalesce', ['feature-state', 'fillColor'], '#888888'],
+        'fill-opacity': ['coalesce', ['feature-state', 'fillOpacity'], 0.01]
+      }
+    });
+
+    // Invisible hit layer so ALL polygons are clickable regardless of opacity
+    map.addLayer({
+      id: 'alerts-hit',
+      type: 'fill',
+      source: 'alerts-source',
+      paint: { 'fill-opacity': 0, 'fill-color': 'transparent' }
+    });
+
+    map.addLayer({
+      id: 'alerts-stroke',
+      type: 'line',
+      source: 'alerts-source',
+      paint: {
+        'line-color': ['coalesce', ['feature-state', 'lineColor'], '#aaaaaa'],
+        'line-opacity': ['coalesce', ['feature-state', 'lineOpacity'], 0.25],
+        'line-width': ['coalesce', ['feature-state', 'lineWidth'], 1]
+      }
+    });
+
+    map.on('click', 'alerts-hit', function(e) {
+      if (menuOpen) return;
+      e.originalEvent.stopPropagation();
+      var name = e.features[0].properties.name;
+      if (selectedLocation === name) {
+        deselectLocation();
+      } else {
+        openLocationPanel(name);
+      }
+    });
+    map.on('mouseenter', 'alerts-hit', function() {
+      if (!menuOpen) map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'alerts-hit', function() { map.getCanvas().style.cursor = ''; });
+
+    // If geo data already fetched, build polygons now
+    if (pendingPolygonData) {
+      var cb = pendingPolygonCallback;
+      pendingPolygonCallback = null;
+      buildPolygons(pendingPolygonData, cb);
+      pendingPolygonData = null;
+    }
+  });
 
   // --- Toast ---
   function showToast(msg) {
@@ -868,37 +1345,77 @@ body.idle #right-panel {
   // --- User location ---
   var userLocationMarker = null;
   var currentUserLatLng = null;
+  var requestUserLocation = function(cb) { if (cb) cb(false); };
+  var STORED_POSITION_COOKIE = 'oref-stored-my-position';
 
-  function getUrlPosition() {
-    var raw = new URLSearchParams(window.location.search).get('myPosition');
+  function parsePositionValue(raw) {
     if (!raw) return null;
     var parts = raw.split(',').map(function(part) { return Number(part.trim()); });
     if (parts.length !== 2 || parts.some(function(n) { return Number.isNaN(n); })) return null;
     return [parts[0], parts[1]];
   }
 
+  function getUrlPosition() {
+    return parsePositionValue(new URLSearchParams(window.location.search).get('myPosition'));
+  }
+
+  function getStoredPosition() {
+    var match = document.cookie.match(new RegExp('(?:^|; )' + STORED_POSITION_COOKIE + '=([^;]*)'));
+    if (!match) return null;
+    return parsePositionValue(decodeURIComponent(match[1]));
+  }
+
+  function storePositionCookie(latlng) {
+    if (!FF['store-my-position'] || !latlng) return;
+    var expires = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    document.cookie = STORED_POSITION_COOKIE + '=' + encodeURIComponent(latlng[0] + ',' + latlng[1]) +
+      '; expires=' + expires.toUTCString() + '; path=/; SameSite=Lax';
+  }
+
   function getCurrentUserPosition() {
     if (currentUserLatLng) return currentUserLatLng;
     var urlPos = getUrlPosition();
-    return urlPos ? { lat: urlPos[0], lng: urlPos[1] } : null;
+    if (urlPos) return { lat: urlPos[0], lng: urlPos[1] };
+    var storedPos = getStoredPosition();
+    return storedPos ? { lat: storedPos[0], lng: storedPos[1] } : null;
   }
 
   function initUserLocation() {
     var menuGps = document.getElementById('menu-gps');
     var gpsLabel = menuGps.querySelector('.menu-item-label');
-    if (!navigator.geolocation) { menuGps.style.display = 'none'; return; }
+    var urlPos = getUrlPosition();
+    var storedPos = getStoredPosition();
+    if (!navigator.geolocation && !urlPos && !storedPos) { menuGps.style.display = 'none'; return; }
     var LOCATION_PREF_KEY = 'oref-show-user-location';
     var LOCATION_HIDDEN_KEY = 'oref-location-hidden';
 
-    var icon = L.divIcon({
-      html: '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>',
-      className: '',
-      iconSize: [20, 20],
-      iconAnchor: [10, 10]
-    });
+    function makeUserLocationDotEl() {
+      var el = document.createElement('div');
+      el.style.cssText = 'width:20px;height:20px;display:flex;align-items:center;justify-content:center;';
+      el.innerHTML = '<span style="display:block;width:14px;height:14px;background:#4285F4;border:3px solid #fff;border-radius:50%;box-shadow:0 0 6px rgba(66,133,244,0.6);"></span>';
+      return el;
+    }
+    function makeUserLocationCarEl() {
+      var el = document.createElement('div');
+      el.style.cssText = 'width:28px;height:28px;';
+      el.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;font-size:22px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.35));">🚗</span>';
+      return el;
+    }
 
     var watchId = null;
     var transientTimeout = null;
+
+    function makeUserLocationEl() {
+      return drivingModeFeatureEnabled ? makeUserLocationCarEl() : makeUserLocationDotEl();
+    }
+
+    function refreshUserLocationMarkerIcon() {
+      if (!userLocationMarker) return;
+      var el = userLocationMarker.getElement();
+      var newEl = makeUserLocationEl();
+      el.innerHTML = newEl.innerHTML;
+      el.style.cssText = newEl.style.cssText;
+    }
 
     function shouldRestoreUserLocation() {
       try {
@@ -938,7 +1455,7 @@ body.idle #right-panel {
 
     function stopWatching() {
       if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
-      if (userLocationMarker) { map.removeLayer(userLocationMarker); userLocationMarker = null; }
+      if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
       currentUserLatLng = null;
       document.dispatchEvent(new CustomEvent('app:locationChanged'));
     }
@@ -949,14 +1466,13 @@ body.idle #right-panel {
         return false;
       }
       if (!userLocationMarker) {
-        userLocationMarker = L.marker(latlng, {
-          icon: icon,
-          interactive: false,
-          zIndexOffset: 1000
-        }).addTo(map);
+        userLocationMarker = new maplibregl.Marker({ element: makeUserLocationEl(), anchor: 'center' })
+          .setLngLat([latlng[1], latlng[0]])
+          .addTo(map);
         showToast('מראה מיקום על המפה');
       } else {
-        userLocationMarker.setLatLng(latlng);
+        userLocationMarker.setLngLat([latlng[1], latlng[0]]);
+        refreshUserLocationMarkerIcon();
       }
       currentUserLatLng = { lat: latlng[0], lng: latlng[1] };
       setActive();
@@ -964,28 +1480,91 @@ body.idle #right-panel {
       return true;
     }
 
+    function showStoredPositionFallback() {
+      var fallback = getStoredPosition();
+      if (!fallback) return false;
+      if (!showUserLocation(fallback)) return false;
+      showToast('נעשה שימוש במיקום שמור');
+      return true;
+    }
+
     function startWatching() {
+      if (!navigator.geolocation) return false;
       if (watchId !== null) return;
       watchId = navigator.geolocation.watchPosition(function(pos) {
         var latlng = [pos.coords.latitude, pos.coords.longitude];
         if (!showUserLocation(latlng)) {
           stopWatching();
+          showStoredPositionFallback();
+          return;
         }
+        storePositionCookie(latlng);
       }, function(err) {
         console.warn('Geolocation error:', err.code, err.message);
         if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+        if (showStoredPositionFallback()) return;
         setTransient('מיקום לא זמין');
       }, { enableHighAccuracy: false, maximumAge: 30000 });
+      return true;
+    }
+
+    requestUserLocation = function(cb) {
+      var currentPos = getCurrentUserPosition();
+      if (currentPos) {
+        if (!userLocationMarker) showUserLocation([currentPos.lat, currentPos.lng]);
+        saveUserLocationPreference(true);
+        if (!getUrlPosition()) startWatching();
+        if (cb) cb(true);
+        return;
+      }
+      if (!navigator.geolocation) {
+        if (showStoredPositionFallback()) {
+          saveUserLocationPreference(true);
+          if (cb) cb(true);
+          return;
+        }
+        if (cb) cb(false);
+        return;
+      }
+      if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
+      gpsLabel.textContent = 'מאתר...';
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        var latlng = [pos.coords.latitude, pos.coords.longitude];
+        if (!showUserLocation(latlng)) {
+          showStoredPositionFallback();
+          if (cb) cb(false);
+          return;
+        }
+        storePositionCookie(latlng);
+        saveUserLocationPreference(true);
+        startWatching();
+        if (cb) cb(true);
+      }, function(err) {
+        console.warn('Geolocation error:', err.code, err.message);
+        if (showStoredPositionFallback()) {
+          saveUserLocationPreference(true);
+          if (cb) cb(true);
+          return;
+        }
+        setTransient('מיקום לא זמין');
+        if (cb) cb(false);
+      }, { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 });
     }
 
     if (shouldRestoreUserLocation()) {
-      var urlPos = getUrlPosition();
       if (urlPos) {
         showUserLocation(urlPos);
+      } else if (storedPos) {
+        showStoredPositionFallback();
+        if (navigator.geolocation) startWatching();
+      } else if (!navigator.geolocation) {
+        showStoredPositionFallback();
       } else if (navigator.permissions) {
         navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
           if (result.state !== 'denied' && shouldRestoreUserLocation()) {
             startWatching();
+          } else if (shouldRestoreUserLocation()) {
+            showStoredPositionFallback();
           }
         }).catch(function() {
           if (shouldRestoreUserLocation()) startWatching();
@@ -1001,11 +1580,27 @@ body.idle #right-panel {
         showToast('מיקום הוסר מהמפה');
         setIdle();
         saveUserLocationPreference(false);
+        if (typeof isFollowModeSelected === 'function' && isFollowModeSelected()) {
+          setSelectedZoomMode('alerts', { force: true });
+        }
       } else {
-        var urlPos = getUrlPosition();
         if (urlPos) {
           saveUserLocationPreference(true);
           showUserLocation(urlPos);
+          return;
+        }
+        if (storedPos) {
+          saveUserLocationPreference(true);
+          showStoredPositionFallback();
+          if (navigator.geolocation) startWatching();
+          return;
+        }
+        if (!navigator.geolocation) {
+          if (showStoredPositionFallback()) {
+            saveUserLocationPreference(true);
+            return;
+          }
+          setTransient('מיקום לא זמין');
           return;
         }
         if (transientTimeout) { clearTimeout(transientTimeout); transientTimeout = null; }
@@ -1019,35 +1614,269 @@ body.idle #right-panel {
   initUserLocation();
 
   // --- State ---
-  var autoZoomActive = localStorage.getItem('oref-auto-zoom') !== 'disabled';
+  var DRIVING_MODE_FEATURE_KEY = 'oref-driving-mode-feature';
+  var ZOOM_MODE_KEY = 'oref-zoom-mode';
+  var LEGACY_AUTO_ZOOM_KEY = 'oref-auto-zoom';
+  var FOLLOW_ZOOM = 13;
+  var FOLLOW_DRIFT_RATIO = 0.10;
+  var FOLLOW_PAUSE_MS = 10000;
+  var drivingModeFeatureEnabled = false;
+  var selectedZoomMode = 'alerts';
   var isZoomingProgrammatically = false;
+  var followPausedUntil = 0;
+  var followResumeTimer = null;
+  var lastFollowPauseAt = 0;
+  var menuZoomEl = document.getElementById('menu-zoom');
+  var menuZoomLabelEl = document.getElementById('menu-zoom-label');
+  var menuZoomValueEl = document.getElementById('menu-zoom-value');
+  var menuDrivingModeFeatureEl = document.getElementById('menu-driving-mode-feature');
 
-  if (autoZoomActive) {
-    document.getElementById('menu-zoom').classList.add('active');
+  function loadSelectedZoomMode() {
+    try {
+      var saved = localStorage.getItem(ZOOM_MODE_KEY);
+      if (saved === 'manual' || saved === 'alerts' || saved === 'follow') return saved;
+      return localStorage.getItem(LEGACY_AUTO_ZOOM_KEY) === 'disabled' ? 'manual' : 'alerts';
+    } catch (e) {
+      return 'alerts';
+    }
   }
 
+  function persistZoomPreferences() {
+    try {
+      localStorage.setItem(ZOOM_MODE_KEY, selectedZoomMode);
+      localStorage.setItem(LEGACY_AUTO_ZOOM_KEY, selectedZoomMode === 'manual' ? 'disabled' : 'enabled');
+      localStorage.setItem(DRIVING_MODE_FEATURE_KEY, drivingModeFeatureEnabled ? 'enabled' : 'disabled');
+    } catch (e) {}
+  }
+
+  function getEffectiveZoomMode() {
+    if (!drivingModeFeatureEnabled) return selectedZoomMode === 'manual' ? 'manual' : 'alerts';
+    return selectedZoomMode;
+  }
+
+  function zoomModeText(mode) {
+    if (mode === 'manual') return 'ידני';
+    if (mode === 'follow') return 'עקוב אחרי';
+    return 'לאירועים';
+  }
+
+  function shouldAutoZoomToEvents() {
+    return getEffectiveZoomMode() === 'alerts';
+  }
+
+  function isFollowModeSelected() {
+    return drivingModeFeatureEnabled && selectedZoomMode === 'follow';
+  }
+
+  function isFollowModePaused() {
+    return followPausedUntil > Date.now();
+  }
+
+  function isFollowModeActive() {
+    return getEffectiveZoomMode() === 'follow' && typeof isLiveMode !== 'undefined' && isLiveMode && !isFollowModePaused();
+  }
+
+  function clearFollowPauseTimer() {
+    if (followResumeTimer) {
+      clearTimeout(followResumeTimer);
+      followResumeTimer = null;
+    }
+  }
+
+  function updateZoomMenuState() {
+    var effectiveMode = getEffectiveZoomMode();
+    menuZoomLabelEl.textContent = drivingModeFeatureEnabled ? 'זום' : 'זום אוטומטי';
+    menuZoomValueEl.style.display = drivingModeFeatureEnabled ? '' : 'none';
+    if (drivingModeFeatureEnabled) menuZoomValueEl.textContent = zoomModeText(selectedZoomMode);
+    menuZoomEl.classList.toggle('active', effectiveMode !== 'manual');
+    if (menuDrivingModeFeatureEl) menuDrivingModeFeatureEl.classList.toggle('active', drivingModeFeatureEnabled);
+  }
+
+  function getUserViewportDriftRatio(lnglat) {
+    // lnglat = [lng, lat] (MapLibre order)
+    var point = map.project(lnglat);
+    var center = map.getCenter();
+    var centerPoint = map.project([center.lng, center.lat]);
+    var canvas = map.getCanvas();
+    var w = canvas.offsetWidth, h = canvas.offsetHeight;
+    if (!w || !h) return 0;
+    return Math.max(Math.abs(point.x - centerPoint.x) / w, Math.abs(point.y - centerPoint.y) / h);
+  }
+
+  function maybeFollowUserLocation(force) {
+    if (!isFollowModeActive()) return false;
+    var pos = getCurrentUserPosition();
+    if (!pos) return false;
+    var lnglat = [pos.lng, pos.lat];
+    if (!force && map.getZoom() === FOLLOW_ZOOM && getUserViewportDriftRatio(lnglat) <= FOLLOW_DRIFT_RATIO) {
+      return false;
+    }
+    isZoomingProgrammatically = true;
+    map.flyTo({ center: lnglat, zoom: FOLLOW_ZOOM });
+    return true;
+  }
+
+  function pauseFollowMode(ms, silent) {
+    if (!isFollowModeSelected()) return;
+    clearFollowPauseTimer();
+    followPausedUntil = Date.now() + ms;
+    followResumeTimer = setTimeout(function() {
+      followResumeTimer = null;
+      followPausedUntil = 0;
+      maybeFollowUserLocation(true);
+    }, ms + 50);
+    if (!silent) showToast('המעקב הושהה ל-10 שניות');
+  }
+
+  function applySelectedZoomMode(forceFollow) {
+    if (forceFollow && getEffectiveZoomMode() === 'follow') {
+      followPausedUntil = 0;
+      clearFollowPauseTimer();
+      maybeFollowUserLocation(true);
+      return;
+    }
+    if (isFollowModeActive()) {
+      maybeFollowUserLocation(!!forceFollow);
+      return;
+    }
+    if (shouldAutoZoomToEvents() && typeof getActiveEventBounds === 'function' && getActiveEventBounds()) {
+      maybeZoomToEvent();
+      return;
+    }
+    if (!drivingModeFeatureEnabled && getEffectiveZoomMode() === 'manual') {
+      isZoomingProgrammatically = true;
+      map.flyTo({ center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], zoom: DEFAULT_ZOOM });
+    }
+  }
+
+  function setSelectedZoomMode(nextMode, opts) {
+    opts = opts || {};
+    if (selectedZoomMode === nextMode && !opts.force) return;
+    selectedZoomMode = nextMode;
+    if (nextMode !== 'follow') {
+      followPausedUntil = 0;
+      clearFollowPauseTimer();
+    }
+    persistZoomPreferences();
+    updateZoomMenuState();
+    if (opts.skipApply) return;
+    if (nextMode === 'follow') {
+      requestUserLocation(function(ok) {
+        if (!ok) {
+          if (opts.revertMode) {
+            selectedZoomMode = opts.revertMode;
+            persistZoomPreferences();
+            updateZoomMenuState();
+          }
+          if (!opts.silentFailure) showToast('מיקום המכשיר לא זמין');
+          return;
+        }
+        followPausedUntil = 0;
+        clearFollowPauseTimer();
+        if (!opts.silentSuccess) showToast('מעקב אחרי המיקום הופעל');
+        maybeFollowUserLocation(true);
+      });
+      return;
+    }
+    applySelectedZoomMode(false);
+  }
+
+  try { drivingModeFeatureEnabled = localStorage.getItem(DRIVING_MODE_FEATURE_KEY) === 'enabled'; } catch (e) {}
+  selectedZoomMode = loadSelectedZoomMode();
+  updateZoomMenuState();
+  if (getEffectiveZoomMode() === 'follow') {
+    setSelectedZoomMode('follow', { force: true, silentSuccess: true, silentFailure: true, revertMode: 'alerts' });
+  }
+
+  map.on('movestart', function() {
+    if (isZoomingProgrammatically) return;
+    if (!isFollowModeSelected()) return;
+    if (typeof isLiveMode !== 'undefined' && !isLiveMode) return;
+    var now = Date.now();
+    if (now - lastFollowPauseAt < 400) return;
+    lastFollowPauseAt = now;
+    pauseFollowMode(FOLLOW_PAUSE_MS, false);
+  });
+  map.on('zoomstart', function() {
+    if (isZoomingProgrammatically) return;
+    if (!isFollowModeSelected()) return;
+    if (typeof isLiveMode !== 'undefined' && !isLiveMode) return;
+    var now = Date.now();
+    if (now - lastFollowPauseAt < 400) return;
+    lastFollowPauseAt = now;
+    pauseFollowMode(FOLLOW_PAUSE_MS, false);
+  });
   map.on('moveend', function() {
     isZoomingProgrammatically = false;
+    if (isFollowModeActive()) maybeFollowUserLocation(false);
   });
 
-  document.getElementById('menu-zoom').querySelector('.menu-item-row').addEventListener('click', function() {
-    autoZoomActive = !autoZoomActive;
-    localStorage.setItem('oref-auto-zoom', autoZoomActive ? 'enabled' : 'disabled');
-    document.getElementById('menu-zoom').classList.toggle('active', autoZoomActive);
-    if (autoZoomActive) {
-      showToast('זום אוטומטי מופעל');
-      maybeZoomToEvent();
-    } else {
-      showToast('זום אוטומטי כובה');
-      isZoomingProgrammatically = true;
-      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+  document.addEventListener('app:locationChanged', function() {
+    if (isFollowModeActive()) maybeFollowUserLocation(false);
+  });
+
+  menuZoomEl.querySelector('.menu-item-row').addEventListener('click', function() {
+    if (!drivingModeFeatureEnabled) {
+      var nextLegacyMode = getEffectiveZoomMode() === 'manual' ? 'alerts' : 'manual';
+      selectedZoomMode = nextLegacyMode;
+      persistZoomPreferences();
+      updateZoomMenuState();
+      if (nextLegacyMode === 'alerts') {
+        followPausedUntil = 0;
+        clearFollowPauseTimer();
+        showToast('זום אוטומטי מופעל');
+        maybeZoomToEvent();
+      } else {
+        showToast('זום אוטומטי כובה');
+        isZoomingProgrammatically = true;
+        map.flyTo({ center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], zoom: DEFAULT_ZOOM });
+      }
+      return;
+    }
+    var currentMode = selectedZoomMode;
+    var nextMode = currentMode === 'manual' ? 'alerts' : (currentMode === 'alerts' ? 'follow' : 'manual');
+    setSelectedZoomMode(nextMode, { revertMode: currentMode });
+    if (nextMode === 'alerts') {
+      showToast('זום: לאירועים');
+    } else if (nextMode === 'manual') {
+      showToast('זום: ידני');
     }
   });
+  if (menuDrivingModeFeatureEl) {
+    menuDrivingModeFeatureEl.querySelector('.menu-item-row').addEventListener('click', function() {
+      drivingModeFeatureEnabled = !drivingModeFeatureEnabled;
+      if (!drivingModeFeatureEnabled && selectedZoomMode === 'follow') {
+        selectedZoomMode = 'alerts';
+      }
+      persistZoomPreferences();
+      updateZoomMenuState();
+      refreshUserLocationMarkerIcon();
+      showToast(drivingModeFeatureEnabled ? 'מצב נהיגה הופעל' : 'מצב נהיגה כובה');
+      applySelectedZoomMode(true);
+    });
+  }
+  var menuVisitorsEl = document.getElementById('menu-visitors');
+  if (menuVisitorsEl) {
+    if (visitorsEnabled) menuVisitorsEl.classList.add('active');
+    menuVisitorsEl.querySelector('.menu-item-row').addEventListener('click', function() {
+      visitorsEnabled = !visitorsEnabled;
+      try { localStorage.setItem('oref-visitors', visitorsEnabled ? 'enabled' : 'disabled'); } catch(e) {}
+      menuVisitorsEl.classList.toggle('active', visitorsEnabled);
+      if (visitorsEnabled) {
+        showToast('מספר משתמשים מופעל');
+        startAnalyticsPolling();
+      } else {
+        showToast('מספר משתמשים כובה');
+        stopAnalyticsPolling();
+        if (visitorCountEl) visitorCountEl.style.display = 'none';
+      }
+    });
+  }
+
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
   var favorites = {};            // {name: {lat, lng}}
-  var favoriteMarkers = {};      // {name: L.marker}
-  var openPopupLatlng = null;    // latlng of the click that opened the current popup
+  var favoriteMarkers = {};      // {name: maplibregl.Marker}
   var lastHistoryDate = null;    // track newest history entry
   var liveErrors = 0;
   var historyErrors = 0;
@@ -1085,10 +1914,20 @@ body.idle #right-panel {
   var closeTimelinePanel = function() {}; // set by initTimeline
   var openTimelineToLastEvent = function() {}; // set by initTimeline
   var rebuildTimelineFn = function() {}; // set by initTimeline
+  var openTimelineFn = function() {}; // set by initTimeline
   var timelineDate = null;         // 'YYYY-MM-DD' string, null = today
   var dayHistoryReady = false;     // true once day-history fetch completes
-  var historyPollId = null;        // setInterval ID for fetchHistory
+  var historyPollId  = null;        // setInterval ID for fetchHistory
+  var livePollId     = null;        // setInterval ID for fetchLiveAlerts
+  var fadePollId     = null;        // setInterval ID for fadeGreenMarkers
+  var pollingStarted = false;       // true once polling intervals are created
   var DAY_HISTORY_MIN_DATE = '2026-02-28';
+
+  // --- Unified panel state ---
+  var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
+  var selectedLocation = null;      // name of location in full mode
+  var _scrollSyncLock = false;      // prevent scroll↔slider infinite loop
+  var _currentEventIdx = -1;        // index of current-time event in list
 
   function todayDateStr() {
     return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem' }).format(new Date());
@@ -1176,7 +2015,6 @@ body.idle #right-panel {
       popPanelHistory();
     } else {
       closeTimelinePanel();
-      map.closePopup();
       openMenu();
     }
   }
@@ -1186,26 +2024,41 @@ body.idle #right-panel {
     toggleMenu();
   });
 
-  // --- Polygon state ---
-  var locationPolygons = {};  // name → L.polygon
+  // --- Shared oref_points.json loader (used by extension modules) ---
+  var _orefPoints = null;
+  var _orefPointsPromise = null;
+  function _ensureOrefPoints() {
+    if (_orefPoints) return Promise.resolve(_orefPoints);
+    if (_orefPointsPromise) return _orefPointsPromise;
+    _orefPointsPromise = fetch('oref_points.json')
+      .then(function(resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      })
+      .then(function(data) {
+        _orefPoints = data || {};
+        return _orefPoints;
+      })
+      .finally(function() { _orefPointsPromise = null; });
+    return _orefPointsPromise;
+  }
 
   // --- Extension state API ---
   window.AppState = {
     map: map,
     get locationStates() { return locationStates; },
     get locationHistory() { return locationHistory; },
-    get locationPolygons() { return locationPolygons; },
-    get extendedHistory() { return extendedHistory; },
+    get featureMap() { return featureMap; },
+    ensureOrefPoints: _ensureOrefPoints,
     get userPosition() { return currentUserLatLng || null; },
     get isLiveMode() { return isLiveMode; },
     get viewTime() { return currentViewTime; },
-    showToast: function(msg, opts) { showToast(msg, opts); }
+    showToast: function(msg, opts) { showToast(msg, opts); },
+    openLocationPanel: function(name) { openLocationPanel(name); }
   };
 
   // --- Colors ---
   var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
-  var BASE_STYLE = { fillColor: '#888', fillOpacity: 0.01, color: '#888', opacity: 0 };
-
   // --- Sound ---
   function getAudioContext() {
     if (!audioCtx) {
@@ -1331,49 +2184,45 @@ body.idle #right-panel {
     return latlng[0] >= 29.4 && latlng[0] <= 33.4 && latlng[1] >= 34.2 && latlng[1] <= 35.9;
   }
 
+  // Normalize Hebrew geresh/gershayim (׳/״) to ASCII apostrophes to match geo lookup keys
+  function normalizeGeresh(s) {
+    return s.replace(/\u05F4/g, "''").replace(/\u05F3/g, "'");
+  }
+
   // --- Build pre-computed polygons from locations_polygons.json ---
-  function buildPolygons(data) {
+  // Coordinates in locations_polygons.json are already [lng, lat] — GeoJSON order
+  var nameToId = {};   // name → numeric feature id (for setFeatureState)
+
+  var pendingPolygonCallback = null;
+
+  function buildPolygons(data, onReady) {
+    if (!mapLoaded) {
+      pendingPolygonData = data;
+      if (onReady) pendingPolygonCallback = onReady;
+      return;
+    }
+    var features = [];
+    var fid = 0;
     for (var name in data) {
       var coords = data[name];
       if (!Array.isArray(coords)) continue;
       var isNested = Array.isArray(coords[0][0]);
-      var latlngs;
-      if (isNested) {
-        // Polygon with holes: [[[outer]], [[hole1]], ...]
-        latlngs = coords.map(function(ring) {
-          return ring.map(function(c) { return [c[1], c[0]]; });
-        });
-      } else {
-        // Simple polygon: [[lng,lat], ...]
-        latlngs = coords.map(function(c) { return [c[1], c[0]]; });
-      }
-      var polygon = L.polygon(latlngs, {
-        fillColor: '#888',
-        fillOpacity: 0.01,
-        color: '#888',
-        opacity: 0,
-        weight: 1,
-        interactive: true
-      }).addTo(map);
-      polygon.bindTooltip(name, { direction: 'top', offset: [0, -20] });
-      (function(n, poly) {
-        poly.on('click', function(e) {
-          if (document.body.classList.contains('has-overlay')) return;
-          showPopup(n, poly, e.latlng);
-        });
-        poly.on('mouseover', function() {
-          if (document.body.classList.contains('has-overlay')) return;
-          poly.setStyle(ACTIVE_STYLE);
-        });
-        poly.on('mouseout', function() {
-          if (openPopupName === n) return;
-          poly.setStyle(currentLocationStyle(n));
-        });
-      })(name, polygon);
-      locationPolygons[name] = polygon;
+      var polygonCoords = isNested ? coords : [coords];
+      var feature = {
+        type: 'Feature',
+        id: fid,
+        properties: { name: name },
+        geometry: { type: 'Polygon', coordinates: polygonCoords }
+      };
+      features.push(feature);
+      featureMap[name] = feature;
+      nameToId[name] = fid;
+      fid++;
     }
-
-    console.log('Loaded pre-computed polygons for', Object.keys(locationPolygons).length, 'locations');
+    polygonsGeoJSON.features = features;
+    updateMapLibreSource();
+    console.log('Loaded GeoJSON polygons for', features.length, 'locations');
+    if (onReady) onReady();
   }
 
   // --- Title classification ---
@@ -1417,7 +2266,25 @@ body.idle #right-panel {
     return 'red'; // default to danger for unknown
   }
 
-  // --- Marker management ---
+  // --- Marker management (feature-state) ---
+  function applyFeatureStyle(name, state, opacity) {
+    var id = nameToId[name];
+    if (id === undefined) return;
+    map.setFeatureState({ source: 'alerts-source', id: id }, {
+      fillColor: COLORS[state],
+      fillOpacity: opacity,
+      lineColor: COLORS[state],
+      lineOpacity: opacity + 0.15,
+      lineWidth: state === 'red' ? 0.5 : 1
+    });
+  }
+
+  function resetFeatureStyle(name) {
+    var id = nameToId[name];
+    if (id === undefined) return;
+    map.removeFeatureState({ source: 'alerts-source', id: id });
+  }
+
   function setLocationState(name, state, since) {
     var existing = locationStates[name];
 
@@ -1432,48 +2299,31 @@ body.idle #right-panel {
       }
     }
 
-    var polygon = locationPolygons[name] || null;
-    if (!polygon) return;
+    if (nameToId[name] === undefined) return;
 
     var now = Date.now();
     var opacity = state === 'green'
       ? 0.5 * Math.max(0, 1 - ((now - (since || now)) / GREEN_FADE_MS))
       : 0.3;
-    polygon.setStyle({
-      color: COLORS[state],
-      fillColor: COLORS[state],
-      fillOpacity: opacity,
-      opacity: opacity + 0.15,
-      weight: state === 'red' ? 0.5 : 1
-    });
-    locationStates[name] = {
-      state: state,
-      since: since || Date.now(),
-      marker: polygon
-    };
-
+    applyFeatureStyle(name, state, opacity);
+    locationStates[name] = { state: state, since: since || Date.now() };
     playSoundForState(state, name);
   }
 
   function removeLocation(name) {
     var entry = locationStates[name];
-    if (entry && entry.marker) {
-      entry.marker.setStyle(BASE_STYLE);
-      entry.marker.closePopup();
+    if (entry) {
+      resetFeatureStyle(name);
     }
+    if (selectedLocation === name) closeLocationPanel();
     delete locationStates[name];
   }
 
   // --- Alert history per location ---
-  var openPopupName = null;
-  var openPopupMarker = null;
 
   function updateOverlay() {
-    var tlBtn = document.getElementById('timeline-btn');
-    var panelOpen = menuOpen ||
-      (tlBtn && tlBtn.classList.contains('open'));
-    var popupOpen = openPopupName !== null;
-    document.body.classList.toggle('has-overlay', panelOpen || popupOpen);
+    // Only menu blocks map interaction; unified panel keeps map interactive
+    document.body.classList.toggle('has-overlay', menuOpen);
   }
 
   function recordHistory(name, title, alertDate, state) {
@@ -1491,9 +2341,13 @@ body.idle #right-panel {
       }
     }
     arr.push({ title: title, alertDate: alertDate, state: state });
-    // Refresh popup if it's open for this location
-    if (openPopupName === name && openPopupMarker) {
-      openPopupMarker.getPopup().setContent(buildPopupHtml(name));
+    // Refresh unified panel event list if open for this location
+    if (selectedLocation === name) {
+      _scrollSyncLock = true;
+      buildLocationEventList(name);
+      renderEventList();
+      if (!isLiveMode && currentViewTime) syncScrollToTime(currentViewTime);
+      requestAnimationFrame(function() { _scrollSyncLock = false; });
     }
   }
 
@@ -1527,25 +2381,309 @@ body.idle #right-panel {
     return '\u26A0 ' + norm;
   }
 
-  // --- Favorites ---
-  var favoriteIcon = L.divIcon({
-    html: '<span style="display:flex;width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 0 6px rgba(0,0,0,0.3);align-items:center;justify-content:center"><svg width="10" height="10" viewBox="0 0 24 24" fill="#f5a623" stroke="#c88a1a" stroke-width="1"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg></span>',
-    className: '',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7]
-  });
+  // --- Polygon highlight for selected location ---
+  var _panelHighlightName = null;
+  var _panelHighlightSaved = null;
+  var _panelLabelPopup = null;
 
+  function _polygonCentroid(name) {
+    var feature = featureMap[name];
+    if (!feature) return null;
+    var coords = feature.geometry.coordinates[0];
+    var sumLng = 0, sumLat = 0;
+    for (var i = 0; i < coords.length; i++) { sumLng += coords[i][0]; sumLat += coords[i][1]; }
+    return [sumLng / coords.length, sumLat / coords.length];
+  }
+
+  function _applyPanelHighlight(name) {
+    if (_panelLabelPopup) { _panelLabelPopup.remove(); _panelLabelPopup = null; }
+    var id = nameToId[name];
+    if (id === undefined) return;
+    _panelHighlightName = name;
+    _panelHighlightSaved = map.getFeatureState({ source: 'alerts-source', id: id }) || {};
+    map.setFeatureState({ source: 'alerts-source', id: id }, {
+      fillColor: _panelHighlightSaved.fillColor || '#888888',
+      fillOpacity: Math.max((_panelHighlightSaved.fillOpacity || 0.01), 0.35),
+      lineColor: '#3b82f6',
+      lineOpacity: 1,
+      lineWidth: 3
+    });
+    // Show location name label on the map
+    var center = _polygonCentroid(name);
+    if (center) {
+      _panelLabelPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'selected-label', offset: [0, -4] })
+        .setLngLat(center)
+        .setDOMContent((function() { var b = document.createElement('b'); b.textContent = name; return b; })())
+        .addTo(map);
+    }
+  }
+
+  function _removePanelHighlight() {
+    if (_panelLabelPopup) { _panelLabelPopup.remove(); _panelLabelPopup = null; }
+    if (!_panelHighlightName) return;
+    var name = _panelHighlightName;
+    var entry = locationStates[name];
+    if (entry) {
+      var now = Date.now();
+      var opacity = entry.state === 'green'
+        ? 0.5 * Math.max(0, 1 - ((now - entry.since) / GREEN_FADE_MS))
+        : 0.3;
+      applyFeatureStyle(name, entry.state, opacity);
+    } else {
+      resetFeatureStyle(name);
+    }
+    _panelHighlightName = null;
+    _panelHighlightSaved = null;
+  }
+
+  // --- Unified panel: event list ---
+  var _locationEventList = []; // merged events for selected location
+
+  function buildLocationEventList(name) {
+    var extEntries = [];
+    var latestExtTs = 0;
+    var bounds = viewingDayBounds();
+    for (var i = 0; i < extendedHistory.length; i++) {
+      var e = extendedHistory[i];
+      if (e.location === name && e.alertDate >= bounds.start && e.alertDate <= bounds.end) {
+        extEntries.push({ title: e.title, alertDate: e.alertDate, state: e.state });
+        if (e.alertDate > latestExtTs) latestExtTs = e.alertDate;
+      }
+    }
+    // Supplement with recent locationHistory entries (fills R2 lag)
+    var locEntries = locationHistory[name] || [];
+    for (var j = 0; j < locEntries.length; j++) {
+      var le = locEntries[j];
+      var leTs = parseAlertDate(le.alertDate);
+      if (leTs && leTs > latestExtTs) {
+        extEntries.push({ title: le.title, alertDate: leTs, state: le.state });
+      }
+    }
+    extEntries.sort(function(a, b) { return a.alertDate - b.alertDate; });
+    // Dedup same title within 1 minute
+    _locationEventList = [];
+    for (var k = 0; k < extEntries.length; k++) {
+      var entry = extEntries[k];
+      var dominated = false;
+      for (var m = _locationEventList.length - 1; m >= 0; m--) {
+        if (_locationEventList[m].title === entry.title &&
+            Math.abs(_locationEventList[m].alertDate - entry.alertDate) <= 60000) {
+          dominated = true; break;
+        }
+      }
+      if (!dominated) _locationEventList.push(entry);
+    }
+  }
+
+  function renderEventList() {
+    var listEl = document.getElementById('up-event-list');
+    listEl.innerHTML = '';
+    if (_locationEventList.length === 0) {
+      var emptyEl = document.createElement('div');
+      emptyEl.className = 'up-empty';
+      emptyEl.textContent = 'אין אירועים';
+      listEl.appendChild(emptyEl);
+      return;
+    }
+    for (var i = 0; i < _locationEventList.length; i++) {
+      var e = _locationEventList[i];
+      var color = COLORS[e.state] || '#888';
+      var label = displayLabel(e.title);
+      var d = new Date(e.alertDate);
+      var timeStr = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+      // Group separator: if next entry is non-green and this entry is green
+      var nextE = _locationEventList[i + 1];
+      var sepClass = (nextE && e.state === 'green' && nextE.state !== 'green') ? ' up-event-sep' : '';
+      var row = document.createElement('div');
+      row.className = 'up-event-row' + sepClass;
+      row.dataset.ts = e.alertDate;
+      row.dataset.idx = String(i);
+      var timeSpan = document.createElement('span');
+      timeSpan.className = 'up-event-time';
+      timeSpan.style.color = color;
+      timeSpan.textContent = timeStr;
+      var labelSpan = document.createElement('span');
+      labelSpan.className = 'up-event-label';
+      labelSpan.textContent = label;
+      row.appendChild(timeSpan);
+      row.appendChild(labelSpan);
+      listEl.appendChild(row);
+    }
+  }
+
+  function updateFavStar(name) {
+    var isFav = !!favorites[name];
+    var starEl = document.getElementById('up-fav-star');
+    starEl.textContent = isFav ? '\u2605' : '\u2606';
+    starEl.style.color = isFav ? '#f5a623' : '#ccc';
+    starEl.title = isFav ? '\u05D4\u05E1\u05E8 \u05DE\u05DE\u05D5\u05E2\u05D3\u05E4\u05D9\u05DD' : '\u05D4\u05D5\u05E1\u05E3 \u05DC\u05DE\u05D5\u05E2\u05D3\u05E4\u05D9\u05DD';
+  }
+
+  function syncScrollToTime(time) {
+    if (!selectedLocation) return;
+    var wasLocked = _scrollSyncLock;
+    _scrollSyncLock = true;
+    var listEl = document.getElementById('up-event-list');
+    var rows = listEl.querySelectorAll('.up-event-row');
+    var targetIdx = -1;
+    for (var i = rows.length - 1; i >= 0; i--) {
+      var ts = Number(rows[i].getAttribute('data-ts'));
+      if (ts <= time) { targetIdx = i; break; }
+    }
+    // Update current marker
+    for (var j = 0; j < rows.length; j++) {
+      rows[j].classList.toggle('up-current', j === targetIdx);
+    }
+    _currentEventIdx = targetIdx;
+    // Scroll to ~75% from top
+    if (targetIdx >= 0 && rows[targetIdx]) {
+      var listHeight = listEl.clientHeight;
+      var targetOffset = rows[targetIdx].offsetTop;
+      var scrollTarget = targetOffset - listHeight * 0.75;
+      listEl.scrollTop = Math.max(0, scrollTarget);
+    }
+    // Only schedule unlock if we acquired the lock (caller may hold it)
+    if (!wasLocked) {
+      requestAnimationFrame(function() { _scrollSyncLock = false; });
+    }
+  }
+
+  // --- Unified panel: open/close ---
+  function openSlimPanel() {
+    if (menuOpen) closeMenu();
+    var panel = document.getElementById('unified-panel');
+    panel.classList.remove('full');
+    panel.classList.add('slim');
+    unifiedPanelState = 'slim';
+    document.body.classList.add('panel-open');
+    pushPanelHistory();
+  }
+
+  function openFullPanel(name) {
+    _removePanelHighlight();
+    if (unifiedPanelState === 'closed') {
+      openTimelineFn(); // opens slim + triggers rebuildTimeline
+    }
+    var panel = document.getElementById('unified-panel');
+    // Animate height on desktop (slim → full)
+    if (window.innerWidth >= 600 && unifiedPanelState === 'slim') {
+      panel.style.height = panel.offsetHeight + 'px';
+      panel.offsetHeight; // force reflow
+    }
+    panel.classList.remove('slim');
+    panel.classList.add('full');
+    if (window.innerWidth >= 600) {
+      panel.style.height = ''; // CSS .full sets height: 100vh, transition animates
+    }
+    unifiedPanelState = 'full';
+    selectedLocation = name;
+    // Populate header
+    document.getElementById('up-location-name').textContent = name;
+    updateFavStar(name);
+    // Build and render event list (lock scroll sync to prevent scroll events
+    // from renderEventList() triggering a seekTo that changes the viewed time)
+    _scrollSyncLock = true;
+    buildLocationEventList(name);
+    renderEventList();
+    _applyPanelHighlight(name);
+    // If in history mode, sync scroll to current time
+    if (!isLiveMode && currentViewTime) {
+      syncScrollToTime(currentViewTime);
+    }
+    // Hold lock until after desktop height transition completes (~250ms CSS),
+    // then release on next rAF to cover any final scroll events
+    if (window.innerWidth >= 600) {
+      panel.addEventListener('transitionend', function handler(e) {
+        if (e.propertyName !== 'height') return;
+        panel.removeEventListener('transitionend', handler);
+        requestAnimationFrame(function() { _scrollSyncLock = false; });
+      });
+      // Fallback: release after 350ms if transitionend doesn't fire (e.g. no transition)
+      setTimeout(function() { _scrollSyncLock = false; }, 350);
+    } else {
+      requestAnimationFrame(function() { _scrollSyncLock = false; });
+    }
+  }
+
+  function deselectLocation() {
+    _removePanelHighlight();
+    selectedLocation = null;
+    _locationEventList = [];
+    _currentEventIdx = -1;
+    document.getElementById('up-event-list').innerHTML = '';
+    var panel = document.getElementById('unified-panel');
+    if (unifiedPanelState === 'full') {
+      // Suppress CSS transition so the swap is instant
+      panel.style.transition = 'none';
+      panel.classList.remove('full');
+      panel.classList.add('slim');
+      panel.offsetHeight; // force reflow with no transition
+      panel.style.transition = '';
+      unifiedPanelState = 'slim';
+    }
+  }
+
+  function closeUnifiedPanel() {
+    var panel = document.getElementById('unified-panel');
+    panel.classList.remove('slim', 'full');
+    unifiedPanelState = 'closed';
+    document.body.classList.remove('panel-open');
+    // Deselect location
+    _removePanelHighlight();
+    selectedLocation = null;
+    _locationEventList = [];
+    _currentEventIdx = -1;
+    document.getElementById('up-event-list').innerHTML = '';
+    // closeTimeline logic is called from within initTimeline
+  }
+
+  // Wrappers that existing code calls
+  function openLocationPanel(name) {
+    openFullPanel(name);
+  }
+
+  function closeLocationPanel() {
+    if (selectedLocation) deselectLocation();
+  }
+
+
+  // Expose for panel onclick — uses selectedLocation so no name is embedded in HTML
+  window._toggleFav = function(e) {
+    if (e) e.stopPropagation();
+    var name = selectedLocation;
+    if (!name) return;
+    var latlng = favorites[name];
+    if (!latlng) {
+      // Compute centroid from feature
+      var feature = featureMap[name];
+      if (feature) {
+        var outer = feature.geometry.coordinates[0];
+        var sumLat = 0, sumLng = 0;
+        for (var i = 0; i < outer.length; i++) { sumLng += outer[i][0]; sumLat += outer[i][1]; }
+        latlng = { lat: sumLat / outer.length, lng: sumLng / outer.length };
+      }
+    }
+    if (!latlng) return;
+    toggleFavorite(name, latlng);
+  };
+
+  // --- Favorites ---
   function saveFavorites() {
     try { localStorage.setItem('oref-favorites', JSON.stringify(favorites)); } catch(e) {}
   }
 
+  function makeFavoriteMarkerEl() {
+    var el = document.createElement('span');
+    el.style.cssText = 'display:flex;width:14px;height:14px;background:#fff;border-radius:50%;box-shadow:0 0 6px rgba(0,0,0,0.3);align-items:center;justify-content:center';
+    el.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="#f5a623" stroke="#c88a1a" stroke-width="1"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>';
+    return el;
+  }
+
   function addFavoriteMarker(name, latlng) {
     if (favoriteMarkers[name]) favoriteMarkers[name].remove();
-    favoriteMarkers[name] = L.marker([latlng.lat, latlng.lng], {
-      icon: favoriteIcon,
-      interactive: false,
-      zIndexOffset: 900
-    }).addTo(map);
+    favoriteMarkers[name] = new maplibregl.Marker({ element: makeFavoriteMarkerEl(), anchor: 'center' })
+      .setLngLat([latlng.lng, latlng.lat])
+      .addTo(map);
   }
 
   function removeFavoriteMarker(name) {
@@ -1564,102 +2702,30 @@ body.idle #right-panel {
       addFavoriteMarker(name, latlng);
     }
     saveFavorites();
-    // Refresh popup if open
-    if (openPopupName === name && openPopupMarker) {
-      openPopupMarker.getPopup().setContent(buildPopupHtml(name));
+    // Refresh fav star if panel open for this location
+    if (selectedLocation === name) {
+      updateFavStar(name);
     }
-  }
-
-  // Expose for popup onclick — uses openPopupName so no name is embedded in HTML
-  window._toggleFav = function() {
-    var name = openPopupName;
-    if (!name) return;
-    var polygon = locationPolygons[name];
-    var latlng = openPopupLatlng || favorites[name] || (polygon && polygon.getBounds().getCenter());
-    if (!latlng) return;
-    toggleFavorite(name, latlng);
-  };
-
-  function buildPopupHtml(name) {
-    var entries = (locationHistory[name] || []).slice()
-      .sort(function(a, b) { return (b.alertDate || '').replace('T', ' ').localeCompare((a.alertDate || '').replace('T', ' ')); });
-    var rows = entries.map(function(e, i) {
-      var color = COLORS[e.state] || '#888';
-      var label = displayLabel(e.title);
-      var time = e.alertDate ? e.alertDate.slice(11, 16) : '';
-      var nextEntry = entries[i + 1];
-      var border = (nextEntry && nextEntry.state === 'green') ? 'border-bottom:1px solid #ccc;padding-bottom:4px;margin-bottom:4px;' : '';
-      return '<div style="padding:1px 0;' + border + 'display:flex;align-items:baseline;gap:8px;direction:rtl">' +
-        (time ? '<span style="color:' + color + ';font-size:12px;white-space:nowrap;font-weight:bold">' + time + '</span>' : '') +
-        '<span style="color:#444;font-size:13px;flex:1;text-align:right">' + label + '</span>' +
-      '</div>';
-    }).join('');
-    var isFav = !!favorites[name];
-    var starColor = isFav ? '#f5a623' : '#ccc';
-    var starChar = isFav ? '\u2605' : '\u2606';
-    var starBtn = '<span class="fav-star" onclick="window._toggleFav()" ' +
-      'style="cursor:pointer;font-size:18px;color:' + starColor + ';margin-inline-start:6px;vertical-align:middle" ' +
-      'title="' + (isFav ? 'הסר ממועדפים' : 'הוסף למועדפים') + '">' + starChar + '</span>';
-    return '<div style="direction:rtl;width:min(170px,85vw);text-align:right"><b>' + name + '</b>' + starBtn +
-      (rows ? '<div style="margin-top:6px">' + rows + '</div>' : '<p style="color:#888;margin-top:6px">אין אירועים לאחרונה</p>') +
-      '</div>';
-  }
-
-  var ACTIVE_STYLE = { fillOpacity: 0.5, opacity: 0.8, weight: 3 };
-
-  function currentLocationStyle(name) {
-    var entry = locationStates[name];
-    if (!entry) return BASE_STYLE;
-    if (entry.state === 'green') {
-      var opacity = 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS));
-      return { color: COLORS.green, fillColor: COLORS.green, fillOpacity: opacity, opacity: opacity + 0.15, weight: 1 };
-    }
-    return { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: 0.3, opacity: 0.45, weight: entry.state === 'red' ? 0.5 : 1 };
-  }
-
-  function showPopup(name, marker, latlng) {
-    openPopupName = name;
-    openPopupMarker = marker;
-    openPopupLatlng = latlng || null;
-    marker.setStyle(ACTIVE_STYLE);
-    marker.bindPopup(buildPopupHtml(name), { maxWidth: 180 })
-      .openPopup()
-      .on('popupclose', function() {
-        openPopupName = null; openPopupMarker = null;
-        openPopupLatlng = null;
-        marker.setStyle(currentLocationStyle(name));
-        updateOverlay();
-      });
-    updateOverlay();
   }
 
   // --- Polygon pulse hint (mobile) ---
   function showPolygonHint() {
     // Collect all currently colored polygons and those with recent history
-    var targets = []; // [{polygon, name, color, origStyle}]
+    var targets = []; // [{name, color, savedState}]
 
     for (var name in locationStates) {
       var entry = locationStates[name];
-      var polygon = locationPolygons[name];
-      if (!polygon) continue;
-      var op = entry.state === 'green'
-        ? 0.5 * Math.max(0, 1 - ((Date.now() - entry.since) / GREEN_FADE_MS))
-        : 0.3;
-      targets.push({
-        polygon: polygon,
-        color: COLORS[entry.state],
-        origStyle: { color: COLORS[entry.state], fillColor: COLORS[entry.state], fillOpacity: op, opacity: op + 0.15, weight: entry.state === 'red' ? 0.5 : 1 }
-      });
+      if (nameToId[name] === undefined) continue;
+      var saved = map.getFeatureState({ source: 'alerts-source', id: nameToId[name] }) || {};
+      targets.push({ name: name, color: COLORS[entry.state], savedState: saved });
     }
 
     // Also include recently-faded polygons with history but no active state
     if (targets.length === 0) {
       for (var hName in locationHistory) {
-        if (locationHistory[hName].length > 0 && !locationStates[hName]) {
-          var hPoly = locationPolygons[hName];
-          if (hPoly) {
-            targets.push({ polygon: hPoly, color: COLORS.green, origStyle: BASE_STYLE });
-          }
+        if (locationHistory[hName].length > 0 && !locationStates[hName] && nameToId[hName] !== undefined) {
+          var hSaved = map.getFeatureState({ source: 'alerts-source', id: nameToId[hName] }) || {};
+          targets.push({ name: hName, color: COLORS.green, savedState: hSaved });
         }
       }
     }
@@ -1672,9 +2738,11 @@ body.idle #right-panel {
       var t = (step % 10) / 10;
       var opacity = 0.05 + 0.15 * Math.sin(t * Math.PI);
       for (var i = 0; i < targets.length; i++) {
-        targets[i].polygon.setStyle({
+        var id = nameToId[targets[i].name];
+        if (id === undefined) continue;
+        map.setFeatureState({ source: 'alerts-source', id: id }, {
           fillColor: targets[i].color, fillOpacity: opacity,
-          color: targets[i].color, opacity: Math.min(opacity + 0.15, 0.8), weight: 2
+          lineColor: targets[i].color, lineOpacity: Math.min(opacity + 0.15, 0.8), lineWidth: 2
         });
       }
       step++;
@@ -1682,7 +2750,13 @@ body.idle #right-panel {
         clearInterval(polygonHintInterval);
         polygonHintInterval = null;
         for (var j = 0; j < targets.length; j++) {
-          targets[j].polygon.setStyle(targets[j].origStyle);
+          var rid = nameToId[targets[j].name];
+          if (rid === undefined) continue;
+          if (Object.keys(targets[j].savedState).length > 0) {
+            map.setFeatureState({ source: 'alerts-source', id: rid }, targets[j].savedState);
+          } else {
+            map.removeFeatureState({ source: 'alerts-source', id: rid });
+          }
         }
         polygonHintTargets = null;
       }
@@ -1696,7 +2770,14 @@ body.idle #right-panel {
     }
     if (polygonHintTargets) {
       for (var i = 0; i < polygonHintTargets.length; i++) {
-        polygonHintTargets[i].polygon.setStyle(BASE_STYLE);
+        var id = nameToId[polygonHintTargets[i].name];
+        if (id === undefined) continue;
+        var saved = polygonHintTargets[i].savedState;
+        if (saved && Object.keys(saved).length > 0) {
+          map.setFeatureState({ source: 'alerts-source', id: id }, saved);
+        } else {
+          map.removeFeatureState({ source: 'alerts-source', id: id });
+        }
       }
       polygonHintTargets = null;
     }
@@ -1716,7 +2797,7 @@ body.idle #right-panel {
     lastLiveAlertId = alert.id;
     var now = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
     for (var i = 0; i < locations.length; i++) {
-      var loc = locations[i];
+      var loc = normalizeGeresh(locations[i]);
       recordHistory(loc, title, now, state);
       if (isLiveMode) {
         setLocationState(loc, state);
@@ -1724,7 +2805,7 @@ body.idle #right-panel {
         updateShadowState(loc, state);
       }
     }
-    if (autoZoomActive && isLiveMode && isNewAlert && !openPopupName) {
+    if (shouldAutoZoomToEvents() && isLiveMode && isNewAlert && !selectedLocation) {
       maybeZoomToEvent();
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
@@ -1736,7 +2817,7 @@ body.idle #right-panel {
     processLiveAlert(mockAlert);
   };
 
-  window.printActiveAlertLocations = function() {
+  window.printAlertAllLocations = function() {
     var active = [];
     for (var name in locationStates) {
       if (locationStates[name] && locationStates[name].state !== 'green') {
@@ -1748,12 +2829,24 @@ body.idle #right-panel {
     return active;
   };
 
+  window.printRedAlertLocations = function() {
+    var red = [];
+    for (var name in locationStates) {
+      if (locationStates[name] && locationStates[name].state === 'red') {
+        red.push(name);
+      }
+    }
+    red.sort(function(a, b) { return a.localeCompare(b, 'he'); });
+    console.log(JSON.stringify(red));
+    return red;
+  };
+
   function processHistoryEntry(entry) {
     if (!entry || !entry.data || !entry.title) return;
     var title = entry.title.replace(/\s+/g, ' ').trim();
     var state = classifyTitle(title);
     // History `data` is a string (single location)
-    var location = (typeof entry.data === 'string' ? entry.data : String(entry.data)).trim();
+    var location = normalizeGeresh((typeof entry.data === 'string' ? entry.data : String(entry.data)).trim());
     var since = parseAlertDate(entry.alertDate) || Date.now();
     if (state !== 'green' && since > lastDangerTime) lastDangerTime = since;
     recordHistory(location, title, entry.alertDate || '', state);
@@ -1807,7 +2900,13 @@ body.idle #right-panel {
         toRemove.push(name);
       } else {
         var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-        entry.marker.setStyle({ fillOpacity: opacity, opacity: opacity + 0.15 });
+        var id = nameToId[name];
+        if (id !== undefined) {
+          map.setFeatureState({ source: 'alerts-source', id: id }, {
+            fillOpacity: opacity,
+            lineOpacity: opacity + 0.15
+          });
+        }
       }
     }
     for (var i = 0; i < toRemove.length; i++) {
@@ -1831,17 +2930,25 @@ body.idle #right-panel {
     return '';
   }
 
+  // Returns a maplibregl.LngLatBounds for the given feature (GeoJSON polygon)
+  function featureBounds(feature) {
+    var bounds = new maplibregl.LngLatBounds();
+    var coords = feature.geometry.coordinates;
+    // outer ring only (index 0)
+    var outer = coords[0];
+    for (var i = 0; i < outer.length; i++) bounds.extend(outer[i]);
+    return bounds;
+  }
+
   function getActiveEventBounds() {
     var allBounds = null;
     for (var name in locationStates) {
       if (locationStates[name].state === 'green') continue;
-      var polygon = locationPolygons[name];
-      if (!polygon) continue;
-      if (!allBounds) {
-        allBounds = L.latLngBounds(polygon.getBounds());
-      } else {
-        allBounds.extend(polygon.getBounds());
-      }
+      var feature = featureMap[name];
+      if (!feature) continue;
+      var b = featureBounds(feature);
+      if (!allBounds) allBounds = b;
+      else allBounds.extend(b);
     }
     return allBounds;
   }
@@ -1850,7 +2957,7 @@ body.idle #right-panel {
     var bounds = getActiveEventBounds();
     if (!bounds) return;
     isZoomingProgrammatically = true;
-    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+    map.fitBounds(bounds, { padding: 80, maxZoom: 10 });
   }
 
 
@@ -2061,7 +3168,7 @@ body.idle #right-panel {
         var rid = String(e.rid || '');
         var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
         var state = classifyTitle(title);
-        var location = (typeof e.data === 'string' ? e.data : String(e.data)).trim();
+        var location = normalizeGeresh((typeof e.data === 'string' ? e.data : String(e.data)).trim());
         var ts = parseAlertDate(e.alertDate);
         if (!ts) continue;
         var compositeKey = location + '|' + (e.alertDate || '').replace('T', ' ');
@@ -2121,11 +3228,7 @@ body.idle #right-panel {
     cancelPolygonHint();
     // Clear all polygons
     for (var name in locationStates) {
-      var entry = locationStates[name];
-      if (entry && entry.marker) {
-        entry.marker.setStyle(BASE_STYLE);
-        entry.marker.closePopup();
-      }
+      resetFeatureStyle(name);
     }
     locationStates = {};
 
@@ -2151,30 +3254,26 @@ body.idle #right-panel {
     for (var loc in accumulated) {
       var s = accumulated[loc].state;
       var sinceTime = accumulated[loc].since;
-      var polygon = locationPolygons[loc] || null;
-      if (!polygon) continue;
+      if (nameToId[loc] === undefined) continue;
       if (s === 'green') {
         var elapsed = targetTime - sinceTime;
         if (elapsed >= GREEN_FADE_MS) continue; // already faded
         var opacity = 0.5 * (1 - elapsed / GREEN_FADE_MS);
-        polygon.setStyle({
-          color: COLORS.green,
-          fillColor: COLORS.green,
-          fillOpacity: opacity,
-          opacity: opacity + 0.15,
-          weight: 1
-        });
+        applyFeatureStyle(loc, 'green', opacity);
       } else {
         if (targetTime - sinceTime >= ALERT_MAX_AGE_MS) continue; // stale alert
-        polygon.setStyle({
-          color: COLORS[s],
-          fillColor: COLORS[s],
-          fillOpacity: 0.3,
-          opacity: 0.45,
-          weight: s === 'red' ? 0.5 : 1
-        });
+        applyFeatureStyle(loc, s, 0.3);
       }
-      locationStates[loc] = { state: s, since: sinceTime, marker: polygon };
+      locationStates[loc] = { state: s, since: sinceTime };
+    }
+    // Re-apply highlight for selected location.
+    // Don't call _removePanelHighlight here — reconstructStateAt already reset all
+    // feature styles above, so restoring the saved state would undo applyFeatureStyle.
+    // Just clear the saved state and re-read what applyFeatureStyle just set.
+    if (selectedLocation) {
+      _panelHighlightName = null;
+      _panelHighlightSaved = null;
+      _applyPanelHighlight(selectedLocation);
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
   }
@@ -2245,7 +3344,7 @@ body.idle #right-panel {
     container.classList.add('has-data');
 
     var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
-    var PLAY_SPEED = 600;
+    var PLAY_SPEED = 510;
 
     function updateDateNav() {
       var d = timelineDate || todayDateStr();
@@ -2308,6 +3407,8 @@ body.idle #right-panel {
       extendedHistory = [];
       extendedRids = new Set();
       locationHistory = {};
+      _locationEventList = [];
+      if (selectedLocation) document.getElementById('up-event-list').innerHTML = '';
       lastHistoryDate = null;
       stopPlay();
       timelineDate = (newDate === todayDateStr()) ? null : newDate;
@@ -2340,6 +3441,12 @@ body.idle #right-panel {
           mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
+          if (selectedLocation) {
+            _scrollSyncLock = true;
+            buildLocationEventList(selectedLocation);
+            renderEventList();
+            requestAnimationFrame(function() { _scrollSyncLock = false; });
+          }
           if (onSwitched) onSwitched();
         });
       } else {
@@ -2352,6 +3459,12 @@ body.idle #right-panel {
           mergeCarryover();
           rebuildTimeline('first');
           prefetchPrevDay();
+          if (selectedLocation) {
+            _scrollSyncLock = true;
+            buildLocationEventList(selectedLocation);
+            renderEventList();
+            requestAnimationFrame(function() { _scrollSyncLock = false; });
+          }
           if (onSwitched) onSwitched();
         });
       }
@@ -2363,13 +3476,11 @@ body.idle #right-panel {
     }
 
     // --- Open / Close ---
-    function isOpen() { return container.classList.contains('open'); }
+    function isOpen() { return unifiedPanelState !== 'closed'; }
 
     function openTimeline() {
-      if (menuOpen) { closeMenu(); }
-      map.closePopup();
-      container.classList.add('open');
-      pushPanelHistory();
+      // Delegated to openSlimPanel + timeline init logic
+      openSlimPanel();
       updateDateNav();
       if (!dayHistoryReady) {
         label.textContent = '\u05D8\u05D5\u05E2\u05DF...';
@@ -2378,6 +3489,13 @@ body.idle #right-panel {
           onDayHistoryReady = null;
           rebuildTimeline();
           prefetchPrevDay();
+          // If location selected, refresh event list
+          if (selectedLocation) {
+            _scrollSyncLock = true;
+            buildLocationEventList(selectedLocation);
+            renderEventList();
+            requestAnimationFrame(function() { _scrollSyncLock = false; });
+          }
         };
       } else {
         rebuildTimeline();
@@ -2389,12 +3507,11 @@ body.idle #right-panel {
           });
         }
       }
-      updateOverlay();
     }
 
     function closeTimeline() {
       if (!isOpen()) return;
-      container.classList.remove('open');
+      closeUnifiedPanel();
       stopPlay();
 
       // If viewing a past date, reset to today
@@ -2421,16 +3538,26 @@ body.idle #right-panel {
 
       // Restore live state before zoom decision so getActiveEventBounds reflects reality
       enterLiveMode();
-      updateOverlay();
 
-      if (autoZoomActive && getActiveEventBounds()) {
+      if (shouldAutoZoomToEvents() && getActiveEventBounds()) {
         maybeZoomToEvent();
-      } else {
+      } else if (!drivingModeFeatureEnabled && getEffectiveZoomMode() === 'manual') {
         isZoomingProgrammatically = true;
-        map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.7 });
+        map.flyTo({ center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], zoom: DEFAULT_ZOOM });
+      } else {
+        applySelectedZoomMode(true);
       }
     }
     closeTimelinePanel = closeTimeline;
+
+    // Listen for seekTo events from unified panel wiring
+    document.addEventListener('app:seekTo', function(e) {
+      var time = e.detail && e.detail.time;
+      if (time) {
+        stopPlay();
+        seekTo(time);
+      }
+    });
 
     // Called when dayHistoryReady becomes true (from fetchExtendedHistory callback in init)
     rebuildTimelineFn = function() {
@@ -2438,6 +3565,8 @@ body.idle #right-panel {
         onDayHistoryReady();
       }
     };
+
+    openTimelineFn = openTimeline;
 
     openTimelineToLastEvent = function() {
       if (extendedHistory.length === 0) return;
@@ -2518,18 +3647,8 @@ body.idle #right-panel {
     });
 
     btnRow.addEventListener('click', function(e) {
-      if (isOpen()) {
-        closeTimeline();
-        popPanelHistory();
-      } else {
+      if (!isOpen()) {
         openTimeline();
-      }
-    });
-
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && isOpen()) {
-        closeTimeline();
-        popPanelHistory();
       }
     });
 
@@ -2577,13 +3696,17 @@ body.idle #right-panel {
       document.getElementById('historyTimeLabel').style.display = 'block';
       document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
       reconstructStateAt(time);
+      // Sync event list scroll
+      if (selectedLocation && !_scrollSyncLock) {
+        syncScrollToTime(time);
+      }
     }
 
     function seekTo(time) {
       time = clampTime(time);
       slider.value = Math.min(sliderFromTime(time), 999);
       enterHistoryMode(time);
-      if (autoZoomActive) maybeZoomToEvent();
+      if (shouldAutoZoomToEvents() && !selectedLocation) maybeZoomToEvent();
     }
 
     // --- Slider input ---
@@ -2592,7 +3715,7 @@ body.idle #right-panel {
       var time = clampTime(timeFromSlider(parseInt(slider.value)));
       slider.value = sliderFromTime(time);
       enterHistoryMode(time);
-      if (autoZoomActive) maybeZoomToEvent();
+      if (shouldAutoZoomToEvents() && !selectedLocation) maybeZoomToEvent();
     });
 
     // --- Timeline bands (show duration of active alerts) ---
@@ -2644,10 +3767,11 @@ body.idle #right-panel {
       if (!locs) return null;
       var bounds = null;
       locs.forEach(function(loc) {
-        var polygon = locationPolygons[loc];
-        if (!polygon) return;
-        if (!bounds) bounds = L.latLngBounds(polygon.getBounds());
-        else bounds.extend(polygon.getBounds());
+        var feature = featureMap[loc];
+        if (!feature) return;
+        var b = featureBounds(feature);
+        if (!bounds) bounds = b;
+        else bounds.extend(b);
       });
       return bounds;
     }
@@ -2676,15 +3800,26 @@ body.idle #right-panel {
         return best;
       }
 
-      function expireStale(atTime) {
-        for (var loc in locStates) {
-          if (atTime - locStates[loc].since >= ALERT_MAX_AGE_MS) delete locStates[loc];
-        }
-      }
-
       for (var i = 0; i < extendedHistory.length; i++) {
         var e = extendedHistory[i];
-        expireStale(e.alertDate);
+        // Expire stale entries — if expiry causes a state drop, close the current band.
+        var maxExpiry = 0, anyExpired = false;
+        for (var loc in locStates) {
+          if (e.alertDate - locStates[loc].since >= ALERT_MAX_AGE_MS) {
+            var t = locStates[loc].since + ALERT_MAX_AGE_MS;
+            if (t > maxExpiry) maxExpiry = t;
+            delete locStates[loc];
+            anyExpired = true;
+          }
+        }
+        if (anyExpired) {
+          var domAfterExpiry = dominantState();
+          if (domAfterExpiry !== curState) {
+            if (curState) bands.push({ start: curStart, end: maxExpiry, state: curState });
+            curState = domAfterExpiry;
+            curStart = maxExpiry;
+          }
+        }
         if (e.state === 'green') {
           delete locStates[e.location];
         } else {
@@ -2752,7 +3887,7 @@ body.idle #right-panel {
       if (playFlyHandler) { map.off('moveend', playFlyHandler); playFlyHandler = null; }
     }
 
-    var GAP_SKIP_MS = 1000; // real-time ms before skipping a dead gap
+    var GAP_SKIP_MS = 300; // real-time ms before skipping a dead gap
 
     function isInBand(time) {
       for (var i = 0; i < computedBands.length; i++) {
@@ -2822,12 +3957,22 @@ body.idle #right-panel {
         var datePart = isViewingToday() ? '' : ' (' + formatDateLabel(timelineDate) + ')';
         document.getElementById('historyTimeLabel').textContent = '\u05DE\u05E8\u05D0\u05D4 \u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05DE\u05E9\u05E2\u05D4 ' + timeStr + datePart;
         reconstructStateAt(newTime);
+        // Sync event list scroll (throttled: only when event index changes)
+        if (selectedLocation && _locationEventList.length > 0) {
+          var evIdx = -1;
+          for (var ei = _locationEventList.length - 1; ei >= 0; ei--) {
+            if (_locationEventList[ei].alertDate <= newTime) { evIdx = ei; break; }
+          }
+          if (evIdx !== _currentEventIdx) {
+            syncScrollToTime(newTime);
+          }
+        }
 
         // Auto-zoom: fly to event area when entering a new event group
         var curIdx = findEventIdx(newTime);
         if (curIdx !== playEventIdx) {
           playEventIdx = curIdx;
-          var bounds = autoZoomActive && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
+          var bounds = shouldAutoZoomToEvents() && !selectedLocation && curIdx >= 0 && getActiveEventBounds() ? boundsForEvent(curIdx) : null;
           if (bounds) {
             isZoomingProgrammatically = true;
             isPlaying = false;
@@ -2844,7 +3989,7 @@ body.idle #right-panel {
               }
             };
             map.on('moveend', playFlyHandler);
-            map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 10, duration: 0.7 });
+            map.fitBounds(bounds, { padding: 80, maxZoom: 10 });
             return;
           }
         }
@@ -2886,8 +4031,6 @@ body.idle #right-panel {
     fetch('locations_polygons.json').then(function(r) { return r.json(); })
     .then(function(data) {
 
-      buildPolygons(data);
-
       // Load favorite markers
       Object.keys(favorites).forEach(function(name) {
         addFavoriteMarker(name, favorites[name]);
@@ -2901,21 +4044,76 @@ body.idle #right-panel {
       // Init timeline immediately (button always visible)
       initTimeline();
 
-      // Start live + history polling immediately
-      setInterval(fetchLiveAlerts, LIVE_POLL_MS);
-      historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-      setInterval(fadeGreenMarkers, FADE_TICK_MS);
-      fetchLiveAlerts();
-
-      fetchHistory(function() {
-        initialized = true;
+      // --- Unified panel wiring ---
+      document.getElementById('up-close-row').addEventListener('click', function() {
+        closeTimelinePanel();
       });
-      // Day-history load in background (independent of live history)
-      fetchExtendedHistory(function() {
-        rebuildTimelineFn();
+      document.getElementById('up-handle').addEventListener('click', function() {
+        closeTimelinePanel();
+      });
+      document.getElementById('up-location-close').addEventListener('click', function(e) {
+        e.stopPropagation();
+        deselectLocation();
+      });
+      document.getElementById('up-fav-star').addEventListener('click', function(e) {
+        window._toggleFav(e);
+      });
+      // Event row click: seek to that time
+      document.getElementById('up-event-list').addEventListener('click', function(e) {
+        var row = e.target.closest('.up-event-row');
+        if (!row) return;
+        var ts = Number(row.getAttribute('data-ts'));
+        if (ts) {
+          document.dispatchEvent(new CustomEvent('app:seekTo', { detail: { time: ts } }));
+        }
+      });
+      // Scroll → slider sync
+      document.getElementById('up-event-list').addEventListener('scroll', function() {
+        if (_scrollSyncLock || !selectedLocation || isPlaying) return;
+        _scrollSyncLock = true;
+        var listEl = this;
+        var listHeight = listEl.clientHeight;
+        var targetY = listEl.scrollTop + listHeight * 0.75;
+        var rows = listEl.querySelectorAll('.up-event-row');
+        var closestIdx = 0;
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].offsetTop <= targetY) closestIdx = i;
+          else break;
+        }
+        if (rows[closestIdx]) {
+          var ts = Number(rows[closestIdx].getAttribute('data-ts'));
+          if (ts && ts !== currentViewTime) {
+            document.dispatchEvent(new CustomEvent('app:seekTo', { detail: { time: ts } }));
+            // Update current marker directly (avoid re-triggering scroll)
+            for (var j = 0; j < rows.length; j++) {
+              rows[j].classList.toggle('up-current', j === closestIdx);
+            }
+            _currentEventIdx = closestIdx;
+          }
+        }
+        requestAnimationFrame(function() { _scrollSyncLock = false; });
       });
 
-      if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+      // Build polygons; start polling only after nameToId is populated
+      buildPolygons(data, function() {
+        pollingStarted = true;
+        // Always do the initial data fetch to populate state and set initialized=true
+        fetchLiveAlerts();
+        fetchHistory(function() {
+          initialized = true;
+          if (shouldAutoZoomToEvents() && !selectedLocation) maybeZoomToEvent();
+        });
+        fetchExtendedHistory(function() { rebuildTimelineFn(); });
+        if ('ontouchstart' in window) setTimeout(showPolygonHint, 500);
+        // Only start interval timers if the tab is currently visible;
+        // if hidden, visibilitychange → visible will call resumePolling()
+        if (document.visibilityState !== 'hidden') {
+          livePollId    = setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+          historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+          fadePollId    = setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        }
+      });
+
     }).catch(function(err) {
       console.error('Failed to load geo data:', err);
       setStatus('err', 'אירעה שגיאה בטעינת נתונים גאוגרפיים');
@@ -2924,6 +4122,11 @@ body.idle #right-panel {
 
   // --- About control ---
   function openAbout() {
+    var statEl = document.getElementById('about-visitors-stat');
+    if (statEl && lastVisitors24h !== null) {
+      statEl.querySelector('.stat-number').textContent = lastVisitors24h.toLocaleString('he-IL');
+      statEl.style.display = 'block';
+    }
     document.getElementById('about-backdrop').classList.add('visible');
   }
   function closeAbout() {
@@ -2973,8 +4176,20 @@ body.idle #right-panel {
         }
       }
       document.dispatchEvent(new CustomEvent('app:escape'));
-      map.closePopup();
+      // Unified panel: Full→Slim→Closed
+      if (unifiedPanelState === 'full' && selectedLocation) {
+        deselectLocation();
+      } else if (unifiedPanelState !== 'closed') {
+        closeTimelinePanel();
+        popPanelHistory();
+      }
       document.getElementById('errorDetail').style.display = 'none';
+    }
+    // Arrow keys: prev/next event when timeline is open
+    if (unifiedPanelState !== 'closed' && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      var btn = e.key === 'ArrowLeft' ? document.getElementById('tl-next') : document.getElementById('tl-prev');
+      if (btn) btn.click();
     }
   });
 
@@ -3035,7 +4250,7 @@ body.idle #right-panel {
       soundResults.innerHTML = '';
       return;
     }
-    var matches = Object.keys(locationPolygons).filter(function(name) {
+    var matches = Object.keys(featureMap).filter(function(name) {
       return name.includes(q);
     }).slice(0, 20);
 
@@ -3058,7 +4273,7 @@ body.idle #right-panel {
       searchResults.innerHTML = '';
       return;
     }
-    var matches = Object.keys(locationPolygons).filter(function(name) {
+    var matches = Object.keys(featureMap).filter(function(name) {
       return name.includes(q);
     }).slice(0, 20);
 
@@ -3071,19 +4286,19 @@ body.idle #right-panel {
     var item = e.target.closest('.location-item');
     if (!item) return;
     var name = item.getAttribute('data-name');
-    var polygon = locationPolygons[name];
-    if (!polygon) return;
+    var feature = featureMap[name];
+    if (!feature) return;
 
     closeMenu();
     popPanelHistory();
 
-    var bounds = polygon.getBounds();
+    var bounds = featureBounds(feature);
     isZoomingProgrammatically = true;
-    map.flyToBounds(bounds, { padding: [80, 80], maxZoom: 12, duration: 0.7 });
+    map.fitBounds(bounds, { padding: 80, maxZoom: 12 });
 
     map.once('moveend', function() {
       isZoomingProgrammatically = false;
-      showPopup(name, polygon);
+      openLocationPanel(name);
     });
   });
 
@@ -3092,37 +4307,72 @@ body.idle #right-panel {
     panelHistoryPushed = false;
     closeMenu();
     closeTimelinePanel();
-    map.closePopup();
   });
 
-  // --- Click outside to close panels ---
+  // --- Click outside to close menu ---
   document.addEventListener('click', function(e) {
-    var closed = false;
     if (menuOpen && !menuPanel.contains(e.target) && !menuBtn.contains(e.target)) {
       closeMenu();
-      closed = true;
-    }
-    if (closed) popPanelHistory();
-    if (openPopupName) {
-      var mapContainer = document.getElementById('map');
-      var popupEl = document.querySelector('.leaflet-popup');
-      if (!mapContainer.contains(e.target) && (!popupEl || !popupEl.contains(e.target))) {
-        map.closePopup();
-      }
+      popPanelHistory();
     }
   });
 
-  // --- Mobile resume: reload if data is stale ---
+  // --- Wake lock: prevent screen from turning off ---
+  var _wakeLock = null;
+  var _wakeLockEnabled = true;
+  try { _wakeLockEnabled = localStorage.getItem('oref-wake-lock') !== 'disabled'; } catch(e) {}
+  var _menuWakeLock = document.getElementById('menu-wakelock');
+  var _isMobileDevice = (navigator.userAgentData ? navigator.userAgentData.mobile : window.matchMedia('(pointer: coarse) and (hover: none)').matches);
+  if (!('wakeLock' in navigator)) {
+    if (_menuWakeLock) _menuWakeLock.style.display = 'none';
+  } else if (_menuWakeLock) {
+    if (_isMobileDevice) {
+      var _iconEl = document.getElementById('menu-wakelock-icon');
+      if (_iconEl) _iconEl.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="18" r="1"/></svg>';
+    }
+    if (_wakeLockEnabled) _menuWakeLock.classList.add('active');
+    _menuWakeLock.querySelector('.menu-item-row').addEventListener('click', function() {
+      _wakeLockEnabled = !_wakeLockEnabled;
+      try { localStorage.setItem('oref-wake-lock', _wakeLockEnabled ? 'enabled' : 'disabled'); } catch(e) {}
+      _menuWakeLock.classList.toggle('active', _wakeLockEnabled);
+      if (_wakeLockEnabled) {
+        _acquireWakeLock();
+      } else if (_wakeLock) {
+        _wakeLock.release().catch(function() {});
+        _wakeLock = null;
+      }
+    });
+  }
+  function _acquireWakeLock() {
+    if (!('wakeLock' in navigator) || !_wakeLockEnabled) return;
+    if (_wakeLock && !_wakeLock.released) return;
+    navigator.wakeLock.request('screen').then(function(wl) { _wakeLock = wl; }).catch(function() {});
+  }
+  _acquireWakeLock();
+
+  // --- Pause polling when tab is hidden; resume when visible ---
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState === 'hidden') {
+      pausePolling();
+      return;
+    }
+    // visible
+    _acquireWakeLock();
+    if (!pollingStarted) return; // page still initializing, nothing to resume
+    if (livePollId !== null) return; // polling already running (wasn't paused)
+    // If hidden for >30s, reload instead of resuming (existing mobile behavior)
     try {
       var lastPoll = Number(sessionStorage.getItem('oref-last-poll')) || 0;
-      if (Date.now() - lastPoll < 30000) return;
-      var lastReload = Number(sessionStorage.getItem('oref-reload-ts')) || 0;
-      if (Date.now() - lastReload < 60000) return; // prevent reload loop
-      sessionStorage.setItem('oref-reload-ts', String(Date.now()));
-    } catch(e) { return; }
-    location.reload();
+      if (lastPoll > 0 && Date.now() - lastPoll >= 30000) {
+        var lastReload = Number(sessionStorage.getItem('oref-reload-ts')) || 0;
+        if (Date.now() - lastReload >= 60000) {
+          sessionStorage.setItem('oref-reload-ts', String(Date.now()));
+          location.reload();
+          return;
+        }
+      }
+    } catch(e) {}
+    resumePolling();
   });
 
   if (window.matchMedia('(display-mode: standalone)').matches) {
@@ -3133,7 +4383,7 @@ body.idle #right-panel {
   var IDLE_MS = 45000;
   var _idleTimer = null;
   function _enterIdle() {
-    if (menuOpen || document.getElementById('timeline-btn').classList.contains('open')) {
+    if (menuOpen || unifiedPanelState !== 'closed') {
       _resetIdle(); return;
     }
     document.body.classList.add('idle');
