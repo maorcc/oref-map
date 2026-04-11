@@ -4,7 +4,7 @@
   "description": "מפת התרעות פיקוד העורף בזמן אמת",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "natural",
   "dir": "rtl",
   "lang": "he",
   "theme_color": "#1a1a2e",
