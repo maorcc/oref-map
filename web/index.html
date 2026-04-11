@@ -1084,6 +1084,27 @@ body.idle #right-panel {
     }
   }
 
+  function pausePolling() {
+    if (livePollId)    { clearInterval(livePollId);    livePollId    = null; }
+    if (historyPollId) { clearInterval(historyPollId); historyPollId = null; }
+    if (fadePollId)    { clearInterval(fadePollId);    fadePollId    = null; }
+    stopAnalyticsPolling();
+  }
+
+  function resumePolling() {
+    if (livePollId) return; // already running
+    fadeGreenMarkers();
+    fetchLiveAlerts();
+    livePollId = setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+    fadePollId = setInterval(fadeGreenMarkers, FADE_TICK_MS);
+    // Only restart history polling when viewing today — past-date mode stops it intentionally
+    if (isViewingToday()) {
+      fetchHistory();
+      historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
+    }
+    if (visitorsEnabled) startAnalyticsPolling();
+  }
+
   // Periodically reset proxy so client can re-check if direct /api works
   setInterval(resetProxy, 300000); // 5 min
   if (visitorsEnabled) {
@@ -1896,7 +1917,10 @@ body.idle #right-panel {
   var openTimelineFn = function() {}; // set by initTimeline
   var timelineDate = null;         // 'YYYY-MM-DD' string, null = today
   var dayHistoryReady = false;     // true once day-history fetch completes
-  var historyPollId = null;        // setInterval ID for fetchHistory
+  var historyPollId  = null;        // setInterval ID for fetchHistory
+  var livePollId     = null;        // setInterval ID for fetchLiveAlerts
+  var fadePollId     = null;        // setInterval ID for fadeGreenMarkers
+  var pollingStarted = false;       // true once polling intervals are created
   var DAY_HISTORY_MIN_DATE = '2026-02-28';
 
   // --- Unified panel state ---
@@ -4072,9 +4096,10 @@ body.idle #right-panel {
 
       // Build polygons; start polling only after nameToId is populated
       buildPolygons(data, function() {
-        setInterval(fetchLiveAlerts, LIVE_POLL_MS);
+        livePollId    = setInterval(fetchLiveAlerts, LIVE_POLL_MS);
         historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
-        setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        fadePollId    = setInterval(fadeGreenMarkers, FADE_TICK_MS);
+        pollingStarted = true;
         fetchLiveAlerts();
         fetchHistory(function() {
           initialized = true;
@@ -4320,18 +4345,29 @@ body.idle #right-panel {
   }
   _acquireWakeLock();
 
-  // --- Mobile resume: reload if data is stale ---
+  // --- Pause polling when tab is hidden; resume when visible ---
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState !== 'visible') return;
+    if (document.visibilityState === 'hidden') {
+      pausePolling();
+      return;
+    }
+    // visible
     _acquireWakeLock();
+    if (!pollingStarted) return; // page still initializing, nothing to resume
+    if (livePollId !== null) return; // polling already running (wasn't paused)
+    // If hidden for >30s, reload instead of resuming (existing mobile behavior)
     try {
       var lastPoll = Number(sessionStorage.getItem('oref-last-poll')) || 0;
-      if (Date.now() - lastPoll < 30000) return;
-      var lastReload = Number(sessionStorage.getItem('oref-reload-ts')) || 0;
-      if (Date.now() - lastReload < 60000) return; // prevent reload loop
-      sessionStorage.setItem('oref-reload-ts', String(Date.now()));
-    } catch(e) { return; }
-    location.reload();
+      if (Date.now() - lastPoll >= 30000) {
+        var lastReload = Number(sessionStorage.getItem('oref-reload-ts')) || 0;
+        if (Date.now() - lastReload >= 60000) {
+          sessionStorage.setItem('oref-reload-ts', String(Date.now()));
+          location.reload();
+          return;
+        }
+      }
+    } catch(e) {}
+    resumePolling();
   });
 
   if (window.matchMedia('(display-mode: standalone)').matches) {
