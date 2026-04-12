@@ -705,6 +705,102 @@ body.idle #right-panel {
   bottom: 12px;
   gap: 0;
 }
+
+/* Settings items with stacked label + select */
+.menu-setting .menu-item-row { padding-bottom: 4px; }
+.menu-setting-select {
+  display: block;
+  width: calc(100% - 50px);
+  margin: 0 16px 10px auto;
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  direction: rtl;
+}
+
+/* --- Dark theme --- */
+body.dark #map { background: #1e3048; }
+body.dark #site-logo img { filter: invert(1) brightness(1.8); }
+/* Panels & controls: neutral-cool gray (contrasts with warm map tones) */
+body.dark #menu-btn { background: rgba(48,50,56,0.92); border-color: #555; color: #ccc; }
+body.dark #menu-btn:hover, body.dark #menu-btn[aria-expanded="true"] { background: rgba(40,60,90,0.92); border-color: #5b8def; }
+body.dark #menu-panel { background: rgba(48,50,56,0.97); border-color: #555; color: #ddd; }
+body.dark .menu-item { border-bottom-color: #3a3c40; }
+body.dark .menu-item-row { color: #ddd; }
+@media (hover: hover) { body.dark .menu-item-row:hover { background: #3a3c40; } }
+body.dark .menu-item-label { color: #ddd; }
+body.dark .menu-item-value { color: #999; }
+body.dark .menu-check { border-color: #666; }
+body.dark .menu-setting-select { background: #3a3c40; border-color: #555; color: #ddd; }
+body.dark #status { background: rgba(48,50,56,0.92); color: #ddd; }
+body.dark #visitorCount { border-top-color: #4a4c50; color: #999; }
+body.dark #historyTimeLabel { color: #999 !important; border-top-color: #4a4c50 !important; }
+body.dark #errorDetail { background: #30323a; color: #ddd; border-color: #c00; }
+body.dark #legend { background: rgba(48,50,56,0.92); color: #ddd; }
+/* Unified panel (location + timeline) */
+body.dark #unified-panel { background: #2e3038; }
+body.dark #up-location-name { color: #eee; }
+body.dark .up-event-row:hover { background: #3a3c40; }
+body.dark .up-event-row.up-current { background: rgba(59,130,246,0.15); }
+body.dark .up-event-time { color: #ddd; }
+body.dark .up-event-label { color: #bbb; }
+body.dark .up-event-sep { border-bottom-color: #4a4c50; }
+body.dark #up-event-list .up-empty { color: #999; }
+body.dark #up-handle { background: #666; }
+body.dark #up-fav-star { color: #666; }
+body.dark #up-location-close { color: #999; }
+body.dark #up-location-close:hover { color: #ddd; }
+body.dark #up-timeline { border-top-color: #4a4c50; }
+/* Timeline button & transport controls */
+body.dark #timeline-btn { background: rgba(55,52,38,0.92); border-color: #8a6e0b; }
+body.dark #timeline-btn.has-data { background: rgba(65,58,35,0.92); border-color: #b8860b; }
+body.dark .btn-text { color: #ddd; }
+body.dark .btn-icon { color: #ddd; }
+body.dark .tl-close { color: #999; }
+body.dark .tl-close:hover { color: #ddd; }
+body.dark #timeline-label { color: #eee; }
+body.dark #timeline-ticks { background: #3a3a38; }
+body.dark #timeline-transport button { color: #ddd; border-color: #555; }
+body.dark #timeline-transport button:hover { background: #3a3a38; }
+body.dark #timeline-transport button:active { background: #444; }
+body.dark #timeline-transport #tl-prev, body.dark #timeline-transport #tl-next { background: rgba(40,60,90,0.92); border-color: #5b8def; }
+body.dark #timeline-date-nav { background: #3a3520; border-color: #8a6e0b; }
+body.dark #timeline-date-nav button { color: #dda520; }
+body.dark #timeline-date-nav button:hover { background: #4a4525; }
+body.dark #timeline-date-nav button:active { background: #5a5530; }
+body.dark #tl-date-label { color: #dda520; }
+body.dark #up-close-row .btn-text { color: #999; }
+/* Modals */
+body.dark .modal-backdrop { background: rgba(0,0,0,0.7); }
+body.dark .modal-content { background: #30323a; color: #ddd; }
+body.dark .modal-content a { color: #6ba6ff; }
+body.dark .modal-close { color: #aaa; }
+body.dark .modal-close:hover { background: #3a3c40; color: #ddd; }
+body.dark #about-visitors-stat { background: #253050; }
+body.dark #about-visitors-stat .stat-number { color: #6ba6ff; }
+body.dark #about-visitors-stat .stat-label { color: #999; }
+/* Search & inputs */
+body.dark #search-input, body.dark #sound-search { background: #3a3c40; border-color: #555; color: #ddd; }
+body.dark #search-results, body.dark #sound-results { border-color: #4a4c50; }
+body.dark .location-item { border-bottom-color: #3a3c40; color: #ddd; }
+body.dark .location-item:hover { background: #3a3c40; }
+/* Experimental section */
+body.dark #ext-section { border-top-color: #4a4c50; }
+body.dark #ext-section > .menu-item-row { color: #777; }
+body.dark #ext-section .menu-sub-panel .menu-item-label { color: #999; }
+body.dark .menu-sub-panel { border-top-color: #4a4c50; }
+/* MapLibre controls */
+body.dark .maplibregl-ctrl-group { background: rgba(48,50,56,0.92) !important; }
+body.dark .maplibregl-ctrl-group button { background: transparent !important; }
+body.dark .maplibregl-ctrl-group button + button { border-top: 1px solid #4a4c50 !important; }
+body.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+body.dark .maplibregl-ctrl-attrib { background: rgba(48,50,56,0.7) !important; color: #999 !important; }
+body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
 </style>
 </head>
 <body>
@@ -753,6 +849,29 @@ body.idle #right-panel {
       <span class="menu-item-label">מס' משתמשים</span>
       <span class="menu-check"></span>
     </button>
+  </div>
+  <div id="menu-lang" class="menu-item menu-setting">
+    <div class="menu-item-row">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg></span>
+      <span class="menu-item-label">שפת מפה</span>
+    </div>
+    <select id="lang-select" class="menu-setting-select">
+      <option value="he">עברית</option>
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+      <option value="ru">Русский</option>
+    </select>
+  </div>
+  <div id="menu-theme" class="menu-item menu-setting">
+    <div class="menu-item-row">
+      <span id="menu-theme-icon" class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
+      <span class="menu-item-label">ערכת נושא</span>
+    </div>
+    <select id="theme-select" class="menu-setting-select">
+      <option value="light">בהיר</option>
+      <option value="dark">כהה</option>
+      <option value="auto">אוטומטי</option>
+    </select>
   </div>
   <div id="menu-share" class="menu-item" style="display:none;">
     <button class="menu-item-row" type="button">
@@ -1129,6 +1248,20 @@ body.idle #right-panel {
 
   var PMTILES_URL = 'pmtiles://https://tiles.oref-map.org/middle-east.pmtiles';
 
+  // --- Language & theme preferences ---
+  var currentLang = 'he';
+  var currentTheme = 'auto';
+  try { currentLang = localStorage.getItem('oref-map-lang') || 'he'; } catch(e) {}
+  try { currentTheme = localStorage.getItem('oref-theme') || 'auto'; } catch(e) {}
+
+  function resolveDarkMode() {
+    if (currentTheme === 'dark') return true;
+    if (currentTheme === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return false;
+  }
+  var isDarkActive = resolveDarkMode();
+  if (isDarkActive) document.body.classList.add('dark');
+
   // Warm MapTiler-like flavor (Protomaps LIGHT with warmer, more colorful tones)
   var WARM_FLAVOR = Object.assign({}, basemaps.LIGHT, {
     background:            '#f5f0e8',
@@ -1182,6 +1315,59 @@ body.idle #right-panel {
     }
   });
 
+  // Warm dark flavor (Protomaps DARK with warmer tones, lifted ~15% for readability)
+  var WARM_DARK_FLAVOR = Object.assign({}, basemaps.DARK, {
+    background:            '#2a2a28',
+    earth:                 '#2a2a28',
+    park_a:                '#253528',
+    park_b:                '#28382c',
+    hospital:              '#352a2a',
+    industrial:            '#282c30',
+    school:                '#352f2a',
+    wood_a:                '#253020',
+    wood_b:                '#253520',
+    pedestrian:            '#282625',
+    scrub_a:               '#283028',
+    scrub_b:               '#263525',
+    sand:                  '#302d28',
+    beach:                 '#302d28',
+    aerodrome:             '#28282c',
+    runway:                '#353538',
+    water:                 '#1e3048',
+    buildings:             '#222220',
+    minor_service_casing:  '#333330',
+    minor_casing:          '#333330',
+    link_casing:           '#453828',
+    major_casing_early:    '#453828',
+    major_casing_late:     '#453828',
+    highway_casing_early:  '#453518',
+    highway_casing_late:   '#453518',
+    other:                 '#2c2c28',
+    minor_service:         '#333330',
+    minor_a:               '#333330',
+    minor_b:               '#383835',
+    link:                  '#454028',
+    major:                 '#454028',
+    highway:               '#555028',
+    city_label:            '#c0c0b8',
+    city_label_halo:       '#2a2a28',
+    subplace_label:        '#999890',
+    subplace_label_halo:   '#2a2a28',
+    state_label:           '#787870',
+    state_label_halo:      '#2a2a28',
+    boundaries:            '#606058',
+    country_label:         '#888880',
+    landcover: {
+      grassland: 'rgba(38, 58, 38, 1)',
+      barren:    'rgba(40, 38, 30, 1)',
+      urban_area:'rgba(35, 35, 30, 1)',
+      farmland:  'rgba(36, 48, 32, 1)',
+      glacier:   'rgba(38, 38, 42, 1)',
+      scrub:     'rgba(36, 46, 32, 1)',
+      forest:    'rgba(32, 50, 35, 1)'
+    }
+  });
+
   // --- Basemap style customizations ---
   // Modify the Protomaps layer list before passing to MapLibre so tweaks are
   // baked into the initial style rather than applied post-load via setPaintProperty.
@@ -1219,19 +1405,24 @@ body.idle #right-panel {
     });
   }
 
-  var MAP_STYLE = {
-    version: 8,
-    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
-    sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
-    sources: {
-      protomaps: {
-        type: 'vector',
-        url: PMTILES_URL,
-        attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
-      }
-    },
-    layers: customizeBasemapLayers(basemaps.layers('protomaps', WARM_FLAVOR, { lang: 'he' }))
-  };
+  function buildMapStyle(isDark, lang) {
+    var flavor = isDark ? WARM_DARK_FLAVOR : WARM_FLAVOR;
+    return {
+      version: 8,
+      glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+      sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/' + (isDark ? 'dark' : 'light'),
+      sources: {
+        protomaps: {
+          type: 'vector',
+          url: PMTILES_URL,
+          attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
+        }
+      },
+      layers: customizeBasemapLayers(basemaps.layers('protomaps', flavor, { lang: lang }))
+    };
+  }
+
+  var MAP_STYLE = buildMapStyle(isDarkActive, currentLang);
 
   var map = new maplibregl.Map({
     container: 'map',
@@ -4402,6 +4593,38 @@ body.idle #right-panel {
   ['mousemove','mousedown','keydown','wheel','scroll','touchstart','touchmove']
     .forEach(function(e) { document.addEventListener(e, _resetIdle, {passive:true}); });
   _resetIdle();
+
+  // --- Menu: Language ---
+  var langSelect = document.getElementById('lang-select');
+  langSelect.value = currentLang;
+  langSelect.addEventListener('change', function() {
+    try { localStorage.setItem('oref-map-lang', langSelect.value); } catch(e) {}
+    location.reload();
+  });
+
+  // --- Menu: Theme ---
+  var themeSelect = document.getElementById('theme-select');
+  var themeIcon = document.getElementById('menu-theme-icon');
+  themeSelect.value = currentTheme;
+  var THEME_ICONS = {
+    light: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+    dark: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    auto: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill="currentColor"/></svg>'
+  };
+  // Show icon matching the resolved state (sun if light, moon if dark)
+  themeIcon.innerHTML = THEME_ICONS[isDarkActive ? 'dark' : 'light'];
+  // But if auto mode, show the auto icon
+  if (currentTheme === 'auto') themeIcon.innerHTML = THEME_ICONS.auto;
+  themeSelect.addEventListener('change', function() {
+    try { localStorage.setItem('oref-theme', themeSelect.value); } catch(e) {}
+    location.reload();
+  });
+  // Auto-theme: reload on system preference change
+  try {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+      if (currentTheme === 'auto') location.reload();
+    });
+  } catch(e) {}
 
   // --- Menu: Share ---
   var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
