@@ -87,6 +87,20 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 .dot-yellow { background: #ffcc00; }
 .dot-green  { background: #00cc00; }
 
+#resident-count {
+  display: none;
+  font-size: 13px;
+  font-weight: bold;
+  color: #c00;
+  text-align: center;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  white-space: nowrap;
+}
+#resident-count.visible { display: block; }
+body.dark #resident-count { color: #f88; border-bottom-color: rgba(255,255,255,0.12); }
+
 #status {
   position: fixed;
   top: 80px;
@@ -980,6 +994,7 @@ try {
 <div id="right-panel">
   <div id="legend">
     <div id="legend-icon"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,1 23,12 12,12" fill="#ff0000"/><polygon points="12,1 12,12 1,12" fill="#ffcc00"/><polygon points="1,12 12,12 12,23" fill="#9922cc"/><polygon points="12,12 23,12 12,23" fill="#00cc00"/></svg></div>
+    <div id="resident-count"></div>
     <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
     <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
@@ -2079,6 +2094,7 @@ try {
 
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
+  var locationPopulations = null; // {name: population} from CBS 2024 data — null until loaded
   var favorites = {};            // {name: {lat, lng}}
   var favoriteMarkers = {};      // {name: maplibregl.Marker}
   var lastHistoryDate = null;    // track newest history entry
@@ -2126,6 +2142,31 @@ try {
   var fadePollId     = null;        // setInterval ID for fadeGreenMarkers
   var pollingStarted = false;       // true once polling intervals are created
   var DAY_HISTORY_MIN_DATE = '2026-02-28';
+
+  // --- Resident count (CBS 2024 population data) ---
+  function updateResidentCount() {
+    var el = document.getElementById('resident-count');
+    if (!el || !locationPopulations) return;
+    var total = 0, hasActive = false;
+    for (var n in locationStates) {
+      if (locationStates[n].state !== 'green') {
+        hasActive = true;
+        var pop = locationPopulations[n];
+        if (pop) total += pop;
+      }
+    }
+    if (!hasActive || total === 0) {
+      el.classList.remove('visible');
+    } else {
+      el.textContent = '\u007e' + total.toLocaleString('he-IL') + ' \u05EA\u05D5\u05E9\u05D1\u05D9\u05DD \u05D1\u05D0\u05D6\u05E2\u05E7\u05D4';
+      el.classList.add('visible');
+    }
+  }
+
+  fetch('location_populations.json')
+    .then(function(r) { return r.ok ? r.json() : {}; })
+    .then(function(data) { locationPopulations = data; updateResidentCount(); })
+    .catch(function() { locationPopulations = {}; });
 
   // --- Unified panel state ---
   var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
@@ -2512,6 +2553,7 @@ try {
     applyFeatureStyle(name, state, opacity);
     locationStates[name] = { state: state, since: since || Date.now() };
     playSoundForState(state, name);
+    updateResidentCount();
   }
 
   function removeLocation(name) {
@@ -2521,6 +2563,7 @@ try {
     }
     if (selectedLocation === name) closeLocationPanel();
     delete locationStates[name];
+    updateResidentCount();
   }
 
   // --- Alert history per location ---
@@ -3480,6 +3523,7 @@ try {
       _applyPanelHighlight(selectedLocation);
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
+    updateResidentCount();
   }
 
   function saveLiveState() {
