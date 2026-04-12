@@ -14,7 +14,7 @@
   //     starting conditions (PCA guess + rotated variants) to escape local
   //     minima. Loss = mean squared distance from ellipse sample points
   //     (inside Israel's land border) to the union boundary.
-  //  5. Estimate slope uncertainty by re-fitting on even/odd subsets.
+  //  5. Estimate slope uncertainty: analytical formula σ_θ≈(k/√N)·(AR/(AR²-1)).
   //  6. Draw the corridor (5000 km) starting from the major axis eastern tip,
   //     plus a cross showing both ellipse axes. Filter aspect ratio < 1.2.
   //
@@ -31,19 +31,21 @@
   // ------------------------------------------------------------------
 
   var ASPECT_RATIO_MIN  = 1.2;
-  var MIN_CLUSTER_RED   = 15;
-  var YELLOW_WINDOW_MS  = 12 * 60 * 1000; // 12 min: yellow says "coming minutes" ~10 min before reds
+  var MIN_CLUSTER_RED   = 10;
   var FIT_NUM_PTS       = 40;
   var FIT_PHASE1_ITER   = 60;   // iterations per candidate starting point
   var FIT_PHASE2_ITER   = 80;   // refinement iterations from best candidate
   var CACHE_MAX_AGE_MS  = 10 * 60 * 1000;
   var CORRIDOR_DIST_DEG = 5000 / 111.32; // ~44.9 degrees
-  var CLUSTER_TOL2      = 0.005 * 0.005; // ~500 m vertex proximity
+  var CLUSTER_TOL2        = 0.005 * 0.005; // ~500 m vertex proximity
+  var BRIDGE_MAX_DIST2    = 0.35 * 0.35;  // ~39 km: bridge polygon cannot link clusters farther than this apart
+  var YELLOW_GATE_WINDOW_MS = 10 * 60 * 1000; // 10 min: window before first cluster red to look for yellow
 
-  var YELLOW_PATTERNS = [
-    /בדקות הקרובות צפויות להתקבל התרעות/,
-    /לשפר את המיקום למיגון/
-  ];
+  // Differential Evolution parameters (for the DE optimizer alternative)
+  var DE_POP_SIZE = 20;   // population size
+  var DE_GENS     = 100;  // generations
+  var DE_F        = 0.8;  // mutation scaling factor
+  var DE_CR       = 0.9;  // crossover rate
 
   function initPrediction() {
     var A = window.AppState;
@@ -52,7 +54,8 @@
 
     var israelBorder = null;
     var israelBorderPromise = null;
-    var enabled = localStorage.getItem('oref-predict') === 'true';
+    var enabled    = localStorage.getItem('oref-predict') === 'true';
+    var useDEFit   = localStorage.getItem('oref-de-fit')  === 'true';
     var predictionUpdateScheduled = false;
     var fitCache = Object.create(null);
 
@@ -115,6 +118,7 @@
     // ----------------------------------------------------------------
     var SOURCE_ID = 'prediction-source';
     var allFeatures = [];
+    var labelMarkers = [];   // maplibregl.Marker instances for cluster labels
 
     function pushFeature(f) { allFeatures.push(f); }
 
@@ -127,7 +131,24 @@
       allFeatures = [];
       var src = map.getSource(SOURCE_ID);
       if (src) src.setData({ type: 'FeatureCollection', features: [] });
+      for (var mi = 0; mi < labelMarkers.length; mi++) labelMarkers[mi].remove();
+      labelMarkers = [];
       clearStatus();
+    }
+
+    function addLabelMarker(lat, lng, text) {
+      var el = document.createElement('div');
+      el.textContent = text;
+      el.style.cssText = [
+        'color:#22cc44', 'font-size:11px', 'font-weight:bold',
+        'font-family:monospace', 'white-space:nowrap',
+        'text-shadow:0 0 3px #000,0 0 3px #000',
+        'pointer-events:none', 'user-select:none'
+      ].join(';');
+      var m = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([lng, lat])
+        .addTo(map);
+      labelMarkers.push(m);
     }
 
     function setupLayers() {
@@ -159,6 +180,8 @@
       map.addLayer({ id: 'prediction-debug-pts', type: 'circle', source: SOURCE_ID,
         filter: ['==', ['get', 'kind'], 'point'],
         paint: { 'circle-radius': 2, 'circle-color': '#4488ff', 'circle-opacity': 0.8 } });
+      // Note: cluster labels are rendered as maplibregl.Marker HTML elements
+      // (see addLabelMarker) — no symbol layer needed, avoids glyph-loading errors.
     }
 
     // ----------------------------------------------------------------
@@ -301,15 +324,32 @@
     function computeFullFit(boundary, border) {
       var guess=ellipseInitialGuess(boundary);
       var cx=guess[0],cy=guess[1],a=guess[2],b=guess[3],theta=guess[4];
-      var forced_b=Math.min(b, a/3);
+      var forced_b=Math.min(b, a/3);   // moderate aspect (~3:1)
+      var thin_b  =Math.min(b, a/5);   // thin   aspect (~5:1)
+      var big_a   =a*1.8;              // larger scale to allow center to drift outside border
 
+      // Systematic exploration: PCA angles + key rotations, multiple aspect ratios,
+      // multiple scales.  Phase-1 quickly finds the best basin; phase-2 refines it.
       var candidates=[
+        // PCA guess — full angle sweep every 30°
         [cx,cy,a,b,theta],
-        [cx,cy,a,b,theta+Math.PI/4],
-        [cx,cy,a,b,theta-Math.PI/4],
+        [cx,cy,a,b,theta+Math.PI/6],
+        [cx,cy,a,b,theta+Math.PI/3],
         [cx,cy,a,b,theta+Math.PI/2],
+        [cx,cy,a,b,theta-Math.PI/6],
+        [cx,cy,a,b,theta-Math.PI/3],
+        // Moderate aspect ratio at key angles
         [cx,cy,a,forced_b,theta],
-        [cx,cy,a,forced_b,theta+Math.PI/4]
+        [cx,cy,a,forced_b,theta+Math.PI/4],
+        [cx,cy,a,forced_b,theta+Math.PI/2],
+        [cx,cy,a,forced_b,theta-Math.PI/4],
+        // Thin aspect ratio at key angles
+        [cx,cy,a,thin_b,theta],
+        [cx,cy,a,thin_b,theta+Math.PI/4],
+        [cx,cy,a,thin_b,theta+Math.PI/2],
+        // Large scale variants (allow center to drift outside border)
+        [cx,cy,big_a,forced_b,theta],
+        [cx,cy,big_a,thin_b,theta+Math.PI/4]
       ];
 
       var bestPhase1=null;
@@ -319,61 +359,123 @@
       }
 
       var finalRes=runFit(boundary,border,bestPhase1.params,FIT_PHASE2_ITER);
+
+      // If < 10% of the fitted ellipse lies inside Israel's border, the optimizer
+      // drifted off-border into a degenerate basin. Fall back to the PCA initial
+      // guess which is guaranteed to be centered on the cluster boundary.
+      var testPts=ellipsePoints(finalRes.params,FIT_NUM_PTS);
+      var nInsideTest=0;
+      for(var fi=0;fi<FIT_NUM_PTS;fi++){
+        if(pointInBorder(testPts[fi][0],testPts[fi][1],border)) nInsideTest++;
+      }
+      if(nInsideTest/FIT_NUM_PTS<0.10){
+        finalRes={params:guess.slice(),loss:ellipseFitLoss(guess,boundary,border,FIT_NUM_PTS,guess[2]/4,4)};
+      }
+
       var p=finalRes.params;
       var fa=p[2],fb=p[3],aspect=fa>fb?fa/fb:fb/fa;
 
-      // Slope uncertainty via even/odd boundary subsets
-      var evenV=[],oddV=[];
-      for(var i=0;i<boundary.length;i++)(i%2===0?evenV:oddV).push(boundary[i]);
-      var thetas=[p[4]];
-      if(evenV.length>=4&&oddV.length>=4){
-        thetas=[runFit(evenV,border,p,40).params[4],runFit(oddV,border,p,40).params[4]];
+      // Slope uncertainty: analytical formula σ_θ ≈ (k/√N)·(AR/(AR²-1))
+      // where k≈2 encodes noise level, N=boundary vertex count, AR=aspect ratio.
+      // Near-circular fits (AR≈1) have undefined direction → cap at π/2.
+      var N=boundary.length;
+      var dTheta;
+      if(aspect<1.01){
+        dTheta=Math.PI/2;
+      }else{
+        dTheta=(2.0/3.0/Math.sqrt(N))*(aspect/(aspect*aspect-1));
+        if(dTheta>Math.PI/2)dTheta=Math.PI/2;
       }
-      function wrap(t){return((t+Math.PI/2)%Math.PI+Math.PI)%Math.PI-Math.PI/2;}
-      var t0=wrap(thetas[0]),t1=wrap(thetas[thetas.length-1]);
-      var dTheta=Math.abs(t0-t1); if(dTheta>Math.PI/2)dTheta=Math.PI-dTheta;
 
-      return {cx:p[0],cy:p[1],a:fa,b:fb,theta:p[4],aspect:aspect,dTheta:dTheta,loss:finalRes.f};
+      return {cx:p[0],cy:p[1],a:fa,b:fb,theta:p[4],aspect:aspect,dTheta:dTheta,loss:finalRes.loss};
     }
 
     // ----------------------------------------------------------------
-    // Iran/Yemen gate (yellow precedes red within YELLOW_WINDOW_MS,
-    // spatially scoped to locations adjacent to the cluster)
+    // Differential Evolution (DE) optimizer — global alternative to NM.
+    // Maintains a population of DE_POP_SIZE candidates; each generation
+    // mutates via three random distinct individuals and crosses with the
+    // current one. Much less likely to get stuck in local minima at the
+    // cost of ~2× loss evaluations vs the multi-start Nelder-Mead.
     // ----------------------------------------------------------------
-    function parseAlertDateMs(s) {
-      if (!s) return null;
-      var d=new Date(String(s).replace(' ','T'));
-      var t=d.getTime(); return isNaN(t)?null:t;
-    }
+    function runFitDE(boundaryVerts, border) {
+      var D=5; // [cx, cy, a, b, theta]
+      var guess=ellipseInitialGuess(boundaryVerts);
+      var rMin=guess[2]/4;
+      var lossF=function(p){return ellipseFitLoss(p,boundaryVerts,border,FIT_NUM_PTS,rMin,4);};
 
-    function isYellowTitle(title) {
-      if (!title) return false;
-      var norm=String(title).replace(/\s+/g,' ').trim();
-      for (var i=0;i<YELLOW_PATTERNS.length;i++) if(YELLOW_PATTERNS[i].test(norm)) return true;
-      return false;
-    }
+      // Search bounds derived from boundary extent — generous enough for global search
+      var minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
+      for(var i=0;i<boundaryVerts.length;i++){
+        if(boundaryVerts[i][0]<minLat)minLat=boundaryVerts[i][0];
+        if(boundaryVerts[i][0]>maxLat)maxLat=boundaryVerts[i][0];
+        if(boundaryVerts[i][1]<minLng)minLng=boundaryVerts[i][1];
+        if(boundaryVerts[i][1]>maxLng)maxLng=boundaryVerts[i][1];
+      }
+      var dLat=Math.max(maxLat-minLat,0.1),dLng=Math.max(maxLng-minLng,0.1),dim=Math.max(dLat,dLng);
+      var lo=[minLat-dim, minLng-dim, dim*0.05, dim*0.02, -Math.PI/2];
+      var hi=[maxLat+dim, maxLng+dim, dim*3,    dim*2,     Math.PI/2];
 
-    function hasPrecedingYellow(earliestRedMs, locationHistory, extHistory, adjacentNames) {
-      if (!earliestRedMs) return false;
-      var lo=earliestRedMs-YELLOW_WINDOW_MS, hi=earliestRedMs;
-      for (var name in locationHistory) {
-        if (adjacentNames&&!adjacentNames[name]) continue;
-        var arr=locationHistory[name]; if(!arr) continue;
-        for (var j=0;j<arr.length;j++){
-          var e=arr[j]; if(!e||!isYellowTitle(e.title)) continue;
-          var ts=parseAlertDateMs(e.alertDate);
-          if(ts&&ts>=lo&&ts<=hi) return true;
+      // Population: first individual is the PCA guess; rest are random
+      var pop=new Array(DE_POP_SIZE), fitness=new Array(DE_POP_SIZE);
+      pop[0]=guess.slice(); fitness[0]=lossF(pop[0]);
+      for(var i=1;i<DE_POP_SIZE;i++){
+        var ind=new Array(D);
+        for(var d=0;d<D;d++) ind[d]=lo[d]+Math.random()*(hi[d]-lo[d]);
+        pop[i]=ind; fitness[i]=lossF(ind);
+      }
+
+      // Evolution loop — mutation + crossover + selection
+      var trial=new Array(D);
+      for(var gen=0;gen<DE_GENS;gen++){
+        for(var i=0;i<DE_POP_SIZE;i++){
+          var r1,r2,r3;
+          do{r1=Math.floor(Math.random()*DE_POP_SIZE);}while(r1===i);
+          do{r2=Math.floor(Math.random()*DE_POP_SIZE);}while(r2===i||r2===r1);
+          do{r3=Math.floor(Math.random()*DE_POP_SIZE);}while(r3===i||r3===r1||r3===r2);
+          var jRand=Math.floor(Math.random()*D);
+          for(var d=0;d<D;d++){
+            trial[d]=(d===jRand||Math.random()<DE_CR)
+              ? Math.max(lo[d],Math.min(hi[d], pop[r1][d]+DE_F*(pop[r2][d]-pop[r3][d])))
+              : pop[i][d];
+          }
+          var tf=lossF(trial);
+          if(tf<=fitness[i]){pop[i]=trial.slice();fitness[i]=tf;}
         }
       }
-      if (extHistory){
-        for (var i=0;i<extHistory.length;i++){
-          var e=extHistory[i]; if(!e||!isYellowTitle(e.title)) continue;
-          if(adjacentNames&&e.location&&!adjacentNames[e.location]) continue;
-          var ts=typeof e.alertDate==='number'?e.alertDate:parseAlertDateMs(e.alertDate);
-          if(ts&&ts>=lo&&ts<=hi) return true;
-        }
+
+      // Extract best individual and normalize params
+      var bestIdx=0;
+      for(var i=1;i<DE_POP_SIZE;i++) if(fitness[i]<fitness[bestIdx]) bestIdx=i;
+      var p=pop[bestIdx].slice();
+      if(p[3]>p[2]){var tmp=p[2];p[2]=p[3];p[3]=tmp;p[4]+=Math.PI/2;}
+      p[4]=((p[4]+Math.PI/2)%Math.PI+Math.PI)%Math.PI-Math.PI/2;
+      return {params:p, loss:fitness[bestIdx]};
+    }
+
+    function computeFullFitDE(boundary, border) {
+      var guess=ellipseInitialGuess(boundary);
+      var finalRes=runFitDE(boundary,border);
+
+      // Off-border fallback: if < 10% of ellipse pts are inside Israel, use PCA guess
+      var testPts=ellipsePoints(finalRes.params,FIT_NUM_PTS);
+      var nInsideDE=0;
+      for(var fi=0;fi<FIT_NUM_PTS;fi++){
+        if(pointInBorder(testPts[fi][0],testPts[fi][1],border)) nInsideDE++;
       }
-      return false;
+      if(nInsideDE/FIT_NUM_PTS<0.10){
+        finalRes={params:guess.slice(),loss:ellipseFitLoss(guess,boundary,border,FIT_NUM_PTS,guess[2]/4,4)};
+      }
+
+      var p=finalRes.params;
+      var fa=p[2],fb=p[3],aspect=fa>fb?fa/fb:fb/fa;
+      var N=boundary.length, dTheta;
+      if(aspect<1.01){
+        dTheta=Math.PI/2;
+      }else{
+        dTheta=(2.0/3.0/Math.sqrt(N))*(aspect/(aspect*aspect-1));
+        if(dTheta>Math.PI/2) dTheta=Math.PI/2;
+      }
+      return {cx:p[0],cy:p[1],a:fa,b:fb,theta:p[4],aspect:aspect,dTheta:dTheta,loss:finalRes.loss};
     }
 
     // ----------------------------------------------------------------
@@ -418,36 +520,20 @@
           }
           if(touches)touchingRed.push(i);
         }
-        for(var ti=1;ti<touchingRed.length;ti++)union(touchingRed[0],touchingRed[ti]);
+        // Only bridge clusters that are geographically close.  A bridge polygon
+        // that would link the southern and central clusters (>100 km apart) must
+        // be enormous; limiting to ~39 km prevents accidental long-range merges.
+        for(var ti=1;ti<touchingRed.length;ti++){
+          var r0=touchingRed[0],ri=touchingRed[ti];
+          if(find(r0)===find(ri))continue;
+          var dl=redPoints[r0][0]-redPoints[ri][0],dg=redPoints[r0][1]-redPoints[ri][1];
+          if(dl*dl+dg*dg<=BRIDGE_MAX_DIST2)union(r0,ri);
+        }
       }
 
       var groups=Object.create(null);
       for(var i=0;i<n;i++){var r=find(i);if(!groups[r])groups[r]=[];groups[r].push(redPoints[i]);}
       return Object.keys(groups).map(function(k){return groups[k];});
-    }
-
-    function clusterAdjacentNames(cluster, featureMap) {
-      var clusterVerts=[],adjacent=Object.create(null);
-      for(var i=0;i<cluster.length;i++){
-        adjacent[cluster[i][3]]=true;
-        var feat=featureMap[cluster[i][3]]; if(!feat)continue;
-        var outer=feat.geometry.coordinates[0];
-        for(var j=0;j<outer.length;j++)clusterVerts.push([outer[j][1],outer[j][0]]);
-      }
-      for(var locName in featureMap){
-        if(adjacent[locName])continue;
-        var feat=featureMap[locName]; if(!feat)continue;
-        var outer=feat.geometry.coordinates[0],touches=false;
-        for(var a=0;a<outer.length&&!touches;a++){
-          var lat=outer[a][1],lng=outer[a][0];
-          for(var b=0;b<clusterVerts.length&&!touches;b++){
-            var dl=lat-clusterVerts[b][0],dg=lng-clusterVerts[b][1];
-            if(dl*dl+dg*dg<CLUSTER_TOL2)touches=true;
-          }
-        }
-        if(touches)adjacent[locName]=true;
-      }
-      return adjacent;
     }
 
     // ----------------------------------------------------------------
@@ -534,6 +620,97 @@
       if(boundary.length<4)return null;
       var guess=ellipseInitialGuess(boundary);
       return {hull:boundary,guess:guess};
+    }
+
+    // Edge-sampling variant: same union boundary ring, but sample points are
+    // placed at equal arc-length intervals instead of using the raw vertices.
+    // This removes the bias that arises when small polygons (with many short
+    // edges) contribute more vertices than large polygons with fewer vertices.
+    function prepareClusterEdgeSampled(cluster, featureMap) {
+      var boundary=clusterUnionBoundary(cluster,featureMap);
+      if(boundary.length<6){
+        var raw=[];
+        for(var i=0;i<cluster.length;i++){
+          var feat=featureMap[cluster[i][3]]; if(!feat)continue;
+          var outer=feat.geometry.coordinates[0];
+          for(var j=0;j<outer.length;j++)raw.push([outer[j][1],outer[j][0]]);
+        }
+        if(raw.length<6)return null;
+        boundary=convexHull(raw);
+      }
+      if(boundary.length<4)return null;
+
+      // Compute total perimeter of the ring
+      var n=boundary.length, totalLen=0, segLens=new Array(n);
+      for(var i=0;i<n;i++){
+        var p1=boundary[i],p2=boundary[(i+1)%n];
+        var dx=p2[0]-p1[0],dy=p2[1]-p1[1];
+        segLens[i]=Math.sqrt(dx*dx+dy*dy);
+        totalLen+=segLens[i];
+      }
+      if(totalLen<1e-9){var guess0=ellipseInitialGuess(boundary);return{hull:boundary,guess:guess0};}
+
+      // Place n equidistant samples (same count as vertices)
+      var step=totalLen/n, samples=[], acc=0, next=0;
+      for(var i=0;i<n;i++){
+        var p1=boundary[i],p2=boundary[(i+1)%n],segEnd=acc+segLens[i];
+        while(next<=segEnd&&samples.length<n){
+          var t=(next-acc)/Math.max(segLens[i],1e-12);
+          samples.push([p1[0]+t*(p2[0]-p1[0]),p1[1]+t*(p2[1]-p1[1])]);
+          next+=step;
+        }
+        acc=segEnd;
+      }
+      if(samples.length<4)return null;
+      var guess=ellipseInitialGuess(samples);
+      return {hull:samples,guess:guess};
+    }
+
+    // Yellow gate: passes iff at least one cluster polygon had a yellow alert in the
+    // YELLOW_GATE_WINDOW_MS (10 min) immediately before the earliest red event in the
+    // cluster.  Iran/Yemen attacks always broadcast a yellow warning minutes before the
+    // reds; Lebanon/Gaza attacks go straight to red with no yellow precursor.
+    function hasYellowSequenceInCluster(cluster, extHistory) {
+      if(!extHistory||extHistory.length===0) return false;
+      var clusterNames=Object.create(null);
+      for(var ky=0;ky<cluster.length;ky++) clusterNames[cluster[ky][3]]=true;
+
+      // Find the earliest red timestamp among all cluster locations in extHistory.
+      // This is the reference point for the look-back window.
+      var firstRedTs=Infinity;
+      for(var i=0;i<extHistory.length;i++){
+        var e=extHistory[i];
+        if(e.state==='red'&&clusterNames[e.location]&&e.alertDate<firstRedTs)
+          firstRedTs=e.alertDate;
+      }
+      if(!isFinite(firstRedTs)) return false;
+
+      // Check if any cluster location had a yellow in [firstRedTs - window, firstRedTs].
+      var windowStart=firstRedTs-YELLOW_GATE_WINDOW_MS;
+      for(var i=0;i<extHistory.length;i++){
+        var e=extHistory[i];
+        if(e.state==='yellow'&&clusterNames[e.location]
+           &&e.alertDate>=windowStart&&e.alertDate<=firstRedTs)
+          return true;
+      }
+      return false;
+    }
+
+    // Fuzzy cache lookup: also matches a cached cluster if the current cluster is
+    // a superset of it and fewer than 10% new locations were added.
+    function findCompatibleCache(sig, clusterLocs, clusterSize, cache, now) {
+      var exact=cache[sig];
+      if(exact&&(now-exact.ts)<CACHE_MAX_AGE_MS) return exact;
+      for(var k in cache){
+        var entry=cache[k]; if((now-entry.ts)>=CACHE_MAX_AGE_MS) continue;
+        if(!entry.locs) continue;
+        var cachedN=entry.size||0; if(cachedN>clusterSize) continue;
+        if((clusterSize-cachedN)/clusterSize>=0.10) continue; // >10% new → refit
+        var isSubset=true;
+        for(var loc in entry.locs){if(!clusterLocs[loc]){isSubset=false;break;}}
+        if(isSubset) return entry;
+      }
+      return null;
     }
 
     // ----------------------------------------------------------------
@@ -637,7 +814,7 @@
 
       Promise.all([A.ensureOrefPoints(), ensureIsraelBorder()]).then(function(res) {
         var orefPts=res[0],border=res[1];
-        var locationStates=A.locationStates,locationHistory=A.locationHistory;
+        var locationStates=A.locationStates;
         var featureMap=A.featureMap,extHistory=A.extendedHistory;
 
         var locPoints=[];
@@ -663,28 +840,28 @@
 
         for(var ci=0;ci<clusters.length;ci++){
           var cluster=clusters[ci];
-          var label='C'+(ci+1);
+          var label='cluster #'+(ci+1);
 
           if(cluster.length<MIN_CLUSTER_RED){
             setStatus(label,label+': ✗ size='+cluster.length+'<'+MIN_CLUSTER_RED);continue;
           }
 
-          var earliest=Infinity;
-          for(var k=0;k<cluster.length;k++){var ns=locationStates[cluster[k][3]];if(ns&&ns.since&&ns.since<earliest)earliest=ns.since;}
-          if(!isFinite(earliest)){setStatus(label,label+': ✗ no timestamp');continue;}
-
-          var adjNames=clusterAdjacentNames(cluster,featureMap);
-          if(!hasPrecedingYellow(earliest,locationHistory,extHistory,adjNames)){
+          // Yellow gate: at least one cluster location must have had a yellow alert
+          // immediately before its current red wave (green event = wave separator).
+          // Lebanon/Gaza attacks that go directly red (no Iran-style yellow) are rejected.
+          if(!hasYellowSequenceInCluster(cluster,extHistory)){
             setStatus(label,label+': ✗ no yellow ('+cluster.length+' red)');continue;
           }
 
-          var sig=clusterSignature(cluster);
+          var sig=clusterSignature(cluster)+(useDEFit?'|DE':'');
           liveSigs[sig]=true;
-          var prep=prepareCluster(cluster,featureMap);
+          var clusterLocs=Object.create(null);
+          for(var k=0;k<cluster.length;k++) clusterLocs[cluster[k][3]]=true;
+          var prep=prepareClusterEdgeSampled(cluster,featureMap);
           if(!prep){setStatus(label,label+': ✗ boundary fail');continue;}
 
           clusterLabel++;
-          var clLabel='C'+clusterLabel;
+          var clLabel='cluster #'+clusterLabel;
 
           // Draw union boundary vertices (small blue circles)
           for(var hi=0;hi<prep.hull.length;hi++){
@@ -695,7 +872,7 @@
           flushToMap();
 
           setStatus(clLabel,clLabel+': ⟳ fitting… ('+cluster.length+' red, '+prep.hull.length+' pts)');
-          workItems.push({clLabel:clLabel,sig:sig,prep:prep});
+          workItems.push({clLabel:clLabel,sig:sig,prep:prep,clusterLocs:clusterLocs,clusterSize:cluster.length});
         }
 
         if(workItems.length===0)return;
@@ -706,28 +883,28 @@
             return;
           }
           var w=workItems[i];
-          var cached=fitCache[w.sig];
-          if(cached&&(now-cached.ts)<CACHE_MAX_AGE_MS){
+          var cached=findCompatibleCache(w.sig,w.clusterLocs,w.clusterSize,fitCache,now);
+          if(cached){
             var fit=cached.fit;
             var dtStr=cached.dt!==undefined?cached.dt+'ms (cached)':'(cached)';
             var bearingDeg=Math.round(eastwardVector(fit.theta).bearing);
-            var s=w.clLabel+': ✓ '+dtStr+' | aspect='+fit.aspect.toFixed(2)+' | θ='+bearingDeg+'°';
+            var s=w.clLabel+': ✓ '+dtStr+' | aspect='+fit.aspect.toFixed(2)+' | az='+bearingDeg+'°';
             if(fit.aspect<ASPECT_RATIO_MIN)s+=' (too round)';
             setStatus(w.clLabel,s);
-            if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit);
+            if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit,w.clLabel);
             setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
             return;
           }
           var t0=performance.now();
-          var fit=computeFullFit(w.prep.hull,border);
+          var fit=useDEFit?computeFullFitDE(w.prep.hull,border):computeFullFit(w.prep.hull,border);
           var dt=Math.round(performance.now()-t0);
-          fitCache[w.sig]={fit:fit,ts:now,dt:dt};
+          fitCache[w.sig]={fit:fit,ts:now,dt:dt,locs:w.clusterLocs,size:w.clusterSize};
           var bearingDeg=Math.round(eastwardVector(fit.theta).bearing);
-          // aspect is from the FINAL optimized params (not initial guess)
-          var s=w.clLabel+': ✓ '+dt+'ms | aspect='+fit.aspect.toFixed(2)+' | θ='+bearingDeg+'°';
+          var algTag=useDEFit?' DE':' NM';
+          var s=w.clLabel+': ✓ '+dt+'ms'+algTag+' | aspect='+fit.aspect.toFixed(2)+' | az='+bearingDeg+'°';
           if(fit.aspect<ASPECT_RATIO_MIN)s+=' (too round, skip)';
           setStatus(w.clLabel,s);
-          if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit);
+          if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit,w.clLabel);
           setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
         }
         setTimeout(function(){processNext(0);},0);
@@ -737,12 +914,14 @@
       }).catch(function(err){console.warn('prediction update failed:',err);});
     }
 
-    function drawFinalResults(fit) {
+    function drawFinalResults(fit, clLabel) {
       pushFeature(makeEllipseFeature([fit.cx,fit.cy,fit.a,fit.b,fit.theta],80,'ellipse'));
       pushFeature(makeAxesFeature(fit));
       var cf=makeCorridor(fit);
       for(var i=0;i<cf.length;i++)pushFeature(cf[i]);
       flushToMap();
+      // HTML marker label at ellipse center — uses Marker to avoid glyph loading
+      if(clLabel) addLabelMarker(fit.cx, fit.cy, clLabel);
     }
 
     // ----------------------------------------------------------------
@@ -768,6 +947,17 @@
         if(enabled)menuItem.classList.add('active');
         menuItem.querySelector('.menu-item-row').addEventListener('click',function(){
           var next=!enabled;setEnabled(next,{showToast:true});menuItem.classList.toggle('active',next);
+        });
+      }
+      var deItem=document.getElementById('menu-de-fit');
+      if(deItem){
+        if(useDEFit)deItem.classList.add('active');
+        deItem.querySelector('.menu-item-row').addEventListener('click',function(){
+          useDEFit=!useDEFit;
+          localStorage.setItem('oref-de-fit',useDEFit);
+          deItem.classList.toggle('active',useDEFit);
+          showToast(useDEFit?'אלגוריתם DE פעיל':'Nelder-Mead פעיל');
+          if(enabled){fitCache=Object.create(null);sync();}
         });
       }
       document.addEventListener('app:stateChanged',function(){sync();});
