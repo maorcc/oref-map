@@ -853,9 +853,9 @@ body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
   <div id="menu-lang" class="menu-item menu-setting">
     <div class="menu-item-row">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg></span>
-      <span class="menu-item-label">שפת מפה</span>
+      <span id="lang-label" class="menu-item-label">שפת מפה</span>
     </div>
-    <select id="lang-select" class="menu-setting-select">
+    <select id="lang-select" class="menu-setting-select" aria-labelledby="lang-label">
       <option value="he">עברית</option>
       <option value="en">English</option>
       <option value="ar">العربية</option>
@@ -865,9 +865,9 @@ body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
   <div id="menu-theme" class="menu-item menu-setting">
     <div class="menu-item-row">
       <span id="menu-theme-icon" class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
-      <span class="menu-item-label">ערכת נושא</span>
+      <span id="theme-label" class="menu-item-label">ערכת נושא</span>
     </div>
-    <select id="theme-select" class="menu-setting-select">
+    <select id="theme-select" class="menu-setting-select" aria-labelledby="theme-label">
       <option value="light">בהיר</option>
       <option value="dark">כהה</option>
       <option value="auto">אוטומטי</option>
@@ -1249,10 +1249,12 @@ body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
   var PMTILES_URL = 'pmtiles://https://tiles.oref-map.org/middle-east.pmtiles';
 
   // --- Language & theme preferences ---
+  var VALID_LANGS = ['he', 'en', 'ar', 'ru'];
+  var VALID_THEMES = ['light', 'dark', 'auto'];
   var currentLang = 'he';
   var currentTheme = 'auto';
-  try { currentLang = localStorage.getItem('oref-map-lang') || 'he'; } catch(e) {}
-  try { currentTheme = localStorage.getItem('oref-theme') || 'auto'; } catch(e) {}
+  try { var sl = localStorage.getItem('oref-map-lang'); if (VALID_LANGS.indexOf(sl) !== -1) currentLang = sl; } catch(e) {}
+  try { var st = localStorage.getItem('oref-theme'); if (VALID_THEMES.indexOf(st) !== -1) currentTheme = st; } catch(e) {}
 
   function resolveDarkMode() {
     if (currentTheme === 'dark') return true;
