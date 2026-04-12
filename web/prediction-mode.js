@@ -817,8 +817,19 @@
     // Main update pipeline
     // ----------------------------------------------------------------
     function updatePredictionLines() {
-      clearAll();
       if (!enabled) return;
+
+      // The yellow gate reads extendedHistory which is populated by an async
+      // day-history fetch.  The live alert API fires within ~1s of page load,
+      // so prediction can run before extendedHistory has any entries — causing
+      // every yellow-gate check to silently fail (empty array → no yellow found).
+      // Wait until dayHistoryReady is true, then retry.
+      if (!A.dayHistoryReady) {
+        setTimeout(function(){if(enabled)sync();}, 3000);
+        return; // keep any previous prediction visible; don't clear
+      }
+
+      clearAll();
 
       Promise.all([A.ensureOrefPoints(), ensureIsraelBorder()]).then(function(res) {
         var orefPts=res[0],border=res[1];
