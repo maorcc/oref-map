@@ -2562,7 +2562,7 @@ body.idle #right-panel {
   function openFullPanel(name) {
     _removePanelHighlight();
     if (unifiedPanelState === 'closed') {
-      openTimelineFn(); // opens slim + triggers rebuildTimeline
+      openTimelineFn({ noSeek: true }); // opens slim + renders ticks, but don't seek away from current time
     }
     var panel = document.getElementById('unified-panel');
     // Animate height on desktop (slim → full)
@@ -3355,14 +3355,16 @@ body.idle #right-panel {
     updateDateNav();
 
     function rebuildTimeline(seekMode) {
-      // seekMode: 'last' (default) = last event, 'first' = first event
+      // seekMode: 'last' (default) = last event, 'first' = first event, 'none' = don't seek
       var bounds = viewingDayBounds();
       timelineMin = bounds.start;
       timelineMax = bounds.end;
       if (extendedHistory.length > 0) {
         extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
         renderTicks();
-        if (eventPeaks.length > 0) {
+        if (seekMode === 'none') {
+          slider.value = 999; // stay at current time, don't enter history mode
+        } else if (eventPeaks.length > 0) {
           if (seekMode === 'first') {
             seekTo(eventPeaks[0]);
           } else {
@@ -3478,8 +3480,10 @@ body.idle #right-panel {
     // --- Open / Close ---
     function isOpen() { return unifiedPanelState !== 'closed'; }
 
-    function openTimeline() {
+    function openTimeline(opts) {
       // Delegated to openSlimPanel + timeline init logic
+      // opts.noSeek: if true, don't auto-seek to last event (used when opening from location click)
+      var noSeek = opts && opts.noSeek;
       openSlimPanel();
       updateDateNav();
       if (!dayHistoryReady) {
@@ -3487,7 +3491,7 @@ body.idle #right-panel {
         label.style.opacity = '0.5';
         onDayHistoryReady = function() {
           onDayHistoryReady = null;
-          rebuildTimeline();
+          rebuildTimeline(noSeek ? 'none' : undefined);
           prefetchPrevDay();
           // If location selected, refresh event list
           if (selectedLocation) {
@@ -3498,12 +3502,12 @@ body.idle #right-panel {
           }
         };
       } else {
-        rebuildTimeline();
+        rebuildTimeline(noSeek ? 'none' : undefined);
         prefetchPrevDay();
         // Refresh day-history for today in background
         if (isViewingToday()) {
           fetchExtendedHistory(function() {
-            if (isOpen()) rebuildTimeline();
+            if (isOpen()) rebuildTimeline(noSeek ? 'none' : undefined);
           });
         }
       }
