@@ -801,9 +801,20 @@ body.dark .maplibregl-ctrl-group button + button { border-top: 1px solid #4a4c50
 body.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
 body.dark .maplibregl-ctrl-attrib { background: rgba(48,50,56,0.7) !important; color: #999 !important; }
 body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
+/* Sound alert button (has inline background) */
+body.dark #sound-all-btn { background: #3a3c40 !important; color: #ddd; }
+body.dark #sound-all-btn:hover { background: #444 !important; }
 </style>
 </head>
 <body>
+<script>
+// Apply dark class before first paint to prevent flash
+try {
+  var t = localStorage.getItem('oref-theme');
+  if (t === 'dark' || ((!t || t === 'auto') && window.matchMedia('(prefers-color-scheme: dark)').matches))
+    document.body.classList.add('dark');
+} catch(e) {}
+</script>
 
 <div id="site-logo">
   <h1 style="margin:0;font-size:0">מפת העורף</h1>
@@ -4623,9 +4634,15 @@ body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
   });
   // Auto-theme: reload on system preference change
   try {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+    var colorSchemeMq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onColorSchemeChange = function() {
       if (currentTheme === 'auto') location.reload();
-    });
+    };
+    if (typeof colorSchemeMq.addEventListener === 'function') {
+      colorSchemeMq.addEventListener('change', onColorSchemeChange);
+    } else if (typeof colorSchemeMq.addListener === 'function') {
+      colorSchemeMq.addListener(onColorSchemeChange);
+    }
   } catch(e) {}
 
   // --- Menu: Share ---
