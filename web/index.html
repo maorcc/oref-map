@@ -209,6 +209,8 @@ body.dark #resident-count { color: #f88; border-bottom-color: rgba(255,255,255,0
   flex-shrink: 0;
 }
 #up-location-name { font-size: 15px; }
+#up-location-pop { font-size: 12px; color: #888; white-space: nowrap; margin-right: auto; margin-left: 12px; }
+body.dark #up-location-pop { color: #999; }
 #up-fav-star {
   cursor: pointer; font-size: 18px; color: #ccc;
   vertical-align: middle; user-select: none;
@@ -1012,6 +1014,7 @@ try {
     <div id="up-location-header">
       <b id="up-location-name"></b>
       <span id="up-fav-star"></span>
+      <span id="up-location-pop"></span>
       <button id="up-location-close" aria-label="סגור">&times;</button>
     </div>
     <div id="up-event-list"></div>
@@ -2149,7 +2152,8 @@ try {
     if (!el || !locationPopulations) return;
     var total = 0, hasActive = false;
     for (var n in locationStates) {
-      if (locationStates[n].state !== 'green') {
+      var s = locationStates[n].state;
+      if (s === 'red' || s === 'purple') {
         hasActive = true;
         var pop = locationPopulations[n];
         if (pop) total += pop;
@@ -2163,10 +2167,7 @@ try {
     }
   }
 
-  fetch('location_populations.json')
-    .then(function(r) { return r.ok ? r.json() : {}; })
-    .then(function(data) { locationPopulations = data; updateResidentCount(); })
-    .catch(function() { locationPopulations = {}; });
+  // locationPopulations is extracted from _populations in locations_polygons.json (see buildPolygons)
 
   // --- Unified panel state ---
   var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
@@ -2445,6 +2446,11 @@ try {
       pendingPolygonData = data;
       if (onReady) pendingPolygonCallback = onReady;
       return;
+    }
+    // Extract population data embedded in the polygons file
+    if (data._populations) {
+      locationPopulations = data._populations;
+      updateResidentCount();
     }
     var features = [];
     var fid = 0;
@@ -2826,6 +2832,9 @@ try {
     selectedLocation = name;
     // Populate header
     document.getElementById('up-location-name').textContent = name;
+    var popEl = document.getElementById('up-location-pop');
+    var pop = locationPopulations ? locationPopulations[name] : 0;
+    popEl.textContent = pop ? '\uD83D\uDC64 ' + pop.toLocaleString('he-IL') : '';
     updateFavStar(name);
     // Build and render event list (lock scroll sync to prevent scroll events
     // from renderEventList() triggering a seekTo that changes the viewed time)
