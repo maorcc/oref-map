@@ -667,30 +667,38 @@
     }
 
     // Yellow gate: passes iff at least one cluster polygon had a yellow alert in the
-    // YELLOW_GATE_WINDOW_MS (10 min) immediately before the earliest red event in the
-    // cluster.  Iran/Yemen attacks always broadcast a yellow warning minutes before the
-    // reds; Lebanon/Gaza attacks go straight to red with no yellow precursor.
+    // YELLOW_GATE_WINDOW_MS (10 min) immediately before the MOST RECENT red event in
+    // the cluster.  Using the most recent red (not the earliest) ensures the window
+    // is anchored to the current attack wave, not an earlier one from the same day.
+    //
+    // Example bugs this fixes (both share the same root cause):
+    //   False-positive  20.3.26 18:22 Lebanon: cluster locations had old Iran reds at
+    //     ~10:00 in extHistory; firstRedTs=10:00 window found the 09:50 Iran yellow,
+    //     incorrectly passing a direct-red Lebanon cluster.
+    //   False-negative  21.3.26 22:33 Iran: cluster had old Lebanon reds at ~09:00;
+    //     firstRedTs=09:00 window missed the real yellow at 22:23, rejecting a valid
+    //     Iran/Yemen attack cluster.
+    //   Fix: lastRedTs=max(reds) anchors the window to the most recent wave.
     function hasYellowSequenceInCluster(cluster, extHistory) {
       if(!extHistory||extHistory.length===0) return false;
       var clusterNames=Object.create(null);
       for(var ky=0;ky<cluster.length;ky++) clusterNames[cluster[ky][3]]=true;
 
-      // Find the earliest red timestamp among all cluster locations in extHistory.
-      // This is the reference point for the look-back window.
-      var firstRedTs=Infinity;
+      // Find the MOST RECENT red timestamp among all cluster locations in extHistory.
+      var lastRedTs=-Infinity;
       for(var i=0;i<extHistory.length;i++){
         var e=extHistory[i];
-        if(e.state==='red'&&clusterNames[e.location]&&e.alertDate<firstRedTs)
-          firstRedTs=e.alertDate;
+        if(e.state==='red'&&clusterNames[e.location]&&e.alertDate>lastRedTs)
+          lastRedTs=e.alertDate;
       }
-      if(!isFinite(firstRedTs)) return false;
+      if(!isFinite(lastRedTs)) return false;
 
-      // Check if any cluster location had a yellow in [firstRedTs - window, firstRedTs].
-      var windowStart=firstRedTs-YELLOW_GATE_WINDOW_MS;
+      // Check if any cluster location had a yellow in [lastRedTs - window, lastRedTs].
+      var windowStart=lastRedTs-YELLOW_GATE_WINDOW_MS;
       for(var i=0;i<extHistory.length;i++){
         var e=extHistory[i];
         if(e.state==='yellow'&&clusterNames[e.location]
-           &&e.alertDate>=windowStart&&e.alertDate<=firstRedTs)
+           &&e.alertDate>=windowStart&&e.alertDate<=lastRedTs)
           return true;
       }
       return false;
