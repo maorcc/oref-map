@@ -87,6 +87,20 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 .dot-yellow { background: #ffcc00; }
 .dot-green  { background: #00cc00; }
 
+#resident-count {
+  display: none;
+  font-size: 13px;
+  font-weight: bold;
+  color: #c00;
+  text-align: center;
+  padding-bottom: 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid rgba(0,0,0,0.12);
+  white-space: nowrap;
+}
+#resident-count.visible { display: block; }
+body.dark #resident-count { color: #f88; border-bottom-color: rgba(255,255,255,0.12); }
+
 #status {
   position: fixed;
   top: 80px;
@@ -195,10 +209,11 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
   flex-shrink: 0;
 }
 #up-location-name { font-size: 15px; }
+#up-location-pop { font-size: 12px; color: #888; white-space: nowrap; margin-right: auto; margin-left: 12px; }
+body.dark #up-location-pop { color: #999; }
 #up-fav-star {
   cursor: pointer; font-size: 18px; color: #ccc;
   vertical-align: middle; user-select: none;
-  margin-inline-end: auto;
 }
 #up-location-close {
   background: none; border: none; cursor: pointer;
@@ -664,6 +679,7 @@ body.idle #unified-panel.slim { opacity: 0; pointer-events: none; transition: op
   }
   #legend.collapsed .row { display: none; }
   #legend.collapsed #legend-icon { display: block; }
+  #legend.collapsed #resident-count { display: none; }
   #status {
     top: 80px;
     left: 10px;
@@ -704,9 +720,116 @@ body.idle #right-panel {
   bottom: 12px;
   gap: 0;
 }
+
+/* Settings items with stacked label + select */
+.menu-setting .menu-item-row { padding-bottom: 4px; }
+.menu-setting-select {
+  display: block;
+  width: calc(100% - 50px);
+  margin: 0 16px 10px auto;
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 13px;
+  color: #334155;
+  cursor: pointer;
+  direction: rtl;
+}
+
+/* --- Dark theme --- */
+body.dark #map { background: #1e3048; }
+body.dark #site-logo img { filter: invert(1) brightness(1.8); }
+/* Panels & controls: neutral-cool gray (contrasts with warm map tones) */
+body.dark #menu-btn { background: rgba(48,50,56,0.92); border-color: #555; color: #ccc; }
+body.dark #menu-btn:hover, body.dark #menu-btn[aria-expanded="true"] { background: rgba(40,60,90,0.92); border-color: #5b8def; }
+body.dark #menu-panel { background: rgba(48,50,56,0.97); border-color: #555; color: #ddd; }
+body.dark .menu-item { border-bottom-color: #3a3c40; }
+body.dark .menu-item-row { color: #ddd; }
+@media (hover: hover) { body.dark .menu-item-row:hover { background: #3a3c40; } }
+body.dark .menu-item-label { color: #ddd; }
+body.dark .menu-item-value { color: #999; }
+body.dark .menu-check { border-color: #666; }
+body.dark .menu-setting-select { background: #3a3c40; border-color: #555; color: #ddd; }
+body.dark #status { background: rgba(48,50,56,0.92); color: #ddd; }
+body.dark #visitorCount { border-top-color: #4a4c50; color: #999; }
+body.dark #historyTimeLabel { color: #999 !important; border-top-color: #4a4c50 !important; }
+body.dark #errorDetail { background: #30323a; color: #ddd; border-color: #c00; }
+body.dark #legend { background: rgba(48,50,56,0.92); color: #ddd; }
+/* Unified panel (location + timeline) */
+body.dark #unified-panel { background: #2e3038; }
+body.dark #up-location-name { color: #eee; }
+body.dark .up-event-row:hover { background: #3a3c40; }
+body.dark .up-event-row.up-current { background: rgba(59,130,246,0.15); }
+body.dark .up-event-time { color: #ddd; }
+body.dark .up-event-label { color: #bbb; }
+body.dark .up-event-sep { border-bottom-color: #4a4c50; }
+body.dark #up-event-list .up-empty { color: #999; }
+body.dark #up-handle { background: #666; }
+body.dark #up-fav-star { color: #666; }
+body.dark #up-location-close { color: #999; }
+body.dark #up-location-close:hover { color: #ddd; }
+body.dark #up-timeline { border-top-color: #4a4c50; }
+/* Timeline button & transport controls */
+body.dark #timeline-btn { background: rgba(55,52,38,0.92); border-color: #8a6e0b; }
+body.dark #timeline-btn.has-data { background: rgba(65,58,35,0.92); border-color: #b8860b; }
+body.dark .btn-text { color: #ddd; }
+body.dark .btn-icon { color: #ddd; }
+body.dark .tl-close { color: #999; }
+body.dark .tl-close:hover { color: #ddd; }
+body.dark #timeline-label { color: #eee; }
+body.dark #timeline-ticks { background: #3a3a38; }
+body.dark #timeline-transport button { color: #ddd; border-color: #555; }
+body.dark #timeline-transport button:hover { background: #3a3a38; }
+body.dark #timeline-transport button:active { background: #444; }
+body.dark #timeline-transport #tl-prev, body.dark #timeline-transport #tl-next { background: rgba(40,60,90,0.92); border-color: #5b8def; }
+body.dark #timeline-date-nav { background: #3a3520; border-color: #8a6e0b; }
+body.dark #timeline-date-nav button { color: #dda520; }
+body.dark #timeline-date-nav button:hover { background: #4a4525; }
+body.dark #timeline-date-nav button:active { background: #5a5530; }
+body.dark #tl-date-label { color: #dda520; }
+body.dark #up-close-row .btn-text { color: #999; }
+/* Modals */
+body.dark .modal-backdrop { background: rgba(0,0,0,0.7); }
+body.dark .modal-content { background: #30323a; color: #ddd; }
+body.dark .modal-content a { color: #6ba6ff; }
+body.dark .modal-close { color: #aaa; }
+body.dark .modal-close:hover { background: #3a3c40; color: #ddd; }
+body.dark #about-visitors-stat { background: #253050; }
+body.dark #about-visitors-stat .stat-number { color: #6ba6ff; }
+body.dark #about-visitors-stat .stat-label { color: #999; }
+/* Search & inputs */
+body.dark #search-input, body.dark #sound-search { background: #3a3c40; border-color: #555; color: #ddd; }
+body.dark #search-results, body.dark #sound-results { border-color: #4a4c50; }
+body.dark .location-item { border-bottom-color: #3a3c40; color: #ddd; }
+body.dark .location-item:hover { background: #3a3c40; }
+/* Experimental section */
+body.dark #ext-section { border-top-color: #4a4c50; }
+body.dark #ext-section > .menu-item-row { color: #777; }
+body.dark #ext-section .menu-sub-panel .menu-item-label { color: #999; }
+body.dark .menu-sub-panel { border-top-color: #4a4c50; }
+/* MapLibre controls */
+body.dark .maplibregl-ctrl-group { background: rgba(48,50,56,0.92) !important; }
+body.dark .maplibregl-ctrl-group button { background: transparent !important; }
+body.dark .maplibregl-ctrl-group button + button { border-top: 1px solid #4a4c50 !important; }
+body.dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1); }
+body.dark .maplibregl-ctrl-attrib { background: rgba(48,50,56,0.7) !important; color: #999 !important; }
+body.dark .maplibregl-ctrl-attrib a { color: #999 !important; }
+/* Sound alert button (has inline background) */
+body.dark #sound-all-btn { background: #3a3c40 !important; color: #ddd; }
+body.dark #sound-all-btn:hover { background: #444 !important; }
 </style>
 </head>
 <body>
+<script>
+// Apply dark class before first paint to prevent flash
+try {
+  var t = localStorage.getItem('oref-theme');
+  if (t === 'dark' || ((!t || t === 'auto') && window.matchMedia('(prefers-color-scheme: dark)').matches))
+    document.body.classList.add('dark');
+} catch(e) {}
+</script>
 
 <div id="site-logo">
   <h1 style="margin:0;font-size:0">מפת העורף</h1>
@@ -752,6 +875,29 @@ body.idle #right-panel {
       <span class="menu-item-label">מס' משתמשים</span>
       <span class="menu-check"></span>
     </button>
+  </div>
+  <div id="menu-lang" class="menu-item menu-setting">
+    <div class="menu-item-row">
+      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg></span>
+      <span id="lang-label" class="menu-item-label">שפת מפה</span>
+    </div>
+    <select id="lang-select" class="menu-setting-select" aria-labelledby="lang-label">
+      <option value="he">עברית</option>
+      <option value="en">English</option>
+      <option value="ar">العربية</option>
+      <option value="ru">Русский</option>
+    </select>
+  </div>
+  <div id="menu-theme" class="menu-item menu-setting">
+    <div class="menu-item-row">
+      <span id="menu-theme-icon" class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></span>
+      <span id="theme-label" class="menu-item-label">ערכת נושא</span>
+    </div>
+    <select id="theme-select" class="menu-setting-select" aria-labelledby="theme-label">
+      <option value="light">בהיר</option>
+      <option value="dark">כהה</option>
+      <option value="auto">אוטומטי</option>
+    </select>
   </div>
   <div id="menu-share" class="menu-item" style="display:none;">
     <button class="menu-item-row" type="button">
@@ -857,6 +1003,7 @@ body.idle #right-panel {
 <div id="right-panel">
   <div id="legend">
     <div id="legend-icon"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,1 23,12 12,12" fill="#ff0000"/><polygon points="12,1 12,12 1,12" fill="#ffcc00"/><polygon points="1,12 12,12 12,23" fill="#9922cc"/><polygon points="12,12 23,12 12,23" fill="#00cc00"/></svg></div>
+    <div id="resident-count"></div>
     <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
     <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
@@ -874,6 +1021,7 @@ body.idle #right-panel {
     <div id="up-location-header">
       <b id="up-location-name"></b>
       <span id="up-fav-star"></span>
+      <span id="up-location-pop"></span>
       <button id="up-location-close" aria-label="סגור">&times;</button>
     </div>
     <div id="up-event-list"></div>
@@ -1135,6 +1283,22 @@ body.idle #right-panel {
 
   var PMTILES_URL = 'pmtiles://https://tiles.oref-map.org/middle-east.pmtiles';
 
+  // --- Language & theme preferences ---
+  var VALID_LANGS = ['he', 'en', 'ar', 'ru'];
+  var VALID_THEMES = ['light', 'dark', 'auto'];
+  var currentLang = 'he';
+  var currentTheme = 'auto';
+  try { var sl = localStorage.getItem('oref-map-lang'); if (VALID_LANGS.indexOf(sl) !== -1) currentLang = sl; } catch(e) {}
+  try { var st = localStorage.getItem('oref-theme'); if (VALID_THEMES.indexOf(st) !== -1) currentTheme = st; } catch(e) {}
+
+  function resolveDarkMode() {
+    if (currentTheme === 'dark') return true;
+    if (currentTheme === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return false;
+  }
+  var isDarkActive = resolveDarkMode();
+  if (isDarkActive) document.body.classList.add('dark');
+
   // Warm MapTiler-like flavor (Protomaps LIGHT with warmer, more colorful tones)
   var WARM_FLAVOR = Object.assign({}, basemaps.LIGHT, {
     background:            '#f5f0e8',
@@ -1188,6 +1352,59 @@ body.idle #right-panel {
     }
   });
 
+  // Warm dark flavor (Protomaps DARK with warmer tones, lifted ~15% for readability)
+  var WARM_DARK_FLAVOR = Object.assign({}, basemaps.DARK, {
+    background:            '#2a2a28',
+    earth:                 '#2a2a28',
+    park_a:                '#253528',
+    park_b:                '#28382c',
+    hospital:              '#352a2a',
+    industrial:            '#282c30',
+    school:                '#352f2a',
+    wood_a:                '#253020',
+    wood_b:                '#253520',
+    pedestrian:            '#282625',
+    scrub_a:               '#283028',
+    scrub_b:               '#263525',
+    sand:                  '#302d28',
+    beach:                 '#302d28',
+    aerodrome:             '#28282c',
+    runway:                '#353538',
+    water:                 '#1e3048',
+    buildings:             '#222220',
+    minor_service_casing:  '#333330',
+    minor_casing:          '#333330',
+    link_casing:           '#453828',
+    major_casing_early:    '#453828',
+    major_casing_late:     '#453828',
+    highway_casing_early:  '#453518',
+    highway_casing_late:   '#453518',
+    other:                 '#2c2c28',
+    minor_service:         '#333330',
+    minor_a:               '#333330',
+    minor_b:               '#383835',
+    link:                  '#454028',
+    major:                 '#454028',
+    highway:               '#555028',
+    city_label:            '#c0c0b8',
+    city_label_halo:       '#2a2a28',
+    subplace_label:        '#999890',
+    subplace_label_halo:   '#2a2a28',
+    state_label:           '#787870',
+    state_label_halo:      '#2a2a28',
+    boundaries:            '#606058',
+    country_label:         '#888880',
+    landcover: {
+      grassland: 'rgba(38, 58, 38, 1)',
+      barren:    'rgba(40, 38, 30, 1)',
+      urban_area:'rgba(35, 35, 30, 1)',
+      farmland:  'rgba(36, 48, 32, 1)',
+      glacier:   'rgba(38, 38, 42, 1)',
+      scrub:     'rgba(36, 46, 32, 1)',
+      forest:    'rgba(32, 50, 35, 1)'
+    }
+  });
+
   // --- Basemap style customizations ---
   // Modify the Protomaps layer list before passing to MapLibre so tweaks are
   // baked into the initial style rather than applied post-load via setPaintProperty.
@@ -1225,19 +1442,24 @@ body.idle #right-panel {
     });
   }
 
-  var MAP_STYLE = {
-    version: 8,
-    glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
-    sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/light',
-    sources: {
-      protomaps: {
-        type: 'vector',
-        url: PMTILES_URL,
-        attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
-      }
-    },
-    layers: customizeBasemapLayers(basemaps.layers('protomaps', WARM_FLAVOR, { lang: 'he' }))
-  };
+  function buildMapStyle(isDark, lang) {
+    var flavor = isDark ? WARM_DARK_FLAVOR : WARM_FLAVOR;
+    return {
+      version: 8,
+      glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
+      sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/' + (isDark ? 'dark' : 'light'),
+      sources: {
+        protomaps: {
+          type: 'vector',
+          url: PMTILES_URL,
+          attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
+        }
+      },
+      layers: customizeBasemapLayers(basemaps.layers('protomaps', flavor, { lang: lang }))
+    };
+  }
+
+  var MAP_STYLE = buildMapStyle(isDarkActive, currentLang);
 
   var map = new maplibregl.Map({
     container: 'map',
@@ -1881,6 +2103,7 @@ body.idle #right-panel {
 
   var locationStates = {};       // {name: {state, since, marker}}
   var locationHistory = {};      // {name: [{title, alertDate, state}, ...]}
+  var locationPopulations = null; // {name: population} from CBS 2024 data — null until loaded
   var favorites = {};            // {name: {lat, lng}}
   var favoriteMarkers = {};      // {name: maplibregl.Marker}
   var lastHistoryDate = null;    // track newest history entry
@@ -1928,6 +2151,35 @@ body.idle #right-panel {
   var fadePollId     = null;        // setInterval ID for fadeGreenMarkers
   var pollingStarted = false;       // true once polling intervals are created
   var DAY_HISTORY_MIN_DATE = '2026-02-28';
+
+  // --- Resident count (CBS 2024 population data) ---
+  function updateResidentCount() {
+    var el = document.getElementById('resident-count');
+    if (!el || !locationPopulations) return;
+    var total = 0, hasActive = false;
+    for (var n in locationStates) {
+      var s = locationStates[n].state;
+      if (s === 'red' || s === 'purple') {
+        hasActive = true;
+        var pop = locationPopulations[n];
+        if (pop) total += pop;
+      }
+    }
+    if (!hasActive || total === 0) {
+      el.classList.remove('visible');
+    } else {
+      el.innerHTML = makePopIcon() + total.toLocaleString('he-IL') + ' \u05D1\u05DE\u05E7\u05DC\u05D8\u05D9\u05DD';
+      el.classList.add('visible');
+    }
+  }
+
+  var _popIconN = 0;
+  function makePopIcon() {
+    var id = 'pm' + (++_popIconN);
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-0.15em;margin-inline-end:3px"><defs><mask id="' + id + '"><rect width="24" height="24" fill="white"/><circle cx="12" cy="8" r="5" fill="black"/><path d="M12 13.5C8 13.5 4.5 16 4.5 20L4.5 24L19.5 24L19.5 20C19.5 16 16 13.5 12 13.5Z" fill="black"/></mask></defs><g fill="currentColor"><g mask="url(#' + id + ')"><circle cx="6.5" cy="8.5" r="3.5"/><path d="M6.5 13.5C3.7 13.5 1.5 15.5 1.5 18.5L1.5 24L11.5 24L11.5 18.5C11.5 15.5 9.3 13.5 6.5 13.5Z"/><circle cx="17.5" cy="8.5" r="3.5"/><path d="M17.5 13.5C14.7 13.5 12.5 15.5 12.5 18.5L12.5 24L22.5 24L22.5 18.5C22.5 15.5 20.3 13.5 17.5 13.5Z"/></g><circle cx="12" cy="8" r="4"/><path d="M12 14.5C8.4 14.5 5.5 17 5.5 20L5.5 24L18.5 24L18.5 20C18.5 17 15.6 14.5 12 14.5Z"/></g></svg>';
+  }
+
+  // locationPopulations is extracted from _populations in locations_polygons.json (see buildPolygons)
 
   // --- Unified panel state ---
   var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
@@ -2208,6 +2460,11 @@ body.idle #right-panel {
       if (onReady) pendingPolygonCallback = onReady;
       return;
     }
+    // Extract population data embedded in the polygons file
+    if (data._populations) {
+      locationPopulations = data._populations;
+      updateResidentCount();
+    }
     var features = [];
     var fid = 0;
     for (var name in data) {
@@ -2315,6 +2572,7 @@ body.idle #right-panel {
     applyFeatureStyle(name, state, opacity);
     locationStates[name] = { state: state, since: since || Date.now() };
     playSoundForState(state, name);
+    updateResidentCount();
   }
 
   function removeLocation(name) {
@@ -2324,6 +2582,7 @@ body.idle #right-panel {
     }
     if (selectedLocation === name) closeLocationPanel();
     delete locationStates[name];
+    updateResidentCount();
   }
 
   // --- Alert history per location ---
@@ -2569,7 +2828,7 @@ body.idle #right-panel {
   function openFullPanel(name) {
     _removePanelHighlight();
     if (unifiedPanelState === 'closed') {
-      openTimelineFn(); // opens slim + triggers rebuildTimeline
+      openTimelineFn({ noSeek: true }); // opens slim + renders ticks, but don't seek away from current time
     }
     var panel = document.getElementById('unified-panel');
     // Animate height on desktop (slim → full)
@@ -2586,6 +2845,9 @@ body.idle #right-panel {
     selectedLocation = name;
     // Populate header
     document.getElementById('up-location-name').textContent = name;
+    var popEl = document.getElementById('up-location-pop');
+    var pop = locationPopulations ? locationPopulations[name] : 0;
+    popEl.innerHTML = pop ? makePopIcon() + pop.toLocaleString('he-IL') : '';
     updateFavStar(name);
     // Build and render event list (lock scroll sync to prevent scroll events
     // from renderEventList() triggering a seekTo that changes the viewed time)
@@ -3283,6 +3545,7 @@ body.idle #right-panel {
       _applyPanelHighlight(selectedLocation);
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
+    updateResidentCount();
   }
 
   function saveLiveState() {
@@ -3362,14 +3625,18 @@ body.idle #right-panel {
     updateDateNav();
 
     function rebuildTimeline(seekMode) {
-      // seekMode: 'last' (default) = last event, 'first' = first event
+      // seekMode: 'last' (default) = last event, 'first' = first event, 'none' = don't seek
       var bounds = viewingDayBounds();
       timelineMin = bounds.start;
       timelineMax = bounds.end;
       if (extendedHistory.length > 0) {
         extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
         renderTicks();
-        if (eventPeaks.length > 0) {
+        if (seekMode === 'none') {
+          var now = clampTime(Date.now());
+          slider.value = sliderFromTime(now);
+          enterHistoryMode(now);
+        } else if (eventPeaks.length > 0) {
           if (seekMode === 'first') {
             seekTo(eventPeaks[0]);
           } else {
@@ -3485,8 +3752,10 @@ body.idle #right-panel {
     // --- Open / Close ---
     function isOpen() { return unifiedPanelState !== 'closed'; }
 
-    function openTimeline() {
+    function openTimeline(opts) {
       // Delegated to openSlimPanel + timeline init logic
+      // opts.noSeek: if true, don't auto-seek to last event (used when opening from location click)
+      var noSeek = opts && opts.noSeek;
       openSlimPanel();
       updateDateNav();
       if (!dayHistoryReady) {
@@ -3494,7 +3763,7 @@ body.idle #right-panel {
         label.style.opacity = '0.5';
         onDayHistoryReady = function() {
           onDayHistoryReady = null;
-          rebuildTimeline();
+          rebuildTimeline(noSeek ? 'none' : undefined);
           prefetchPrevDay();
           // If location selected, refresh event list
           if (selectedLocation) {
@@ -3505,12 +3774,12 @@ body.idle #right-panel {
           }
         };
       } else {
-        rebuildTimeline();
+        rebuildTimeline(noSeek ? 'none' : undefined);
         prefetchPrevDay();
         // Refresh day-history for today in background
         if (isViewingToday()) {
           fetchExtendedHistory(function() {
-            if (isOpen()) rebuildTimeline();
+            if (isOpen()) rebuildTimeline(noSeek ? 'none' : undefined);
           });
         }
       }
@@ -4403,6 +4672,44 @@ body.idle #right-panel {
   ['mousemove','mousedown','keydown','wheel','scroll','touchstart','touchmove']
     .forEach(function(e) { document.addEventListener(e, _resetIdle, {passive:true}); });
   _resetIdle();
+
+  // --- Menu: Language ---
+  var langSelect = document.getElementById('lang-select');
+  langSelect.value = currentLang;
+  langSelect.addEventListener('change', function() {
+    try { localStorage.setItem('oref-map-lang', langSelect.value); } catch(e) {}
+    location.reload();
+  });
+
+  // --- Menu: Theme ---
+  var themeSelect = document.getElementById('theme-select');
+  var themeIcon = document.getElementById('menu-theme-icon');
+  themeSelect.value = currentTheme;
+  var THEME_ICONS = {
+    light: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+    dark: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    auto: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z" fill="currentColor"/></svg>'
+  };
+  // Show icon matching the resolved state (sun if light, moon if dark)
+  themeIcon.innerHTML = THEME_ICONS[isDarkActive ? 'dark' : 'light'];
+  // But if auto mode, show the auto icon
+  if (currentTheme === 'auto') themeIcon.innerHTML = THEME_ICONS.auto;
+  themeSelect.addEventListener('change', function() {
+    try { localStorage.setItem('oref-theme', themeSelect.value); } catch(e) {}
+    location.reload();
+  });
+  // Auto-theme: reload on system preference change
+  try {
+    var colorSchemeMq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onColorSchemeChange = function() {
+      if (currentTheme === 'auto') location.reload();
+    };
+    if (typeof colorSchemeMq.addEventListener === 'function') {
+      colorSchemeMq.addEventListener('change', onColorSchemeChange);
+    } else if (typeof colorSchemeMq.addListener === 'function') {
+      colorSchemeMq.addListener(onColorSchemeChange);
+    }
+  } catch(e) {}
 
   // --- Menu: Share ---
   var isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
