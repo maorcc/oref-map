@@ -3363,9 +3363,9 @@ body.idle #right-panel {
         extendedHistory.sort(function(a, b) { return a.alertDate - b.alertDate; });
         renderTicks();
         if (seekMode === 'none') {
-          slider.value = 999; // stay at current time, don't enter history mode
-          label.textContent = '';
-          document.getElementById('historyTimeLabel').style.display = 'none';
+          var now = clampTime(Date.now());
+          slider.value = sliderFromTime(now);
+          enterHistoryMode(now);
         } else if (eventPeaks.length > 0) {
           if (seekMode === 'first') {
             seekTo(eventPeaks[0]);
