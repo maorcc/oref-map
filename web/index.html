@@ -797,6 +797,8 @@ body.dark #ext-section > .menu-item-row { color: #777; }
 body.dark #ext-section .menu-sub-panel .menu-item-label { color: #999; }
 body.dark .menu-sub-panel { border-top-color: #4a4c50; }
 /* MapLibre controls */
+.maplibregl-ctrl-attrib { background: rgba(255,255,255,0.5) !important; color: #888 !important; }
+.maplibregl-ctrl-attrib a { color: #888 !important; }
 body.dark .maplibregl-ctrl-group { background: rgba(48,50,56,0.92) !important; }
 body.dark .maplibregl-ctrl-group button { background: transparent !important; }
 body.dark .maplibregl-ctrl-group button + button { border-top: 1px solid #4a4c50 !important; }
@@ -1667,15 +1669,21 @@ try {
       document.dispatchEvent(new CustomEvent('app:locationChanged'));
     }
 
+    var _showUserLocationToken = 0;
+
     function showUserLocation(latlng) {
       if (!isInIsrael(latlng)) {
         setTransient('בעיית GPS');
         return false;
       }
       if (!mapLoaded) {
-        map.once('load', function() { requestAnimationFrame(function() { showUserLocation(latlng); }); });
+        var token = ++_showUserLocationToken;
+        map.once('load', function() { requestAnimationFrame(function() {
+          if (token === _showUserLocationToken) showUserLocation(latlng);
+        }); });
         return true;
       }
+      ++_showUserLocationToken;
       if (!userLocationMarker) {
         userLocationMarker = new maplibregl.Marker({ element: makeUserLocationEl(), anchor: 'center' })
           .setLngLat([latlng[1], latlng[0]])
