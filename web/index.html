@@ -2490,11 +2490,16 @@ try {
       return 'purple';
     }
 
+    // Ignored — "enter shelter immediately" is a secondary alert that often accompanies
+    // UAV alarms, briefly showing as red and confusing users into thinking it's a missile alert.
+    if (title === 'היכנסו מייד למרחב המוגן') {
+      return null;
+    }
+
     // Red — active danger (missiles / non-conventional / terrorists / shelter now)
     if (title === 'ירי רקטות וטילים' ||
         title === 'נשק לא קונבנציונלי' ||
         title === 'חדירת מחבלים' ||
-        title === 'היכנסו מייד למרחב המוגן' ||
         title === 'היכנסו למרחב המוגן') {
       return 'red';
     }
@@ -3030,6 +3035,7 @@ try {
     if (!alert || !alert.data || !alert.title) return;
     var title = (alert.desc || alert.title).replace(/\s+/g, ' ').trim();
     var state = classifyTitle(title);
+    if (state === null) return;
     if (state !== 'green') lastDangerTime = Date.now();
     var locations = alert.data;
     if (!Array.isArray(locations)) return;
@@ -3085,6 +3091,7 @@ try {
     if (!entry || !entry.data || !entry.title) return;
     var title = entry.title.replace(/\s+/g, ' ').trim();
     var state = classifyTitle(title);
+    if (state === null) return;
     // History `data` is a string (single location)
     var location = normalizeGeresh((typeof entry.data === 'string' ? entry.data : String(entry.data)).trim());
     var since = parseAlertDate(entry.alertDate) || Date.now();
@@ -3415,6 +3422,7 @@ try {
         var rid = String(e.rid || '');
         var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
         var state = classifyTitle(title);
+        if (state === null) continue;
         var location = normalizeGeresh((typeof e.data === 'string' ? e.data : String(e.data)).trim());
         var ts = parseAlertDate(e.alertDate);
         if (!ts) continue;
