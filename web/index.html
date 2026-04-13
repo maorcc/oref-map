@@ -639,7 +639,86 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   white-space: nowrap;
   color: #78350f;
   padding: 0 2px;
+  cursor: pointer;
+  text-decoration: underline dotted;
 }
+#tl-date-label:hover { color: #451a03; }
+#date-picker-popup {
+  position: absolute;
+  z-index: 9999;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.18);
+  padding: 10px;
+  min-width: 220px;
+  direction: ltr;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#date-picker-popup .dp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+#date-picker-popup .dp-month-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #78350f;
+}
+#date-picker-popup .dp-nav {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  color: #92400e;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+#date-picker-popup .dp-nav:hover { background: #fde68a; }
+#date-picker-popup .dp-nav:disabled { opacity: 0.3; cursor: default; }
+#date-picker-popup .dp-nav:disabled:hover { background: none; }
+#date-picker-popup .dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+#date-picker-popup .dp-dow {
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  color: #a16207;
+  padding: 2px 0;
+}
+#date-picker-popup .dp-day {
+  font-size: 12px;
+  text-align: center;
+  padding: 4px 2px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #78350f;
+}
+#date-picker-popup .dp-day:hover { background: #fde68a; }
+#date-picker-popup .dp-day.dp-today { font-weight: 700; }
+#date-picker-popup .dp-day.dp-selected { background: #f59e0b; color: #fff; font-weight: 700; }
+#date-picker-popup .dp-day.dp-selected:hover { background: #d97706; }
+#date-picker-popup .dp-day.dp-disabled { opacity: 0.25; cursor: default; pointer-events: none; }
+#date-picker-popup .dp-day.dp-empty { visibility: hidden; }
+body.dark #date-picker-popup {
+  background: #2d2a1a;
+  border-color: #8a6e0b;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.45);
+}
+body.dark #date-picker-popup .dp-month-label { color: #dda520; }
+body.dark #date-picker-popup .dp-nav { color: #dda520; }
+body.dark #date-picker-popup .dp-nav:hover { background: #4a4525; }
+body.dark #date-picker-popup .dp-dow { color: #b8860b; }
+body.dark #date-picker-popup .dp-day { color: #e5d080; }
+body.dark #date-picker-popup .dp-day:hover { background: #4a4525; }
+body.dark #date-picker-popup .dp-day.dp-selected { background: #b8860b; color: #fff; }
+body.dark #date-picker-popup .dp-day.dp-selected:hover { background: #a07800; }
 
 @media (max-width: 480px) {
   #right-panel {
@@ -3897,6 +3976,120 @@ try {
       if (isViewingToday()) return;
       var cur = timelineDate || todayDateStr();
       switchDate(addDays(cur, 1));
+    });
+
+    // --- Date picker popup ---
+    var datePickerPopup = null;
+    var datePickerMonth = null; // 'YYYY-MM' of the currently displayed month
+
+    function closeDatePicker() {
+      if (datePickerPopup) {
+        datePickerPopup.remove();
+        datePickerPopup = null;
+      }
+    }
+
+    function renderDatePicker() {
+      if (!datePickerPopup) return;
+      var today = todayDateStr();
+      var selDate = timelineDate || today;
+      var ym = datePickerMonth; // 'YYYY-MM'
+      var year = parseInt(ym.slice(0, 4), 10);
+      var month = parseInt(ym.slice(5, 7), 10); // 1-based
+
+      var minDate = DAY_HISTORY_MIN_DATE;
+      var maxDate = today;
+
+      // Month label
+      var monthNames = ['January','February','March','April','May','June',
+                        'July','August','September','October','November','December'];
+      var label = monthNames[month - 1] + ' ' + year;
+
+      // Prev/next month boundaries
+      var prevYm = (month === 1) ? (year - 1) + '-12' : year + '-' + String(month - 1).padStart(2, '0');
+      var nextYm = (month === 12) ? (year + 1) + '-01' : year + '-' + String(month + 1).padStart(2, '0');
+      var prevDisabled = (prevYm + '-28' < minDate); // disable if entire prev month is before minDate
+      var nextDisabled = (nextYm + '-01' > maxDate);
+
+      // Days in month
+      var daysInMonth = new Date(year, month, 0).getDate();
+      // Day-of-week for 1st (0=Sun)
+      var firstDow = new Date(year + '-' + String(month).padStart(2, '0') + '-01T12:00:00').getDay();
+
+      var html = '<div class="dp-header">' +
+        '<button class="dp-nav" id="dp-prev"' + (prevDisabled ? ' disabled' : '') + '>&#9666;</button>' +
+        '<span class="dp-month-label">' + label + '</span>' +
+        '<button class="dp-nav" id="dp-next"' + (nextDisabled ? ' disabled' : '') + '>&#9656;</button>' +
+        '</div><div class="dp-grid">';
+
+      var dows = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+      for (var i = 0; i < 7; i++) html += '<span class="dp-dow">' + dows[i] + '</span>';
+
+      // Empty cells before first day
+      for (var i = 0; i < firstDow; i++) html += '<span class="dp-day dp-empty"></span>';
+
+      for (var d = 1; d <= daysInMonth; d++) {
+        var ds = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        var cls = 'dp-day';
+        if (ds === today) cls += ' dp-today';
+        if (ds === selDate) cls += ' dp-selected';
+        if (ds < minDate || ds > maxDate) cls += ' dp-disabled';
+        html += '<span class="' + cls + '" data-date="' + ds + '">' + d + '</span>';
+      }
+
+      html += '</div>';
+      datePickerPopup.innerHTML = html;
+
+      datePickerPopup.querySelector('#dp-prev').addEventListener('click', function(e) {
+        e.stopPropagation();
+        datePickerMonth = prevYm;
+        renderDatePicker();
+      });
+      datePickerPopup.querySelector('#dp-next').addEventListener('click', function(e) {
+        e.stopPropagation();
+        datePickerMonth = nextYm;
+        renderDatePicker();
+      });
+      datePickerPopup.querySelectorAll('.dp-day:not(.dp-disabled):not(.dp-empty)').forEach(function(el) {
+        el.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var picked = el.getAttribute('data-date');
+          closeDatePicker();
+          if (picked !== (timelineDate || todayDateStr())) switchDate(picked);
+        });
+      });
+    }
+
+    function openDatePicker() {
+      if (datePickerPopup) { closeDatePicker(); return; }
+      var cur = timelineDate || todayDateStr();
+      datePickerMonth = cur.slice(0, 7); // 'YYYY-MM'
+
+      datePickerPopup = document.createElement('div');
+      datePickerPopup.id = 'date-picker-popup';
+
+      // Position below the date label
+      var rect = dateLabel.getBoundingClientRect();
+      datePickerPopup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+      datePickerPopup.style.left = Math.max(4, rect.left + window.scrollX - 80) + 'px';
+
+      document.body.appendChild(datePickerPopup);
+      renderDatePicker();
+    }
+
+    dateLabel.addEventListener('click', function(e) {
+      e.stopPropagation();
+      openDatePicker();
+    });
+
+    document.addEventListener('click', function(e) {
+      if (datePickerPopup && !datePickerPopup.contains(e.target)) {
+        closeDatePicker();
+      }
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && datePickerPopup) closeDatePicker();
     });
 
     btnRow.addEventListener('click', function(e) {
