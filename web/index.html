@@ -87,19 +87,6 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 .dot-yellow { background: #ffcc00; }
 .dot-green  { background: #00cc00; }
 
-#resident-count {
-  display: none;
-  font-size: 13px;
-  font-weight: bold;
-  color: #c00;
-  text-align: center;
-  padding-bottom: 6px;
-  margin-bottom: 2px;
-  border-bottom: 1px solid rgba(0,0,0,0.12);
-  white-space: nowrap;
-}
-#resident-count.visible { display: block; }
-body.dark #resident-count { color: #f88; border-bottom-color: rgba(255,255,255,0.12); }
 
 #status {
   position: fixed;
@@ -680,7 +667,6 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   }
   #legend.collapsed .row { display: none; }
   #legend.collapsed #legend-icon { display: block; }
-  #legend.collapsed #resident-count { display: none; }
   #status {
     top: 80px;
     left: 10px;
@@ -811,6 +797,8 @@ body.dark #ext-section > .menu-item-row { color: #777; }
 body.dark #ext-section .menu-sub-panel .menu-item-label { color: #999; }
 body.dark .menu-sub-panel { border-top-color: #4a4c50; }
 /* MapLibre controls */
+.maplibregl-ctrl-attrib { background: rgba(255,255,255,0.5) !important; color: #888 !important; }
+.maplibregl-ctrl-attrib a { color: #888 !important; }
 body.dark .maplibregl-ctrl-group { background: rgba(48,50,56,0.92) !important; }
 body.dark .maplibregl-ctrl-group button { background: transparent !important; }
 body.dark .maplibregl-ctrl-group button + button { border-top: 1px solid #4a4c50 !important; }
@@ -996,7 +984,6 @@ try {
 <div id="right-panel">
   <div id="legend">
     <div id="legend-icon"><svg viewBox="0 0 24 24" width="24" height="24"><polygon points="12,1 23,12 12,12" fill="#ff0000"/><polygon points="12,1 12,12 1,12" fill="#ffcc00"/><polygon points="1,12 12,12 12,23" fill="#9922cc"/><polygon points="12,12 23,12 12,23" fill="#00cc00"/></svg></div>
-    <div id="resident-count"></div>
     <div class="row"><div class="dot dot-red"></div><span>ירי רקטות וטילים</span></div>
     <div class="row"><div class="dot dot-purple"></div><span>חדירת כטב״מ</span></div>
     <div class="row"><div class="dot dot-yellow"></div><span>התרעה מוקדמת</span></div>
@@ -1265,7 +1252,7 @@ try {
   var FADE_TICK_MS = 1000;
 
   // --- Map setup ---
-  var DEFAULT_CENTER = [31.6, 34.8], DEFAULT_ZOOM = 8;
+  var DEFAULT_CENTER = [32.2, 34.9], DEFAULT_ZOOM = 7.2;
   // --- MapLibre GL JS setup ---
   var pmtilesProtocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
@@ -1682,16 +1669,30 @@ try {
       document.dispatchEvent(new CustomEvent('app:locationChanged'));
     }
 
+    var _showUserLocationToken = 0;
+
     function showUserLocation(latlng) {
       if (!isInIsrael(latlng)) {
         setTransient('בעיית GPS');
         return false;
       }
+      if (!mapLoaded) {
+        var token = ++_showUserLocationToken;
+        map.once('load', function() { requestAnimationFrame(function() {
+          if (token === _showUserLocationToken) showUserLocation(latlng);
+        }); });
+        return true;
+      }
+      ++_showUserLocationToken;
       if (!userLocationMarker) {
         userLocationMarker = new maplibregl.Marker({ element: makeUserLocationEl(), anchor: 'center' })
           .setLngLat([latlng[1], latlng[0]])
           .addTo(map);
         showToast('מראה מיקום על המפה');
+        // Re-apply position after the next browser paint — MapLibre's _update() can
+        // return stale coordinates on the first call if the map hasn't rendered yet.
+        var _m = userLocationMarker, _ll = [latlng[1], latlng[0]];
+        requestAnimationFrame(function() { if (_m === userLocationMarker) _m.setLngLat(_ll); });
       } else {
         userLocationMarker.setLngLat([latlng[1], latlng[0]]);
         refreshUserLocationMarkerIcon();
@@ -2146,27 +2147,7 @@ try {
   var pollingStarted = false;       // true once polling intervals are created
   var DAY_HISTORY_MIN_DATE = '2026-02-28';
 
-  // --- Resident count (CBS 2024 population data) ---
-  function updateResidentCount() {
-    var el = document.getElementById('resident-count');
-    if (!el || !locationPopulations) return;
-    var total = 0, hasActive = false;
-    for (var n in locationStates) {
-      var s = locationStates[n].state;
-      if (s === 'red' || s === 'purple') {
-        hasActive = true;
-        var pop = locationPopulations[n];
-        if (pop) total += pop;
-      }
-    }
-    if (!hasActive || total === 0) {
-      el.classList.remove('visible');
-    } else {
-      el.innerHTML = makePopIcon() + total.toLocaleString('he-IL') + ' \u05D1\u05DE\u05E7\u05DC\u05D8\u05D9\u05DD';
-      el.classList.add('visible');
-    }
-  }
-
+  // --- Population icon (used in status bar & location panel) ---
   var _popIconN = 0;
   function makePopIcon() {
     var id = 'pm' + (++_popIconN);
@@ -2456,7 +2437,6 @@ try {
     // Extract population data embedded in the polygons file
     if (data._populations) {
       locationPopulations = data._populations;
-      updateResidentCount();
     }
     var features = [];
     var fid = 0;
@@ -2565,7 +2545,6 @@ try {
     applyFeatureStyle(name, state, opacity);
     locationStates[name] = { state: state, since: since || Date.now() };
     playSoundForState(state, name);
-    updateResidentCount();
   }
 
   function removeLocation(name) {
@@ -2575,7 +2554,6 @@ try {
     }
     if (selectedLocation === name) closeLocationPanel();
     delete locationStates[name];
-    updateResidentCount();
   }
 
   // --- Alert history per location ---
@@ -3226,7 +3204,7 @@ try {
   function updateLiveStatus() {
     if (!isLiveMode) return;
     if (!initialized) return;
-    var dominant = null, bestP = -1;
+    var dominant = null, bestP = -1, residentTotal = 0;
     var P = { red: 3, purple: 2, yellow: 1 };
     for (var name in locationStates) {
       var s = locationStates[name].state;
@@ -3234,9 +3212,16 @@ try {
         bestP = P[s] || 0;
         dominant = s;
       }
+      if ((s === 'red' || s === 'purple') && locationPopulations) {
+        var pop = locationPopulations[name];
+        if (pop) residentTotal += pop;
+      }
     }
     if (dominant) {
-      setStatusHTML(dominant, '<a href="#" id="zoomAlertsLink">התרעות פעילות</a>');
+      var statusLabel = (unifiedPanelState === 'closed' && residentTotal > 0)
+        ? residentTotal.toLocaleString('he-IL') + ' \u05D1\u05DE\u05E7\u05DC\u05D8\u05D9\u05DD'
+        : 'התרעות פעילות';
+      setStatusHTML(dominant, '<a href="#" id="zoomAlertsLink">' + statusLabel + '</a>');
     } else {
       var rel = formatRelativeTime(lastDangerTime);
       if (rel) {
@@ -3538,7 +3523,6 @@ try {
       _applyPanelHighlight(selectedLocation);
     }
     document.dispatchEvent(new CustomEvent('app:stateChanged'));
-    updateResidentCount();
   }
 
   function saveLiveState() {
@@ -3956,6 +3940,9 @@ try {
       if (isLiveMode) {
         saveLiveState();
         isLiveMode = false;
+        // Revert status text to generic label (resident count is live-only)
+        var zl = document.getElementById('zoomAlertsLink');
+        if (zl) zl.innerHTML = '\u05D4\u05EA\u05E8\u05E2\u05D5\u05EA \u05E4\u05E2\u05D9\u05DC\u05D5\u05EA';
       }
       currentViewTime = time;
       var timeStr = formatTime(time);
