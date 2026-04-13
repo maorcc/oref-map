@@ -7,7 +7,7 @@
   // Strategy (see issue #136):
   //  1. Cluster red-alerted locations by polygon adjacency (direct touch OR
   //     bridged through a single non-red polygon).
-  //  2. Gate each cluster on "yellow precedes red within 5 min", counting
+  //  2. Gate each cluster on "yellow precedes red within 40 min", counting
   //     only yellow alerts from locations spatially adjacent to the cluster.
   //  3. Build the outer boundary ring of the union of all cluster polygons.
   //  4. Fit an ellipse to the boundary using Nelder-Mead with multiple
@@ -18,8 +18,7 @@
   //  6. Draw the corridor (5000 km) starting from the major axis eastern tip,
   //     plus a cross showing both ellipse axes. Filter aspect ratio < 1.2.
   //
-  // Debug visuals (shown when feature is enabled):
-  //  - Status bar: per-cluster fit progress, timing, rejection reasons.
+  // Visuals (when feature is enabled):
   //  - Union boundary points: small blue circles on each boundary vertex.
   //  - Initial-guess ellipse: dashed green polyline (drawn immediately).
   //  - Best-fit ellipse: solid green polyline + axis cross.
@@ -52,7 +51,6 @@
     var predictionUpdateScheduled = false;
     var fitCache = Object.create(null);
 
-    // ----------------------------------------------------------------
     // ----------------------------------------------------------------
     // Israel border loading (for border-aware ellipse loss)
     // ----------------------------------------------------------------
@@ -107,12 +105,7 @@
     function addLabelMarker(lat, lng, text) {
       var el = document.createElement('div');
       el.textContent = text;
-      el.style.cssText = [
-        'color:#22cc44', 'font-size:11px', 'font-weight:bold',
-        'font-family:monospace', 'white-space:nowrap',
-        'text-shadow:0 0 3px #000,0 0 3px #000',
-        'pointer-events:none', 'user-select:none'
-      ].join(';');
+      el.style.cssText = 'color:#22cc44;font-size:11px;font-weight:bold;font-family:monospace;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000;pointer-events:none;user-select:none';
       var m = new maplibregl.Marker({ element: el, anchor: 'center' })
         .setLngLat([lng, lat])
         .addTo(map);
@@ -495,24 +488,7 @@
       return ring;
     }
 
-    function prepareCluster(cluster, featureMap) {
-      var boundary=clusterUnionBoundary(cluster,featureMap);
-      if(boundary.length<6){
-        var raw=[];
-        for(var i=0;i<cluster.length;i++){
-          var feat=featureMap[cluster[i][3]]; if(!feat)continue;
-          var outer=feat.geometry.coordinates[0];
-          for(var j=0;j<outer.length;j++)raw.push([outer[j][1],outer[j][0]]);
-        }
-        if(raw.length<6)return null;
-        boundary=convexHull(raw);
-      }
-      if(boundary.length<4)return null;
-      var guess=ellipseInitialGuess(boundary);
-      return {hull:boundary,guess:guess};
-    }
-
-    // Edge-sampling variant: same union boundary ring, but sample points are
+    // Edge-sampling: same union boundary ring, but sample points are
     // placed at equal arc-length intervals instead of using the raw vertices.
     // This removes the bias that arises when small polygons (with many short
     // edges) contribute more vertices than large polygons with fewer vertices.
@@ -556,8 +532,19 @@
       return {hull:samples,guess:guess};
     }
 
+    // Build a location→events index from extHistory for O(1) per-location lookup.
+    function buildHistoryIndex(extHistory) {
+      var idx=Object.create(null);
+      for(var i=0;i<extHistory.length;i++){
+        var e=extHistory[i];
+        if(!idx[e.location])idx[e.location]=[];
+        idx[e.location].push(e);
+      }
+      return idx;
+    }
+
     // Yellow gate: passes iff at least one cluster polygon had a yellow alert in the
-    // YELLOW_GATE_WINDOW_MS (10 min) immediately before the MOST RECENT red event in
+    // YELLOW_GATE_WINDOW_MS (40 min) immediately before the MOST RECENT red event in
     // the cluster.  Using the most recent red (not the earliest) ensures the window
     // is anchored to the current attack wave, not an earlier one from the same day.
     //
@@ -572,29 +559,28 @@
     // cutoffTs = effective "now": Date.now() in live mode, viewTime in history mode.
     // extHistory covers the full day, so without a cutoff the scan for lastRedTs can
     // pick up reds from later waves (e.g. 03:23 when viewing 01:55), shifting the
-    // 10-min yellow window to the wrong attack wave.
-    function hasYellowSequenceInCluster(cluster, extHistory, cutoffTs) {
-      if(!extHistory||extHistory.length===0) return false;
-      var clusterNames=Object.create(null);
-      for(var ky=0;ky<cluster.length;ky++) clusterNames[cluster[ky][3]]=true;
-
+    // yellow window to the wrong attack wave.
+    // histIdx = buildHistoryIndex(extHistory) — per-location event list for O(1) lookup.
+    function hasYellowSequenceInCluster(cluster, histIdx, cutoffTs) {
       // Most recent red at or before cutoffTs — anchors the window to the current wave.
       var lastRedTs=-Infinity;
-      for(var i=0;i<extHistory.length;i++){
-        var e=extHistory[i];
-        if(e.state==='red'&&clusterNames[e.location]
-           &&e.alertDate<=cutoffTs&&e.alertDate>lastRedTs)
-          lastRedTs=e.alertDate;
+      for(var ky=0;ky<cluster.length;ky++){
+        var entries=histIdx[cluster[ky][3]]; if(!entries)continue;
+        for(var i=0;i<entries.length;i++){
+          var e=entries[i];
+          if(e.state==='red'&&e.alertDate<=cutoffTs&&e.alertDate>lastRedTs)lastRedTs=e.alertDate;
+        }
       }
       if(!isFinite(lastRedTs)) return false;
 
       // Check if any cluster location had a yellow in [lastRedTs - window, lastRedTs].
       var windowStart=lastRedTs-YELLOW_GATE_WINDOW_MS;
-      for(var i=0;i<extHistory.length;i++){
-        var e=extHistory[i];
-        if(e.state==='yellow'&&clusterNames[e.location]
-           &&e.alertDate>=windowStart&&e.alertDate<=lastRedTs)
-          return true;
+      for(var ky=0;ky<cluster.length;ky++){
+        var entries=histIdx[cluster[ky][3]]; if(!entries)continue;
+        for(var i=0;i<entries.length;i++){
+          var e=entries[i];
+          if(e.state==='yellow'&&e.alertDate>=windowStart&&e.alertDate<=lastRedTs)return true;
+        }
       }
       return false;
     }
@@ -724,8 +710,6 @@
         return; // keep any previous prediction visible; don't clear
       }
 
-      clearAll();
-
       Promise.all([A.ensureOrefPoints(), ensureIsraelBorder()]).then(function(res) {
         var orefPts=res[0],border=res[1];
         var locationStates=A.locationStates;
@@ -736,6 +720,10 @@
         // yellow-gate window to the wrong wave.
         var cutoffTs=A.isLiveMode?Date.now():A.viewTime;
 
+        // Clear previous render inside the Promise so the old overlay stays visible
+        // until we know what to draw — eliminates the blank flash on every poll tick.
+        clearAll();
+
         var locPoints=[];
         for(var name in locationStates){
           var entry=locationStates[name]; if(!entry||entry.state!=='red')continue;
@@ -744,11 +732,11 @@
           if(pt)locPoints.push([pt[0],pt[1],1,name]);
         }
 
-        var totalRed=locPoints.length;
-        if(totalRed===0){return;}
-        if(totalRed<MIN_CLUSTER_RED){return;}
+        if(locPoints.length<MIN_CLUSTER_RED){return;}
 
         var clusters=clusterByAdjacency(locPoints,featureMap,locationStates);
+        // Index extHistory by location once; hasYellowSequenceInCluster uses O(cluster-size) lookups.
+        var histIdx=buildHistoryIndex(extHistory);
 
         var now=Date.now(),liveSigs=Object.create(null);
         var workItems=[],clusterLabel=0;
@@ -761,7 +749,7 @@
           // Yellow gate: at least one cluster location must have had a yellow alert
           // immediately before its current red wave (green event = wave separator).
           // Lebanon/Gaza attacks that go directly red (no Iran-style yellow) are rejected.
-          if(!hasYellowSequenceInCluster(cluster,extHistory,cutoffTs)){continue;}
+          if(!hasYellowSequenceInCluster(cluster,histIdx,cutoffTs)){continue;}
 
           var sig=clusterSignature(cluster);
           liveSigs[sig]=true;
@@ -804,8 +792,6 @@
           setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
         }
         setTimeout(function(){processNext(0);},0);
-
-        for(var k in fitCache){if(!liveSigs[k]||(now-fitCache[k].ts)>=CACHE_MAX_AGE_MS)delete fitCache[k];}
 
       }).catch(function(err){console.warn('prediction update failed:',err);});
     }

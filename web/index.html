@@ -1128,7 +1128,6 @@ try {
       }
       document.head.appendChild(s);
     }
-    // Always available (not behind feature flag)
     try { if (localStorage.getItem('oref-predict') === 'true') load(true); } catch (e) {}
     document.getElementById('predict-enable-btn').addEventListener('click', function() { load(false); });
   })();
