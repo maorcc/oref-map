@@ -53,30 +53,6 @@
     var fitCache = Object.create(null);
 
     // ----------------------------------------------------------------
-    // Status bar DOM element
-    // ----------------------------------------------------------------
-    var statusBar = document.createElement('div');
-    statusBar.id = 'predict-status-bar';
-    statusBar.style.cssText = [
-      'position:fixed', 'bottom:120px', 'left:8px',
-      'background:rgba(0,0,0,0.78)', 'color:#fff',
-      'padding:6px 10px', 'border-radius:6px', 'font-size:11px',
-      'font-family:monospace', 'z-index:1100', 'pointer-events:none',
-      'direction:ltr', 'white-space:pre', 'display:none',
-      'line-height:1.55', 'max-width:300px'
-    ].join(';');
-    document.body.appendChild(statusBar);
-
-    var statusLines = {};
-    function refreshStatusBar() {
-      var keys = Object.keys(statusLines);
-      if (keys.length === 0) { statusBar.style.display = 'none'; return; }
-      statusBar.style.display = 'block';
-      statusBar.textContent = keys.map(function(k) { return statusLines[k]; }).join('\n');
-    }
-    function setStatus(idx, text) { statusLines[idx] = text; refreshStatusBar(); }
-    function clearStatus() { statusLines = {}; refreshStatusBar(); }
-
     // ----------------------------------------------------------------
     // Israel border loading (for border-aware ellipse loss)
     // ----------------------------------------------------------------
@@ -126,7 +102,6 @@
       if (src) src.setData({ type: 'FeatureCollection', features: [] });
       for (var mi = 0; mi < labelMarkers.length; mi++) labelMarkers[mi].remove();
       labelMarkers = [];
-      clearStatus();
     }
 
     function addLabelMarker(lat, lng, text) {
@@ -357,21 +332,21 @@
 
       var finalRes=runFit(boundary,border,bestPhase1.params,FIT_PHASE2_ITER);
 
-      // If the optimizer converged to a worse solution than the raw PCA guess
-      // (can happen when NM drifts into a degenerate off-boundary basin),
-      // fall back to the initial guess.
-      if(guessLoss<finalRes.loss){
-        finalRes={params:guess.slice(),loss:guessLoss};
-      }
-
-      // Secondary check: if < 10% of the fitted ellipse lies inside Israel's border
-      // the result is geometrically nonsensical — also revert to the PCA guess.
+      // Revert to the PCA initial guess if the optimizer produced a worse result.
+      // Three failure modes all fall back the same way:
+      //   1. Optimizer loss > initial-guess loss (NM drifted to a worse basin).
+      //   2. Best-fit major radius < initial-guess major radius (optimizer shrank
+      //      the ellipse to a degenerate point to minimise boundary distance).
+      //   3. < 10% of ellipse sample points inside Israel's border (off-border basin).
+      var fa0=finalRes.params[2], fb0=finalRes.params[3];
       var testPts=ellipsePoints(finalRes.params,FIT_NUM_PTS);
       var nInsideTest=0;
       for(var fi=0;fi<FIT_NUM_PTS;fi++){
         if(pointInBorder(testPts[fi][0],testPts[fi][1],border)) nInsideTest++;
       }
-      if(nInsideTest/FIT_NUM_PTS<0.10){
+      if(guessLoss<finalRes.loss
+         ||Math.max(fa0,fb0)<a          // shrunken below PCA major radius
+         ||nInsideTest/FIT_NUM_PTS<0.10){
         finalRes={params:guess.slice(),loss:guessLoss};
       }
 
@@ -771,41 +746,32 @@
 
         var totalRed=locPoints.length;
         if(totalRed===0){return;}
-        if(totalRed<MIN_CLUSTER_RED){
-          setStatus('_hdr','predict: '+totalRed+' red < '+MIN_CLUSTER_RED+' min');
-          return;
-        }
+        if(totalRed<MIN_CLUSTER_RED){return;}
 
         var clusters=clusterByAdjacency(locPoints,featureMap,locationStates);
-        setStatus('_hdr','predict: '+totalRed+' red, '+clusters.length+' cluster(s)');
 
         var now=Date.now(),liveSigs=Object.create(null);
         var workItems=[],clusterLabel=0;
 
         for(var ci=0;ci<clusters.length;ci++){
           var cluster=clusters[ci];
-          var label='cluster #'+(ci+1);
 
-          if(cluster.length<MIN_CLUSTER_RED){
-            setStatus(label,label+': ✗ size='+cluster.length+'<'+MIN_CLUSTER_RED);continue;
-          }
+          if(cluster.length<MIN_CLUSTER_RED){continue;}
 
           // Yellow gate: at least one cluster location must have had a yellow alert
           // immediately before its current red wave (green event = wave separator).
           // Lebanon/Gaza attacks that go directly red (no Iran-style yellow) are rejected.
-          if(!hasYellowSequenceInCluster(cluster,extHistory,cutoffTs)){
-            setStatus(label,label+': ✗ no yellow ('+cluster.length+' red)');continue;
-          }
+          if(!hasYellowSequenceInCluster(cluster,extHistory,cutoffTs)){continue;}
 
           var sig=clusterSignature(cluster);
           liveSigs[sig]=true;
           var clusterLocs=Object.create(null);
           for(var k=0;k<cluster.length;k++) clusterLocs[cluster[k][3]]=true;
           var prep=prepareClusterEdgeSampled(cluster,featureMap);
-          if(!prep){setStatus(label,label+': ✗ boundary fail');continue;}
+          if(!prep){continue;}
 
           clusterLabel++;
-          var clLabel='cluster #'+clusterLabel;
+          var clLabel='#'+clusterLabel;
 
           // Draw union boundary vertices (small blue circles)
           for(var hi=0;hi<prep.hull.length;hi++){
@@ -815,7 +781,6 @@
           pushFeature(makeEllipseFeature(prep.guess,60,'guess'));
           flushToMap();
 
-          setStatus(clLabel,clLabel+': ⟳ fitting… ('+cluster.length+' red, '+prep.hull.length+' pts)');
           workItems.push({clLabel:clLabel,sig:sig,prep:prep,clusterLocs:clusterLocs,clusterSize:cluster.length});
         }
 
@@ -829,24 +794,12 @@
           var w=workItems[i];
           var cached=findCompatibleCache(w.sig,w.clusterLocs,w.clusterSize,fitCache,now);
           if(cached){
-            var fit=cached.fit;
-            var dtStr=cached.dt!==undefined?cached.dt+'ms (cached)':'(cached)';
-            var bearingDeg=Math.round(eastwardVector(fit.theta).bearing);
-            var s=w.clLabel+': ✓ '+dtStr+' | aspect='+fit.aspect.toFixed(2)+' | az='+bearingDeg+'°';
-            if(fit.aspect<ASPECT_RATIO_MIN)s+=' (too round)';
-            setStatus(w.clLabel,s);
-            if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit,w.clLabel);
+            if(cached.fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(cached.fit,w.clLabel);
             setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
             return;
           }
-          var t0=performance.now();
           var fit=computeFullFit(w.prep.hull,border);
-          var dt=Math.round(performance.now()-t0);
-          fitCache[w.sig]={fit:fit,ts:now,dt:dt,locs:w.clusterLocs,size:w.clusterSize};
-          var bearingDeg=Math.round(eastwardVector(fit.theta).bearing);
-          var s=w.clLabel+': ✓ '+dt+'ms | aspect='+fit.aspect.toFixed(2)+' | az='+bearingDeg+'°';
-          if(fit.aspect<ASPECT_RATIO_MIN)s+=' (too round, skip)';
-          setStatus(w.clLabel,s);
+          fitCache[w.sig]={fit:fit,ts:now,locs:w.clusterLocs,size:w.clusterSize};
           if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit,w.clLabel);
           setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
         }
