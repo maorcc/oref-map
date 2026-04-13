@@ -1121,7 +1121,8 @@ try {
       var s = document.createElement('script');
       s.src = '/prediction-mode.js';
       if (atStartup) {
-        s.onload = s.onerror = function() { _extPending--; _maybeDispatchReady(); };
+        s.onload = function() { _extPending--; _maybeDispatchReady(); };
+        s.onerror = function() { loaded = false; _extPending--; _maybeDispatchReady(); };
       } else {
         try { localStorage.setItem('oref-predict', 'true'); } catch (e) {}
         s.onerror = function() { loaded = false; try { localStorage.removeItem('oref-predict'); } catch (e) {} };

@@ -11,7 +11,7 @@ function section(name) { console.log('\n' + name); }
 
 // ── Extracted pure functions (mirrored from prediction-mode.js) ───────
 
-var YELLOW_WINDOW_MS = 5 * 60 * 1000;
+var YELLOW_WINDOW_MS = 40 * 60 * 1000;
 var CORRIDOR_DIST_DEG = 5000 / 111.32;
 
 // Andrew's monotone chain convex hull. Points are [lat, lng] pairs.
@@ -346,7 +346,7 @@ section('constants');
 (function() {
   assert(approx(CORRIDOR_DIST_DEG, 5000 / 111.32, 0.01),
     'CORRIDOR_DIST_DEG ≈ 44.9° (5000 km)');
-  assert(YELLOW_WINDOW_MS === 5 * 60 * 1000, 'YELLOW_WINDOW_MS = 5 min');
+  assert(YELLOW_WINDOW_MS === 40 * 60 * 1000, 'YELLOW_WINDOW_MS = 40 min');
 })();
 
 section('convexHull — basic cases');
@@ -545,11 +545,11 @@ section('hasPrecedingYellow — gate logic (no spatial filter)');
 
   var histJustOutside = {
     'תל אביב': [
-      { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 6 * 60 * 1000) },
+      { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: fmtDate(base - 41 * 60 * 1000) },
       { title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }
     ]
   };
-  assert(!hasPrecedingYellow(base, histJustOutside, null, null), 'yellow 6 min before red → gate fails');
+  assert(!hasPrecedingYellow(base, histJustOutside, null, null), 'yellow 41 min before red → gate fails');
 
   var histOnlyRed = {
     'תל אביב': [{ title: 'ירי רקטות וטילים', alertDate: fmtDate(base) }]
@@ -575,9 +575,9 @@ section('hasPrecedingYellow — gate logic (no spatial filter)');
   assert(hasPrecedingYellow(base, {}, extHistYellow, null), 'extHistory ms yellow 4 min before red → gate passes');
 
   var extHistTooOld = [
-    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 8 * 60 * 1000, state: 'yellow', location: 'חיפה' }
+    { title: 'בדקות הקרובות צפויות להתקבל התרעות באזורך', alertDate: base - 41 * 60 * 1000, state: 'yellow', location: 'חיפה' }
   ];
-  assert(!hasPrecedingYellow(base, {}, extHistTooOld, null), 'extHistory ms yellow 8 min before → gate fails');
+  assert(!hasPrecedingYellow(base, {}, extHistTooOld, null), 'extHistory ms yellow 41 min before → gate fails');
 })();
 
 section('hasPrecedingYellow — spatial filter (adjacentNames)');

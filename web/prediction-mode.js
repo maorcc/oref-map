@@ -543,10 +543,39 @@
       return idx;
     }
 
-    // Yellow gate: passes iff at least one cluster polygon had a yellow alert in the
-    // YELLOW_GATE_WINDOW_MS (40 min) immediately before the MOST RECENT red event in
-    // the cluster.  Using the most recent red (not the earliest) ensures the window
-    // is anchored to the current attack wave, not an earlier one from the same day.
+    // Build name set of cluster members + all polygons that touch any cluster polygon.
+    // The yellow early warning can land on a touching polygon that never turns red, so
+    // the yellow scan must include adjacent locations, not just the red cluster members.
+    function buildAdjacentNameSet(cluster, featureMap) {
+      var nameSet=Object.create(null);
+      var clusterVerts=[];
+      for(var ci=0;ci<cluster.length;ci++){
+        nameSet[cluster[ci][3]]=true;
+        var feat=featureMap[cluster[ci][3]]; if(!feat)continue;
+        var outer=feat.geometry.coordinates[0];
+        for(var vi=0;vi<outer.length;vi++)clusterVerts.push([outer[vi][1],outer[vi][0]]);
+      }
+      for(var locName in featureMap){
+        if(nameSet[locName])continue;
+        var bf=featureMap[locName]; if(!bf)continue;
+        var bo=bf.geometry.coordinates[0]; if(!bo.length)continue;
+        var touches=false;
+        for(var a=0;a<bo.length&&!touches;a++){
+          var bLat=bo[a][1],bLng=bo[a][0];
+          for(var b=0;b<clusterVerts.length&&!touches;b++){
+            var dl=bLat-clusterVerts[b][0],dg=bLng-clusterVerts[b][1];
+            if(dl*dl+dg*dg<CLUSTER_TOL2)touches=true;
+          }
+        }
+        if(touches)nameSet[locName]=true;
+      }
+      return nameSet;
+    }
+
+    // Yellow gate: passes iff at least one cluster polygon (or spatially adjacent polygon)
+    // had a yellow alert in YELLOW_GATE_WINDOW_MS (40 min) immediately before the MOST
+    // RECENT red event in the cluster.  Using the most recent red (not the earliest)
+    // ensures the window is anchored to the current attack wave, not an earlier one.
     //
     // Example bugs this fixes (both share the same root cause):
     //   False-positive  20.3.26 18:22 Lebanon: cluster locations had old Iran reds at
@@ -560,9 +589,10 @@
     // extHistory covers the full day, so without a cutoff the scan for lastRedTs can
     // pick up reds from later waves (e.g. 03:23 when viewing 01:55), shifting the
     // yellow window to the wrong attack wave.
-    // histIdx = buildHistoryIndex(extHistory) — per-location event list for O(1) lookup.
-    function hasYellowSequenceInCluster(cluster, histIdx, cutoffTs) {
-      // Most recent red at or before cutoffTs — anchors the window to the current wave.
+    // histIdx  = buildHistoryIndex(extHistory) — per-location event list.
+    // adjNames = buildAdjacentNameSet(cluster, featureMap) — cluster + touching polygons.
+    function hasYellowSequenceInCluster(cluster, histIdx, cutoffTs, adjNames) {
+      // Red scan: cluster members only — we anchor on the wave these locations actually experienced.
       var lastRedTs=-Infinity;
       for(var ky=0;ky<cluster.length;ky++){
         var entries=histIdx[cluster[ky][3]]; if(!entries)continue;
@@ -573,10 +603,11 @@
       }
       if(!isFinite(lastRedTs)) return false;
 
-      // Check if any cluster location had a yellow in [lastRedTs - window, lastRedTs].
+      // Yellow scan: cluster members + spatially adjacent polygons.
+      // Iran/Yemen early warnings can land on a touching polygon that never turns red.
       var windowStart=lastRedTs-YELLOW_GATE_WINDOW_MS;
-      for(var ky=0;ky<cluster.length;ky++){
-        var entries=histIdx[cluster[ky][3]]; if(!entries)continue;
+      for(var loc in adjNames){
+        var entries=histIdx[loc]; if(!entries)continue;
         for(var i=0;i<entries.length;i++){
           var e=entries[i];
           if(e.state==='yellow'&&e.alertDate>=windowStart&&e.alertDate<=lastRedTs)return true;
@@ -746,10 +777,11 @@
 
           if(cluster.length<MIN_CLUSTER_RED){continue;}
 
-          // Yellow gate: at least one cluster location must have had a yellow alert
-          // immediately before its current red wave (green event = wave separator).
+          // Yellow gate: at least one cluster (or adjacent) location must have had a yellow
+          // alert immediately before its current red wave.
           // Lebanon/Gaza attacks that go directly red (no Iran-style yellow) are rejected.
-          if(!hasYellowSequenceInCluster(cluster,histIdx,cutoffTs)){continue;}
+          var adjNames=buildAdjacentNameSet(cluster,featureMap);
+          if(!hasYellowSequenceInCluster(cluster,histIdx,cutoffTs,adjNames)){continue;}
 
           var sig=clusterSignature(cluster);
           liveSigs[sig]=true;
@@ -832,7 +864,7 @@
         });
       }
       document.addEventListener('app:stateChanged',function(){sync();});
-      document.addEventListener('app:escape',function(){clearAll();});
+      document.addEventListener('app:escape',function(){if(!enabled)clearAll();});
       if(enabled)sync();
     }
 
