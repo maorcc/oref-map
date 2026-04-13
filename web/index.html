@@ -640,7 +640,6 @@ body.f-predict #menu-predict.f-gated { display: block !important; }
   color: #78350f;
   padding: 0 2px;
   cursor: pointer;
-  text-decoration: underline dotted;
 }
 #tl-date-label:hover { color: #451a03; }
 #date-picker-popup {
@@ -4067,14 +4066,26 @@ try {
 
       datePickerPopup = document.createElement('div');
       datePickerPopup.id = 'date-picker-popup';
-
-      // Position below the date label
-      var rect = dateLabel.getBoundingClientRect();
-      datePickerPopup.style.top = (rect.bottom + window.scrollY + 6) + 'px';
-      datePickerPopup.style.left = Math.max(4, rect.left + window.scrollX - 80) + 'px';
-
+      // Use fixed positioning (viewport-relative) so it floats above the fixed timeline panel.
+      // Render invisible first to measure height, then place above the date label.
+      datePickerPopup.style.position = 'fixed';
+      datePickerPopup.style.visibility = 'hidden';
+      datePickerPopup.style.top = '0';
+      datePickerPopup.style.left = '0';
       document.body.appendChild(datePickerPopup);
       renderDatePicker();
+
+      var rect = dateLabel.getBoundingClientRect();
+      var popH = datePickerPopup.offsetHeight;
+      var popW = datePickerPopup.offsetWidth;
+      var top = rect.top - popH - 6;
+      var left = rect.left + rect.width / 2 - popW / 2;
+      // Keep within viewport
+      if (top < 4) top = rect.bottom + 6;
+      left = Math.min(Math.max(left, 4), window.innerWidth - popW - 4);
+      datePickerPopup.style.top = top + 'px';
+      datePickerPopup.style.left = left + 'px';
+      datePickerPopup.style.visibility = '';
     }
 
     dateLabel.addEventListener('click', function(e) {
