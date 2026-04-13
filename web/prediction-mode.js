@@ -39,13 +39,7 @@
   var CORRIDOR_DIST_DEG = 5000 / 111.32; // ~44.9 degrees
   var CLUSTER_TOL2        = 0.005 * 0.005; // ~500 m vertex proximity
   var BRIDGE_MAX_DIST2    = 0.35 * 0.35;  // ~39 km: bridge polygon cannot link clusters farther than this apart
-  var YELLOW_GATE_WINDOW_MS = 10 * 60 * 1000; // 10 min: window before first cluster red to look for yellow
-
-  // Differential Evolution parameters (for the DE optimizer alternative)
-  var DE_POP_SIZE = 20;   // population size
-  var DE_GENS     = 100;  // generations
-  var DE_F        = 0.8;  // mutation scaling factor
-  var DE_CR       = 0.9;  // crossover rate
+  var YELLOW_GATE_WINDOW_MS = 40 * 60 * 1000; // 40 min: Iran/Yemen yellow can precede reds by up to ~30+ min
 
   function initPrediction() {
     var A = window.AppState;
@@ -55,7 +49,6 @@
     var israelBorder = null;
     var israelBorderPromise = null;
     var enabled    = localStorage.getItem('oref-predict') === 'true';
-    var useDEFit   = localStorage.getItem('oref-de-fit')  === 'true';
     var predictionUpdateScheduled = false;
     var fitCache = Object.create(null);
 
@@ -324,9 +317,13 @@
     function computeFullFit(boundary, border) {
       var guess=ellipseInitialGuess(boundary);
       var cx=guess[0],cy=guess[1],a=guess[2],b=guess[3],theta=guess[4];
+      var rMin=a/4;
       var forced_b=Math.min(b, a/3);   // moderate aspect (~3:1)
       var thin_b  =Math.min(b, a/5);   // thin   aspect (~5:1)
       var big_a   =a*1.8;              // larger scale to allow center to drift outside border
+
+      // Evaluate the PCA initial guess as a baseline — the optimizer must beat this.
+      var guessLoss=ellipseFitLoss(guess,boundary,border,FIT_NUM_PTS,rMin,4);
 
       // Systematic exploration: PCA angles + key rotations, multiple aspect ratios,
       // multiple scales.  Phase-1 quickly finds the best basin; phase-2 refines it.
@@ -360,16 +357,22 @@
 
       var finalRes=runFit(boundary,border,bestPhase1.params,FIT_PHASE2_ITER);
 
-      // If < 10% of the fitted ellipse lies inside Israel's border, the optimizer
-      // drifted off-border into a degenerate basin. Fall back to the PCA initial
-      // guess which is guaranteed to be centered on the cluster boundary.
+      // If the optimizer converged to a worse solution than the raw PCA guess
+      // (can happen when NM drifts into a degenerate off-boundary basin),
+      // fall back to the initial guess.
+      if(guessLoss<finalRes.loss){
+        finalRes={params:guess.slice(),loss:guessLoss};
+      }
+
+      // Secondary check: if < 10% of the fitted ellipse lies inside Israel's border
+      // the result is geometrically nonsensical — also revert to the PCA guess.
       var testPts=ellipsePoints(finalRes.params,FIT_NUM_PTS);
       var nInsideTest=0;
       for(var fi=0;fi<FIT_NUM_PTS;fi++){
         if(pointInBorder(testPts[fi][0],testPts[fi][1],border)) nInsideTest++;
       }
       if(nInsideTest/FIT_NUM_PTS<0.10){
-        finalRes={params:guess.slice(),loss:ellipseFitLoss(guess,boundary,border,FIT_NUM_PTS,guess[2]/4,4)};
+        finalRes={params:guess.slice(),loss:guessLoss};
       }
 
       var p=finalRes.params;
@@ -387,94 +390,6 @@
         if(dTheta>Math.PI/2)dTheta=Math.PI/2;
       }
 
-      return {cx:p[0],cy:p[1],a:fa,b:fb,theta:p[4],aspect:aspect,dTheta:dTheta,loss:finalRes.loss};
-    }
-
-    // ----------------------------------------------------------------
-    // Differential Evolution (DE) optimizer — global alternative to NM.
-    // Maintains a population of DE_POP_SIZE candidates; each generation
-    // mutates via three random distinct individuals and crosses with the
-    // current one. Much less likely to get stuck in local minima at the
-    // cost of ~2× loss evaluations vs the multi-start Nelder-Mead.
-    // ----------------------------------------------------------------
-    function runFitDE(boundaryVerts, border) {
-      var D=5; // [cx, cy, a, b, theta]
-      var guess=ellipseInitialGuess(boundaryVerts);
-      var rMin=guess[2]/4;
-      var lossF=function(p){return ellipseFitLoss(p,boundaryVerts,border,FIT_NUM_PTS,rMin,4);};
-
-      // Search bounds derived from boundary extent — generous enough for global search
-      var minLat=Infinity,maxLat=-Infinity,minLng=Infinity,maxLng=-Infinity;
-      for(var i=0;i<boundaryVerts.length;i++){
-        if(boundaryVerts[i][0]<minLat)minLat=boundaryVerts[i][0];
-        if(boundaryVerts[i][0]>maxLat)maxLat=boundaryVerts[i][0];
-        if(boundaryVerts[i][1]<minLng)minLng=boundaryVerts[i][1];
-        if(boundaryVerts[i][1]>maxLng)maxLng=boundaryVerts[i][1];
-      }
-      var dLat=Math.max(maxLat-minLat,0.1),dLng=Math.max(maxLng-minLng,0.1),dim=Math.max(dLat,dLng);
-      var lo=[minLat-dim, minLng-dim, dim*0.05, dim*0.02, -Math.PI/2];
-      var hi=[maxLat+dim, maxLng+dim, dim*3,    dim*2,     Math.PI/2];
-
-      // Population: first individual is the PCA guess; rest are random
-      var pop=new Array(DE_POP_SIZE), fitness=new Array(DE_POP_SIZE);
-      pop[0]=guess.slice(); fitness[0]=lossF(pop[0]);
-      for(var i=1;i<DE_POP_SIZE;i++){
-        var ind=new Array(D);
-        for(var d=0;d<D;d++) ind[d]=lo[d]+Math.random()*(hi[d]-lo[d]);
-        pop[i]=ind; fitness[i]=lossF(ind);
-      }
-
-      // Evolution loop — mutation + crossover + selection
-      var trial=new Array(D);
-      for(var gen=0;gen<DE_GENS;gen++){
-        for(var i=0;i<DE_POP_SIZE;i++){
-          var r1,r2,r3;
-          do{r1=Math.floor(Math.random()*DE_POP_SIZE);}while(r1===i);
-          do{r2=Math.floor(Math.random()*DE_POP_SIZE);}while(r2===i||r2===r1);
-          do{r3=Math.floor(Math.random()*DE_POP_SIZE);}while(r3===i||r3===r1||r3===r2);
-          var jRand=Math.floor(Math.random()*D);
-          for(var d=0;d<D;d++){
-            trial[d]=(d===jRand||Math.random()<DE_CR)
-              ? Math.max(lo[d],Math.min(hi[d], pop[r1][d]+DE_F*(pop[r2][d]-pop[r3][d])))
-              : pop[i][d];
-          }
-          var tf=lossF(trial);
-          if(tf<=fitness[i]){pop[i]=trial.slice();fitness[i]=tf;}
-        }
-      }
-
-      // Extract best individual and normalize params
-      var bestIdx=0;
-      for(var i=1;i<DE_POP_SIZE;i++) if(fitness[i]<fitness[bestIdx]) bestIdx=i;
-      var p=pop[bestIdx].slice();
-      if(p[3]>p[2]){var tmp=p[2];p[2]=p[3];p[3]=tmp;p[4]+=Math.PI/2;}
-      p[4]=((p[4]+Math.PI/2)%Math.PI+Math.PI)%Math.PI-Math.PI/2;
-      return {params:p, loss:fitness[bestIdx]};
-    }
-
-    function computeFullFitDE(boundary, border) {
-      var guess=ellipseInitialGuess(boundary);
-      var finalRes=runFitDE(boundary,border);
-
-      // Off-border fallback: if < 10% of ellipse pts are inside Israel, use PCA guess
-      var testPts=ellipsePoints(finalRes.params,FIT_NUM_PTS);
-      var nInsideDE=0;
-      for(var fi=0;fi<FIT_NUM_PTS;fi++){
-        if(pointInBorder(testPts[fi][0],testPts[fi][1],border)) nInsideDE++;
-      }
-      if(nInsideDE/FIT_NUM_PTS<0.10){
-        finalRes={params:guess.slice(),loss:ellipseFitLoss(guess,boundary,border,FIT_NUM_PTS,guess[2]/4,4)};
-      }
-
-      var p=finalRes.params;
-      var fa=p[2],fb=p[3],aspect=fa>fb?fa/fb:fb/fa;
-      var N=boundary.length, dTheta;
-      if(aspect<1.01){
-        dTheta=Math.PI/2;
-      }else{
-        dTheta=(2.0/3.0/Math.sqrt(N))*(aspect/(aspect*aspect-1));
-        if(dTheta>Math.PI/2) dTheta=Math.PI/2;
-      }
       return {cx:p[0],cy:p[1],a:fa,b:fb,theta:p[4],aspect:aspect,dTheta:dTheta,loss:finalRes.loss};
     }
 
@@ -882,7 +797,7 @@
             setStatus(label,label+': ✗ no yellow ('+cluster.length+' red)');continue;
           }
 
-          var sig=clusterSignature(cluster)+(useDEFit?'|DE':'');
+          var sig=clusterSignature(cluster);
           liveSigs[sig]=true;
           var clusterLocs=Object.create(null);
           for(var k=0;k<cluster.length;k++) clusterLocs[cluster[k][3]]=true;
@@ -925,12 +840,11 @@
             return;
           }
           var t0=performance.now();
-          var fit=useDEFit?computeFullFitDE(w.prep.hull,border):computeFullFit(w.prep.hull,border);
+          var fit=computeFullFit(w.prep.hull,border);
           var dt=Math.round(performance.now()-t0);
           fitCache[w.sig]={fit:fit,ts:now,dt:dt,locs:w.clusterLocs,size:w.clusterSize};
           var bearingDeg=Math.round(eastwardVector(fit.theta).bearing);
-          var algTag=useDEFit?' DE':' NM';
-          var s=w.clLabel+': ✓ '+dt+'ms'+algTag+' | aspect='+fit.aspect.toFixed(2)+' | az='+bearingDeg+'°';
+          var s=w.clLabel+': ✓ '+dt+'ms | aspect='+fit.aspect.toFixed(2)+' | az='+bearingDeg+'°';
           if(fit.aspect<ASPECT_RATIO_MIN)s+=' (too round, skip)';
           setStatus(w.clLabel,s);
           if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit,w.clLabel);
@@ -976,17 +890,6 @@
         if(enabled)menuItem.classList.add('active');
         menuItem.querySelector('.menu-item-row').addEventListener('click',function(){
           var next=!enabled;setEnabled(next,{showToast:true});menuItem.classList.toggle('active',next);
-        });
-      }
-      var deItem=document.getElementById('menu-de-fit');
-      if(deItem){
-        if(useDEFit)deItem.classList.add('active');
-        deItem.querySelector('.menu-item-row').addEventListener('click',function(){
-          useDEFit=!useDEFit;
-          localStorage.setItem('oref-de-fit',useDEFit);
-          deItem.classList.toggle('active',useDEFit);
-          showToast(useDEFit?'אלגוריתם DE פעיל':'Nelder-Mead פעיל');
-          if(enabled){fitCache=Object.create(null);sync();}
         });
       }
       document.addEventListener('app:stateChanged',function(){sync();});
