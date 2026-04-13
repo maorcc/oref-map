@@ -104,13 +104,25 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
   display: inline-block; width: 8px; height: 8px; border-radius: 50%;
   margin-left: 6px; vertical-align: middle;
 }
-#visitorCount {
-  display: none;
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 1px solid #ddd;
+.menu-item-info {
+  cursor: pointer;
+  padding: 8px 16px;
+  text-align: center;
+  line-height: 1.3;
+}
+#menu-visitors-count {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a56db;
+}
+.menu-visitors-sub {
+  display: block;
   font-size: 11px;
-  color: #555;
+  color: #6b7280;
+}
+@media (hover: hover) {
+  .menu-item-info:hover { background: transparent !important; }
 }
 .indicator-red    { background: #ff0000; animation: pulse 3s ease-in-out infinite; }
 .indicator-purple { background: #9922cc; animation: pulse 3s ease-in-out infinite; }
@@ -301,7 +313,7 @@ body.idle #unified-panel.slim { opacity: 0; pointer-events: none; transition: op
   font-size: 15px;
   line-height: 1.7;
 }
-.modal-content h2 { margin: 0 0 12px; font-size: 20px; }
+.modal-content h2 { margin: 0 0 12px; font-size: 20px; text-align: center; }
 .modal-content p { margin: 0 0 10px; color: #444; }
 .modal-content a { color: #0066cc; }
 #about-visitors-stat {
@@ -714,8 +726,8 @@ body.idle #right-panel {
 .menu-setting .menu-item-row { padding-bottom: 4px; }
 .menu-setting-select {
   display: block;
-  width: calc(100% - 50px);
-  margin: 0 16px 10px auto;
+  width: calc(100% - 66px);
+  margin: 0 50px 10px auto;
   padding: 5px 8px;
   border: 1px solid #d1d5db;
   border-radius: 6px;
@@ -743,7 +755,8 @@ body.dark .menu-check { border-color: #666; }
 body.dark .menu-item.disabled .menu-item-row { opacity: 0.35; }
 body.dark .menu-setting-select { background: #3a3c40; border-color: #555; color: #ddd; }
 body.dark #status { background: rgba(48,50,56,0.92); color: #ddd; }
-body.dark #visitorCount { border-top-color: #4a4c50; color: #999; }
+body.dark #menu-visitors-count { color: #6ba6ff; }
+body.dark .menu-visitors-sub { color: #999; }
 body.dark #historyTimeLabel { color: #999 !important; border-top-color: #4a4c50 !important; }
 body.dark #errorDetail { background: #30323a; color: #ddd; border-color: #c00; }
 body.dark #legend { background: rgba(48,50,56,0.92); color: #ddd; }
@@ -783,6 +796,8 @@ body.dark #up-close-row .btn-text { color: #999; }
 /* Modals */
 body.dark .modal-backdrop { background: rgba(0,0,0,0.7); }
 body.dark .modal-content { background: #30323a; color: #ddd; }
+body.dark .modal-content p { color: #ccc; }
+body.dark .modal-content img { filter: invert(1) brightness(1.8); }
 body.dark .modal-content a { color: #6ba6ff; }
 body.dark .modal-close { color: #aaa; }
 body.dark .modal-close:hover { background: #3a3c40; color: #ddd; }
@@ -868,13 +883,6 @@ try {
       <span class="menu-check"></span>
     </button>
   </div>
-  <div id="menu-visitors" class="menu-item">
-    <button class="menu-item-row" type="button">
-      <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-      <span class="menu-item-label">מס' משתמשים</span>
-      <span class="menu-check"></span>
-    </button>
-  </div>
   <div id="menu-lang" class="menu-item menu-setting">
     <div class="menu-item-row">
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg></span>
@@ -912,6 +920,12 @@ try {
       <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><circle cx="12" cy="8" r="0.5" fill="currentColor"/></svg></span>
       <span class="menu-item-label">אודות</span>
     </button>
+  </div>
+  <div id="menu-visitors" class="menu-item" style="display:none">
+    <div class="menu-item-info" id="menu-visitors-row">
+      <span id="menu-visitors-count"></span>
+      <span class="menu-visitors-sub">בשעה האחרונה</span>
+    </div>
   </div>
   <div id="ext-section" class="menu-item">
     <button class="menu-item-row" type="button" id="ext-section-btn">
@@ -958,7 +972,6 @@ try {
 <div id="status">
   <span class="indicator indicator-err" id="statusDot"></span>
   <span id="statusText">מתחבר...</span>
-  <div id="visitorCount"></div>
   <div id="historyTimeLabel" style="display:none; font-size:11px; color:#555; margin-top:5px; padding-top:5px; border-top:1px solid #ddd;"></div>
 </div>
 <div id="errorDetail"></div>
@@ -966,7 +979,7 @@ try {
 <div id="about-backdrop" class="modal-backdrop">
   <div id="about-modal" class="modal-content">
     <button id="about-close" class="modal-close">&times;</button>
-    <h2>אודות מפת העורף</h2>
+    <h2><img src="/logo-text.png" srcset="/logo-text.png 1x, /logo-text@2x.png 2x" height="56" alt="מפת העורף"></h2>
     <p>הצגת אזורי ההתרעות של פיקוד העורף על גבי מפה בזמן אמת.</p>
     <p>נוצר על ידי מאור קונפורטי והקהילה. תרומות לפרויקט יתקבלו בברכה.</p>
     <p>מקור הנתונים: ממשק ה-API הציבורי של פיקוד העורף.</p>
@@ -1150,7 +1163,6 @@ try {
   var PROXY_BASE = '';
   var apiPrefix = '/api'; // Pages Function; switches to '/api2' (Worker) if non-TLV
   var ANALYTICS_POLL_MS = 30000;
-  var ANALYTICS_LABEL = 'מבקרים בשעה האחרונה';
   var ANALYTICS_URL = '/api/analytics';
 
   function resetProxy() {
@@ -1180,17 +1192,6 @@ try {
     });
   }
 
-  var visitorCountEl = document.getElementById('visitorCount');
-  var visitorsEnabled = (function() {
-    try { return localStorage.getItem('oref-visitors') !== 'disabled'; } catch(e) { return true; }
-  })();
-
-  function renderVisitorCount(count) {
-    if (!visitorCountEl || !Number.isFinite(count)) return;
-    visitorCountEl.textContent = count + ' ' + ANALYTICS_LABEL;
-    visitorCountEl.style.display = 'block';
-  }
-
   var lastVisitors24h = null;
 
   function fetchAnalytics() {
@@ -1201,8 +1202,12 @@ try {
       if (data && typeof data.visitors_24h === 'number') {
         lastVisitors24h = data.visitors_24h;
       }
-      if (visitorsEnabled && data && typeof data.visitors_1h === 'number') {
-        renderVisitorCount(data.visitors_1h);
+      if (data && typeof data.visitors_1h === 'number') {
+        var el = document.getElementById('menu-visitors-count');
+        if (el) {
+          el.textContent = data.visitors_1h.toLocaleString('he-IL') + ' 👥';
+          el.closest('.menu-item').style.display = '';
+        }
       }
     }).catch(function(err) {
       console.warn('Analytics fetch failed:', err);
@@ -1240,14 +1245,12 @@ try {
       fetchHistory();
       historyPollId = setInterval(function() { fetchHistory(); }, HISTORY_POLL_MS);
     }
-    if (visitorsEnabled) startAnalyticsPolling();
+    startAnalyticsPolling();
   }
 
   // Periodically reset proxy so client can re-check if direct /api works
   setInterval(resetProxy, 300000); // 5 min
-  if (visitorsEnabled) {
-    startAnalyticsPolling();
-  }
+  startAnalyticsPolling();
   var LIVE_POLL_MS = 1000;
   var HISTORY_POLL_MS = 10000;
   var GREEN_FADE_MS = 120000; // 2 minutes
@@ -2119,23 +2122,6 @@ try {
         refreshUserLocationMarkerIcon();
         showToast('מצב נהיגה כובה');
         applySelectedZoomMode(false);
-      }
-    });
-  }
-  var menuVisitorsEl = document.getElementById('menu-visitors');
-  if (menuVisitorsEl) {
-    if (visitorsEnabled) menuVisitorsEl.classList.add('active');
-    menuVisitorsEl.querySelector('.menu-item-row').addEventListener('click', function() {
-      visitorsEnabled = !visitorsEnabled;
-      try { localStorage.setItem('oref-visitors', visitorsEnabled ? 'enabled' : 'disabled'); } catch(e) {}
-      menuVisitorsEl.classList.toggle('active', visitorsEnabled);
-      if (visitorsEnabled) {
-        showToast('מציג מספר משתמשים');
-        startAnalyticsPolling();
-      } else {
-        showToast('לא יוצג מספר המשתמשים');
-        stopAnalyticsPolling();
-        if (visitorCountEl) visitorCountEl.style.display = 'none';
       }
     });
   }
@@ -4767,6 +4753,10 @@ try {
     closeMenu();
     popPanelHistory();
     openAbout();
+  });
+
+  document.getElementById('menu-visitors-row').addEventListener('click', function() {
+    showToast('מספר המבקרים בשעה האחרונה');
   });
 
   init();
