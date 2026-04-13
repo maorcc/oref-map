@@ -679,16 +679,21 @@
     //     firstRedTs=09:00 window missed the real yellow at 22:23, rejecting a valid
     //     Iran/Yemen attack cluster.
     //   Fix: lastRedTs=max(reds) anchors the window to the most recent wave.
-    function hasYellowSequenceInCluster(cluster, extHistory) {
+    // cutoffTs = effective "now": Date.now() in live mode, viewTime in history mode.
+    // extHistory covers the full day, so without a cutoff the scan for lastRedTs can
+    // pick up reds from later waves (e.g. 03:23 when viewing 01:55), shifting the
+    // 10-min yellow window to the wrong attack wave.
+    function hasYellowSequenceInCluster(cluster, extHistory, cutoffTs) {
       if(!extHistory||extHistory.length===0) return false;
       var clusterNames=Object.create(null);
       for(var ky=0;ky<cluster.length;ky++) clusterNames[cluster[ky][3]]=true;
 
-      // Find the MOST RECENT red timestamp among all cluster locations in extHistory.
+      // Most recent red at or before cutoffTs — anchors the window to the current wave.
       var lastRedTs=-Infinity;
       for(var i=0;i<extHistory.length;i++){
         var e=extHistory[i];
-        if(e.state==='red'&&clusterNames[e.location]&&e.alertDate>lastRedTs)
+        if(e.state==='red'&&clusterNames[e.location]
+           &&e.alertDate<=cutoffTs&&e.alertDate>lastRedTs)
           lastRedTs=e.alertDate;
       }
       if(!isFinite(lastRedTs)) return false;
@@ -835,6 +840,11 @@
         var orefPts=res[0],border=res[1];
         var locationStates=A.locationStates;
         var featureMap=A.featureMap,extHistory=A.extendedHistory;
+        // In history mode viewTime is the scrubbed timestamp; in live mode use now.
+        // This caps extHistory scans to entries ≤ the currently displayed moment,
+        // preventing future reds in the full-day extHistory from shifting the
+        // yellow-gate window to the wrong wave.
+        var cutoffTs=A.isLiveMode?Date.now():A.viewTime;
 
         var locPoints=[];
         for(var name in locationStates){
@@ -868,7 +878,7 @@
           // Yellow gate: at least one cluster location must have had a yellow alert
           // immediately before its current red wave (green event = wave separator).
           // Lebanon/Gaza attacks that go directly red (no Iran-style yellow) are rejected.
-          if(!hasYellowSequenceInCluster(cluster,extHistory)){
+          if(!hasYellowSequenceInCluster(cluster,extHistory,cutoffTs)){
             setStatus(label,label+': ✗ no yellow ('+cluster.length+' red)');continue;
           }
 
