@@ -109,6 +109,11 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
   padding: 8px 16px;
   text-align: center;
   line-height: 1.3;
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
 }
 #menu-visitors-count {
   display: block;
@@ -922,10 +927,10 @@ try {
     </button>
   </div>
   <div id="menu-visitors" class="menu-item" style="display:none">
-    <div class="menu-item-info" id="menu-visitors-row">
+    <button class="menu-item-info" id="menu-visitors-row" type="button">
       <span id="menu-visitors-count"></span>
       <span class="menu-visitors-sub">בשעה האחרונה</span>
-    </div>
+    </button>
   </div>
   <div id="ext-section" class="menu-item">
     <button class="menu-item-row" type="button" id="ext-section-btn">
