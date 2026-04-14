@@ -2525,17 +2525,37 @@ try {
       return 'purple';
     }
 
-    // Red — active danger (missiles / non-conventional / terrorists / shelter now)
+    // Inherit — generic shelter command, preserve existing color (red/purple)
+    if (title === 'היכנסו מייד למרחב המוגן' ||
+        title === 'היכנסו למרחב המוגן') {
+      return 'inherit';
+    }
+
+    // Red — active danger (missiles / non-conventional / terrorists)
     if (title === 'ירי רקטות וטילים' ||
         title === 'נשק לא קונבנציונלי' ||
-        title === 'חדירת מחבלים' ||
-        title === 'היכנסו מייד למרחב המוגן' ||
-        title === 'היכנסו למרחב המוגן') {
+        title === 'חדירת מחבלים') {
       return 'red';
     }
 
     console.warn('Unknown alert title:', title);
     return 'red'; // default to danger for unknown
+  }
+
+  // Resolve 'inherit' state for generic "enter shelter" alerts.
+  // These don't specify a threat type — preserve the location's existing
+  // red/purple state if present, otherwise default to red.
+  // In history/timeline mode, `locationStates` holds the replay snapshot,
+  // so read from `liveLocationStates` (the shadow of real current state)
+  // to mirror where the caller will write via updateShadowState.
+  function resolveInherit(state, location) {
+    if (state !== 'inherit') return state;
+    var source = (!isLiveMode && liveLocationStates) ? liveLocationStates : locationStates;
+    var existing = source[location];
+    if (existing && (existing.state === 'red' || existing.state === 'purple')) {
+      return existing.state;
+    }
+    return 'red';
   }
 
   // --- Marker management (feature-state) ---
@@ -3064,8 +3084,8 @@ try {
   function processLiveAlert(alert) {
     if (!alert || !alert.data || !alert.title) return;
     var title = (alert.desc || alert.title).replace(/\s+/g, ' ').trim();
-    var state = classifyTitle(title);
-    if (state !== 'green') lastDangerTime = Date.now();
+    var rawState = classifyTitle(title);
+    if (rawState !== 'green') lastDangerTime = Date.now();
     var locations = alert.data;
     if (!Array.isArray(locations)) return;
     var isNewAlert = alert.id !== lastLiveAlertId;
@@ -3073,6 +3093,7 @@ try {
     var now = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date());
     for (var i = 0; i < locations.length; i++) {
       var loc = normalizeGeresh(locations[i]);
+      var state = resolveInherit(rawState, loc);
       recordHistory(loc, title, now, state);
       if (isLiveMode) {
         setLocationState(loc, state);
@@ -3119,9 +3140,10 @@ try {
   function processHistoryEntry(entry) {
     if (!entry || !entry.data || !entry.title) return;
     var title = entry.title.replace(/\s+/g, ' ').trim();
-    var state = classifyTitle(title);
+    var rawState = classifyTitle(title);
     // History `data` is a string (single location)
     var location = normalizeGeresh((typeof entry.data === 'string' ? entry.data : String(entry.data)).trim());
+    var state = resolveInherit(rawState, location);
     var since = parseAlertDate(entry.alertDate) || Date.now();
     if (state !== 'green' && since > lastDangerTime) lastDangerTime = since;
     recordHistory(location, title, entry.alertDate || '', state);
@@ -3449,8 +3471,9 @@ try {
         if (!e.data || !e.category_desc) continue;
         var rid = String(e.rid || '');
         var title = (e.category_desc || '').replace(/\s+/g, ' ').trim();
-        var state = classifyTitle(title);
+        var rawState = classifyTitle(title);
         var location = normalizeGeresh((typeof e.data === 'string' ? e.data : String(e.data)).trim());
+        var state = resolveInherit(rawState, location);
         var ts = parseAlertDate(e.alertDate);
         if (!ts) continue;
         var compositeKey = location + '|' + (e.alertDate || '').replace('T', ' ');
