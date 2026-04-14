@@ -2545,9 +2545,13 @@ try {
   // Resolve 'inherit' state for generic "enter shelter" alerts.
   // These don't specify a threat type — preserve the location's existing
   // red/purple state if present, otherwise default to red.
+  // In history/timeline mode, `locationStates` holds the replay snapshot,
+  // so read from `liveLocationStates` (the shadow of real current state)
+  // to mirror where the caller will write via updateShadowState.
   function resolveInherit(state, location) {
     if (state !== 'inherit') return state;
-    var existing = locationStates[location];
+    var source = (!isLiveMode && liveLocationStates) ? liveLocationStates : locationStates;
+    var existing = source[location];
     if (existing && (existing.state === 'red' || existing.state === 'purple')) {
       return existing.state;
     }
