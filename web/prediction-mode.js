@@ -50,6 +50,7 @@
     var enabled    = localStorage.getItem('oref-predict') === 'true';
     var predictionUpdateScheduled = false;
     var fitCache = Object.create(null);
+    var activeRunId = 0; // incremented each updatePredictionLines call; stale processNext chains bail on mismatch
 
     // ----------------------------------------------------------------
     // Israel border loading (for border-aware ellipse loss)
@@ -328,8 +329,9 @@
       // Revert to the PCA initial guess if the optimizer produced a worse result.
       // Three failure modes all fall back the same way:
       //   1. Optimizer loss > initial-guess loss (NM drifted to a worse basin).
-      //   2. Best-fit major radius < initial-guess major radius (optimizer shrank
-      //      the ellipse to a degenerate point to minimise boundary distance).
+      //   2. Both optimised semi-axes < rMin (= a/4): the ellipse collapsed to a near-
+      //      point.  Using rMin (not 'a') avoids false positives when NM legitimately
+      //      finds a more compact, better-aligned ellipse (e.g. PCA a=2.0°, NM a=1.5°).
       //   3. < 10% of ellipse sample points inside Israel's border (off-border basin).
       var fa0=finalRes.params[2], fb0=finalRes.params[3];
       var testPts=ellipsePoints(finalRes.params,FIT_NUM_PTS);
@@ -338,7 +340,7 @@
         if(pointInBorder(testPts[fi][0],testPts[fi][1],border)) nInsideTest++;
       }
       if(guessLoss<finalRes.loss
-         ||Math.max(fa0,fb0)<a          // shrunken below PCA major radius
+         ||Math.max(fa0,fb0)<rMin       // collapsed to near-point (< a/4)
          ||nInsideTest/FIT_NUM_PTS<0.10){
         finalRes={params:guess.slice(),loss:guessLoss};
       }
@@ -347,8 +349,9 @@
       var fa=p[2],fb=p[3],aspect=fa>fb?fa/fb:fb/fa;
 
       // Slope uncertainty: analytical formula σ_θ ≈ (k/√N)·(AR/(AR²-1))
-      // where k≈2 encodes noise level, N=boundary vertex count, AR=aspect ratio.
-      // Near-circular fits (AR≈1) have undefined direction → cap at π/2.
+      // where k = 2/3 (empirically calibrated to match observed corridor spread
+      // across the 08.04.26 and 21.03.26 events), N = boundary sample-point count,
+      // AR = aspect ratio.  Near-circular fits (AR ≈ 1) → cap at π/2.
       var N=boundary.length;
       var dTheta;
       if(aspect<1.01){
@@ -464,6 +467,13 @@
       var adjCopy=Object.create(null);
       for(var k in adj)adjCopy[k]=adj[k].slice();
       var ring=[pos[startKey]],prev=null,curr=startKey;
+      // Termination limit: a simple ring visits exactly vkeys.length edges before
+      // returning to startKey and breaking.  The +4 margin covers T-junctions or
+      // other minor topology irregularities (stray isolated edges, duplicate verts
+      // at precision boundaries) where the walk may take one or two extra steps
+      // before the startKey break fires.  A corrupt/partial ring of this size still
+      // passes the length<6 guard in prepareClusterEdgeSampled and triggers the
+      // convex-hull fallback, so the extra steps are safe.
       for(var step=0;step<vkeys.length+4;step++){
         var neighbors=adjCopy[curr];
         if(!neighbors||neighbors.length===0)break;
@@ -741,7 +751,14 @@
         return; // keep any previous prediction visible; don't clear
       }
 
+      // Monotonic run token: if sync() fires again (e.g. live 1-second poll) while a
+      // prior processNext chain is still running, the stale chain detects the mismatch
+      // and exits without touching the map — preventing geometry corruption.
+      var runId = ++activeRunId;
+
       Promise.all([A.ensureOrefPoints(), ensureIsraelBorder()]).then(function(res) {
+        if(runId!==activeRunId)return; // superseded by a newer run
+
         var orefPts=res[0],border=res[1];
         var locationStates=A.locationStates;
         var featureMap=A.featureMap,extHistory=A.extendedHistory;
@@ -791,22 +808,16 @@
           if(!prep){continue;}
 
           clusterLabel++;
-          var clLabel='#'+clusterLabel;
-
-          // Draw union boundary vertices (small blue circles)
-          for(var hi=0;hi<prep.hull.length;hi++){
-            pushFeature({type:'Feature',geometry:{type:'Point',coordinates:lngLat(prep.hull[hi])},properties:{kind:'point'}});
-          }
-          // Draw initial-guess ellipse (dashed green)
-          pushFeature(makeEllipseFeature(prep.guess,60,'guess'));
-          flushToMap();
-
-          workItems.push({clLabel:clLabel,sig:sig,prep:prep,clusterLocs:clusterLocs,clusterSize:cluster.length});
+          workItems.push({clLabel:'#'+clusterLabel,sig:sig,prep:prep,clusterLocs:clusterLocs,clusterSize:cluster.length});
         }
 
         if(workItems.length===0)return;
 
         function processNext(i){
+          // Bail if a newer updatePredictionLines call has superseded this run.
+          // Prevents a slow NM chain from overwriting a fresher render.
+          if(runId!==activeRunId)return;
+
           if(i>=workItems.length){
             for(var k in fitCache){if(!liveSigs[k]||(now-fitCache[k].ts)>=CACHE_MAX_AGE_MS)delete fitCache[k];}
             return;
@@ -814,13 +825,25 @@
           var w=workItems[i];
           var cached=findCompatibleCache(w.sig,w.clusterLocs,w.clusterSize,fitCache,now);
           if(cached){
+            // Only draw if the cached fit meets the aspect threshold; no preview needed.
             if(cached.fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(cached.fit,w.clLabel);
             setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
             return;
           }
+          // Run the multi-start NM fit. Preview geometry is drawn only for clusters
+          // that pass the aspect gate, preventing stale dashed ellipses from
+          // accumulating on clusters that will ultimately be rejected.
           var fit=computeFullFit(w.prep.hull,border);
           fitCache[w.sig]={fit:fit,ts:now,locs:w.clusterLocs,size:w.clusterSize};
-          if(fit.aspect>=ASPECT_RATIO_MIN)drawFinalResults(fit,w.clLabel);
+          if(fit.aspect>=ASPECT_RATIO_MIN){
+            // Draw boundary sample points and initial-guess ellipse as debug visuals,
+            // then immediately overlay the final optimised result.
+            for(var hi=0;hi<w.prep.hull.length;hi++){
+              pushFeature({type:'Feature',geometry:{type:'Point',coordinates:lngLat(w.prep.hull[hi])},properties:{kind:'point'}});
+            }
+            pushFeature(makeEllipseFeature(w.prep.guess,60,'guess'));
+            drawFinalResults(fit,w.clLabel);
+          }
           setTimeout(function(next){return function(){processNext(next);};}(i+1),0);
         }
         setTimeout(function(){processNext(0);},0);
