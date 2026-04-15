@@ -553,6 +553,23 @@
       return idx;
     }
 
+    // Merge fresh locationHistory entries into histIdx.
+    // extHistory lags live alerts by several seconds; locationHistory has them
+    // immediately, so omitting it can cause the yellow gate to miss a brand-new
+    // yellow or anchor lastRedTs on a stale earlier wave at the start of a live event.
+    function mergeLocationHistory(histIdx, locationHistory, cutoffTs) {
+      for(var name in locationHistory){
+        var arr=locationHistory[name]; if(!arr||!arr.length)continue;
+        for(var i=0;i<arr.length;i++){
+          var e=arr[i]; if(!e)continue;
+          var ts=typeof e.alertDate==='number'?e.alertDate:Date.parse(String(e.alertDate).replace(' ','T'));
+          if(!ts||isNaN(ts)||ts>cutoffTs)continue;
+          if(!histIdx[name])histIdx[name]=[];
+          histIdx[name].push({location:name,alertDate:ts,state:e.state,title:e.title});
+        }
+      }
+    }
+
     // Build name set of cluster members + all polygons that touch any cluster polygon.
     // The yellow early warning can land on a touching polygon that never turns red, so
     // the yellow scan must include adjacent locations, not just the red cluster members.
@@ -761,7 +778,7 @@
 
         var orefPts=res[0],border=res[1];
         var locationStates=A.locationStates;
-        var featureMap=A.featureMap,extHistory=A.extendedHistory;
+        var featureMap=A.featureMap,extHistory=A.extendedHistory,locationHistory=A.locationHistory;
         // In history mode viewTime is the scrubbed timestamp; in live mode use now.
         // This caps extHistory scans to entries ≤ the currently displayed moment,
         // preventing future reds in the full-day extHistory from shifting the
@@ -783,8 +800,12 @@
         if(locPoints.length<MIN_CLUSTER_RED){return;}
 
         var clusters=clusterByAdjacency(locPoints,featureMap,locationStates);
-        // Index extHistory by location once; hasYellowSequenceInCluster uses O(cluster-size) lookups.
+        // Index extHistory by location, then overlay fresh locationHistory entries.
+        // locationHistory has live alerts immediately; extHistory lags by several
+        // seconds, so without the merge the gate can miss a brand-new yellow or
+        // anchor lastRedTs on a stale wave right when prediction matters most.
         var histIdx=buildHistoryIndex(extHistory);
+        mergeLocationHistory(histIdx,locationHistory,cutoffTs);
 
         var now=Date.now(),liveSigs=Object.create(null);
         var workItems=[],clusterLabel=0;
@@ -872,6 +893,9 @@
     function sync(){if(enabled)schedulePredictionUpdate();}
     function setEnabled(val,opts){
       enabled=!!val;
+      // Bump the run token on disable so any in-flight Promise/processNext chain
+      // sees a mismatch and stops painting before clearAll() wipes the canvas.
+      if(!enabled)activeRunId++;
       localStorage.setItem('oref-predict',enabled);
       if(opts&&opts.showToast)showToast(enabled?'חיזוי כיוון שיגור מופעל':'חיזוי כיוון שיגור כובה');
       if(enabled)sync();else clearAll();
