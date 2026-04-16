@@ -23,6 +23,7 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 ## Structure
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
+- `web/prediction-mode.js` — Launch-direction prediction overlay (lazy-loaded)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
 - `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
 - `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)

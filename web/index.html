@@ -411,7 +411,6 @@ body.idle #unified-panel.slim { opacity: 0; pointer-events: none; transition: op
 }
 /* Feature-flag-gated elements: hidden by default, shown when flag is active */
 .f-gated { display: none !important; }
-body.f-predict #menu-predict.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-row {
@@ -1039,13 +1038,14 @@ try {
         </button>
       </div>
       <div id="ext-menu">
-        <div id="menu-predict" class="menu-item f-gated">
+        <div id="menu-predict" class="menu-item">
           <button class="menu-item-row" type="button" id="predict-enable-btn">
             <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L12 22M12 2L8 6M12 2L16 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="17" r="2" fill="currentColor"/><circle cx="8" cy="14" r="1.5" fill="currentColor" opacity="0.5"/><circle cx="16" cy="14" r="1.5" fill="currentColor" opacity="0.5"/></svg></span>
             <span class="menu-item-label">כיוון שיגור</span>
             <span class="menu-check"></span>
           </button>
         </div>
+
       </div>
     </div>
   </div>
@@ -1207,17 +1207,16 @@ try {
       var s = document.createElement('script');
       s.src = '/prediction-mode.js';
       if (atStartup) {
-        s.onload = s.onerror = function() { _extPending--; _maybeDispatchReady(); };
+        s.onload = function() { _extPending--; _maybeDispatchReady(); };
+        s.onerror = function() { loaded = false; _extPending--; _maybeDispatchReady(); };
       } else {
         try { localStorage.setItem('oref-predict', 'true'); } catch (e) {}
         s.onerror = function() { loaded = false; try { localStorage.removeItem('oref-predict'); } catch (e) {} };
       }
       document.head.appendChild(s);
     }
-    if (FF.predict) {
-      try { if (localStorage.getItem('oref-predict') === 'true') load(true); } catch (e) {}
-      document.getElementById('predict-enable-btn').addEventListener('click', function() { load(false); });
-    }
+    try { if (localStorage.getItem('oref-predict') === 'true') load(true); } catch (e) {}
+    document.getElementById('predict-enable-btn').addEventListener('click', function() { load(false); });
   })();
 
   // --- Debug overlay (append console.warn/error to on-screen log when ?f-log) ---
@@ -2268,6 +2267,8 @@ try {
   }
 
   // locationPopulations is extracted from _populations in locations_polygons.json (see buildPolygons)
+  // israelBorder is extracted from _border in the same file — outer land boundary as [lng,lat] ring
+  var israelBorder = null;
 
   // --- Unified panel state ---
   var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
@@ -2395,6 +2396,9 @@ try {
     get locationStates() { return locationStates; },
     get locationHistory() { return locationHistory; },
     get featureMap() { return featureMap; },
+    get israelBorder() { return israelBorder; },
+    get extendedHistory() { return extendedHistory; },
+    get dayHistoryReady() { return dayHistoryReady; },
     ensureOrefPoints: _ensureOrefPoints,
     get userPosition() { return currentUserLatLng || null; },
     get isLiveMode() { return isLiveMode; },
@@ -2547,13 +2551,17 @@ try {
       if (onReady) pendingPolygonCallback = onReady;
       return;
     }
-    // Extract population data embedded in the polygons file
+    // Extract metadata embedded in the polygons file
     if (data._populations) {
       locationPopulations = data._populations;
+    }
+    if (data._border) {
+      israelBorder = data._border;
     }
     var features = [];
     var fid = 0;
     for (var name in data) {
+      if (name.charAt(0) === '_') continue; // skip metadata keys (_border, _populations, _copyright, ...)
       var coords = data[name];
       if (!Array.isArray(coords)) continue;
       var isNested = Array.isArray(coords[0][0]);
