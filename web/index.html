@@ -4000,8 +4000,8 @@ try {
       var maxDate = today;
 
       // Month label
-      var monthNames = ['January','February','March','April','May','June',
-                        'July','August','September','October','November','December'];
+      var monthNames = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני',
+                        'יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
       var label = monthNames[month - 1] + ' ' + year;
 
       // Prev/next month boundaries
@@ -4021,7 +4021,7 @@ try {
         '<button class="dp-nav" id="dp-next"' + (nextDisabled ? ' disabled' : '') + '>&#9656;</button>' +
         '</div><div class="dp-grid">';
 
-      var dows = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+      var dows = ['א','ב','ג','ד','ה','ו','ש'];
       for (var i = 0; i < 7; i++) html += '<span class="dp-dow">' + dows[i] + '</span>';
 
       // Empty cells before first day
