@@ -45,24 +45,34 @@
     var map = A.map;
     var showToast = A.showToast;
 
-    var israelBorder = null;
-    var israelBorderPromise = null;
+    var israelBorder = null; // cached {bbox, points:[[lat,lng],...]} derived from A.israelBorder
     var enabled    = localStorage.getItem('oref-predict') === 'true';
     var predictionUpdateScheduled = false;
     var fitCache = Object.create(null);
     var activeRunId = 0; // incremented each updatePredictionLines call; stale processNext chains bail on mismatch
 
     // ----------------------------------------------------------------
-    // Israel border loading (for border-aware ellipse loss)
+    // Israel border (for border-aware ellipse loss)
+    // Source of truth: the `_border` entry in locations_polygons.json, already
+    // loaded by the main app and exposed via AppState.israelBorder as a raw
+    // [[lng,lat],...] ring.  Convert once on first use: swap to [lat,lng] to
+    // match the internal coord convention, and derive a bbox for the fast
+    // reject in pointInBorder.
     // ----------------------------------------------------------------
-    function ensureIsraelBorder() {
-      if (israelBorder) return Promise.resolve(israelBorder);
-      if (israelBorderPromise) return israelBorderPromise;
-      israelBorderPromise = fetch('israel_border.json')
-        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(function(d) { israelBorder = d; return d; })
-        .finally(function() { israelBorderPromise = null; });
-      return israelBorderPromise;
+    function getIsraelBorder() {
+      if (israelBorder) return israelBorder;
+      var raw = A.israelBorder;
+      if (!raw || !raw.length) return null;
+      var pts = new Array(raw.length);
+      var minLat=Infinity, maxLat=-Infinity, minLng=Infinity, maxLng=-Infinity;
+      for (var i = 0; i < raw.length; i++) {
+        var lng = raw[i][0], lat = raw[i][1];
+        pts[i] = [lat, lng];
+        if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
+      }
+      israelBorder = { bbox: {minLat:minLat, maxLat:maxLat, minLng:minLng, maxLng:maxLng}, points: pts };
+      return israelBorder;
     }
 
     // ----------------------------------------------------------------
@@ -773,10 +783,12 @@
       // and exits without touching the map — preventing geometry corruption.
       var runId = ++activeRunId;
 
-      Promise.all([A.ensureOrefPoints(), ensureIsraelBorder()]).then(function(res) {
+      var border = getIsraelBorder();
+      if (!border) return; // polygons (and thus _border) not loaded yet; next sync() will retry
+
+      A.ensureOrefPoints().then(function(orefPts) {
         if(runId!==activeRunId)return; // superseded by a newer run
 
-        var orefPts=res[0],border=res[1];
         var locationStates=A.locationStates;
         var featureMap=A.featureMap,extHistory=A.extendedHistory,locationHistory=A.locationHistory;
         // In history mode viewTime is the scrubbed timestamp; in live mode use now.

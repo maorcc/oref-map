@@ -2189,6 +2189,8 @@ try {
   }
 
   // locationPopulations is extracted from _populations in locations_polygons.json (see buildPolygons)
+  // israelBorder is extracted from _border in the same file — outer land boundary as [lng,lat] ring
+  var israelBorder = null;
 
   // --- Unified panel state ---
   var unifiedPanelState = 'closed'; // 'closed' | 'slim' | 'full'
@@ -2316,6 +2318,7 @@ try {
     get locationStates() { return locationStates; },
     get locationHistory() { return locationHistory; },
     get featureMap() { return featureMap; },
+    get israelBorder() { return israelBorder; },
     get extendedHistory() { return extendedHistory; },
     get dayHistoryReady() { return dayHistoryReady; },
     ensureOrefPoints: _ensureOrefPoints,
@@ -2470,13 +2473,17 @@ try {
       if (onReady) pendingPolygonCallback = onReady;
       return;
     }
-    // Extract population data embedded in the polygons file
+    // Extract metadata embedded in the polygons file
     if (data._populations) {
       locationPopulations = data._populations;
+    }
+    if (data._border) {
+      israelBorder = data._border;
     }
     var features = [];
     var fid = 0;
     for (var name in data) {
+      if (name.charAt(0) === '_') continue; // skip metadata keys (_border, _populations, _copyright, ...)
       var coords = data[name];
       if (!Array.isArray(coords)) continue;
       var isNested = Array.isArray(coords[0][0]);

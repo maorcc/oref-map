@@ -24,7 +24,6 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
 - `web/prediction-mode.js` — Launch-direction prediction overlay (lazy-loaded)
-- `web/israel_border.json` — 185-point Israel land-border polygon used by the prediction border-awareness check. **Regenerate** with `tools/generate_israel_border.py` whenever `locations_polygons.json` changes (new city added, boundary revised) — there is no CI signal for staleness.
 - `web/cities_geo.json` — Location → [lat, lng] lookup
 - `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
 - `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
