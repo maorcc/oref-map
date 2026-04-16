@@ -3842,6 +3842,7 @@ try {
 
     function closeTimeline() {
       if (!isOpen()) return;
+      closeDatePicker();
       closeUnifiedPanel();
       stopPlay();
 
@@ -4100,8 +4101,11 @@ try {
     });
 
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && datePickerPopup) closeDatePicker();
-    });
+      if (e.key === 'Escape' && datePickerPopup) {
+        closeDatePicker();
+        e.stopImmediatePropagation();
+      }
+    }, true);
 
     btnRow.addEventListener('click', function(e) {
       if (!isOpen()) {
