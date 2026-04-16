@@ -2563,7 +2563,6 @@ try {
     for (var name in data) {
       if (name.charAt(0) === '_') continue; // skip metadata keys (_border, _populations, _copyright, ...)
       var coords = data[name];
-      if (!Array.isArray(coords)) continue;
       var isNested = Array.isArray(coords[0][0]);
       var polygonCoords = isNested ? coords : [coords];
       var feature = {
