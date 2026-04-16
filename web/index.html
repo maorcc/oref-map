@@ -1338,10 +1338,9 @@ try {
   var GREEN_FADE_MS = 120000; // 2 minutes
   var ALERT_MAX_AGE_MS = 3600000; // 1 hour — safety net for stuck alerts
   var FADE_TICK_MS = 1000;
-
-  // --- Map setup ---
+// --- Map setup ---
   var DEFAULT_CENTER = [32.2, 34.9], DEFAULT_ZOOM = 7.2;
-  // --- MapLibre GL JS setup ---
+
   var pmtilesProtocol = new pmtiles.Protocol();
   maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 
@@ -1350,206 +1349,130 @@ try {
     null, true
   );
 
-  var PMTILES_URL = 'pmtiles://https://tiles.oref-map.org/middle-east.pmtiles';
-
-  // --- Language & theme preferences ---
-  var VALID_LANGS = ['he', 'en', 'ar', 'ru'];
-  var VALID_THEMES = ['light', 'dark', 'auto'];
-  var currentLang = 'he';
-  var currentTheme = 'auto';
-  try { var sl = localStorage.getItem('oref-map-lang'); if (VALID_LANGS.indexOf(sl) !== -1) currentLang = sl; } catch(e) {}
-  try { var st = localStorage.getItem('oref-theme'); if (VALID_THEMES.indexOf(st) !== -1) currentTheme = st; } catch(e) {}
-
-  function resolveDarkMode() {
-    if (currentTheme === 'dark') return true;
-    if (currentTheme === 'auto') return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return false;
-  }
-  var isDarkActive = resolveDarkMode();
-  if (isDarkActive) document.body.classList.add('dark');
-
-  // Warm MapTiler-like flavor (Protomaps LIGHT with warmer, more colorful tones)
-  var WARM_FLAVOR = Object.assign({}, basemaps.LIGHT, {
-    background:            '#f5f0e8',
-    earth:                 '#f5f0e8',
-    park_a:                '#d1e8c8',
-    park_b:                '#a8d890',
-    hospital:              '#f0e0e0',
-    industrial:            '#e0e8ec',
-    school:                '#f0e8d8',
-    wood_a:                '#c8d8b0',
-    wood_b:                '#8cc880',
-    pedestrian:            '#f0ebe0',
-    scrub_a:               '#d8e8d0',
-    scrub_b:               '#a0d090',
-    sand:                  '#f0e8c0',
-    beach:                 '#f0e8c0',
-    aerodrome:             '#e8e8f0',
-    runway:                '#f0f0f8',
-    water:                 '#aad3df',
-    buildings:             '#e8dfd6',
-    minor_service_casing:  '#e4ddd4',
-    minor_casing:          '#e4ddd4',
-    link_casing:           '#e0c840',
-    major_casing_early:    '#e0c840',
-    major_casing_late:     '#e0c840',
-    highway_casing_early:  '#e0a820',
-    highway_casing_late:   '#e0a820',
-    other:                 '#f5f0ea',
-    minor_service:         '#fafafa',
-    minor_a:               '#fafafa',
-    minor_b:               '#ffffff',
-    link:                  '#fde090',
-    major:                 '#fde090',
-    highway:               '#f8c840',
-    city_label:            '#333333',
-    city_label_halo:       '#ffffff',
-    subplace_label:        '#666666',
-    subplace_label_halo:   '#f5f0e8',
-    state_label:           '#888888',
-    state_label_halo:      '#f5f0e8',
-    boundaries:            '#555555',
-    country_label:         '#888888',
-    landcover: {
-      grassland: 'rgba(195, 235, 180, 1)',
-      barren:    'rgba(245, 235, 200, 1)',
-      urban_area:'rgba(228, 222, 212, 1)',
-      farmland:  'rgba(215, 235, 200, 1)',
-      glacier:   'rgba(255, 255, 255, 1)',
-      scrub:     'rgba(220, 235, 200, 1)',
-      forest:    'rgba(185, 225, 190, 1)'
-    }
-  });
-
-  // Warm dark flavor (Protomaps DARK with warmer tones, lifted ~15% for readability)
-  var WARM_DARK_FLAVOR = Object.assign({}, basemaps.DARK, {
-    background:            '#2a2a28',
-    earth:                 '#2a2a28',
-    park_a:                '#253528',
-    park_b:                '#28382c',
-    hospital:              '#352a2a',
-    industrial:            '#282c30',
-    school:                '#352f2a',
-    wood_a:                '#253020',
-    wood_b:                '#253520',
-    pedestrian:            '#282625',
-    scrub_a:               '#283028',
-    scrub_b:               '#263525',
-    sand:                  '#302d28',
-    beach:                 '#302d28',
-    aerodrome:             '#28282c',
-    runway:                '#353538',
-    water:                 '#1e3048',
-    buildings:             '#222220',
-    minor_service_casing:  '#333330',
-    minor_casing:          '#333330',
-    link_casing:           '#453828',
-    major_casing_early:    '#453828',
-    major_casing_late:     '#453828',
-    highway_casing_early:  '#453518',
-    highway_casing_late:   '#453518',
-    other:                 '#2c2c28',
-    minor_service:         '#333330',
-    minor_a:               '#333330',
-    minor_b:               '#383835',
-    link:                  '#454028',
-    major:                 '#454028',
-    highway:               '#555028',
-    city_label:            '#c0c0b8',
-    city_label_halo:       '#2a2a28',
-    subplace_label:        '#999890',
-    subplace_label_halo:   '#2a2a28',
-    state_label:           '#787870',
-    state_label_halo:      '#2a2a28',
-    boundaries:            '#606058',
-    country_label:         '#888880',
-    landcover: {
-      grassland: 'rgba(38, 58, 38, 1)',
-      barren:    'rgba(40, 38, 30, 1)',
-      urban_area:'rgba(35, 35, 30, 1)',
-      farmland:  'rgba(36, 48, 32, 1)',
-      glacier:   'rgba(38, 38, 42, 1)',
-      scrub:     'rgba(36, 46, 32, 1)',
-      forest:    'rgba(32, 50, 35, 1)'
-    }
-  });
-
-  // --- Basemap style customizations ---
-  // Modify the Protomaps layer list before passing to MapLibre so tweaks are
-  // baked into the initial style rather than applied post-load via setPaintProperty.
-  // Add future basemap tweaks here.
-  function scaleWidthExpr(expr, factor) {
-    if (typeof expr === 'number') return expr * factor;
-    if (!Array.isArray(expr) || expr[0] !== 'interpolate') return expr;
-    var scaled = [expr[0], expr[1], expr[2]];
-    for (var i = 3; i < expr.length; i += 2) {
-      scaled.push(expr[i]);
-      scaled.push(expr[i + 1] * factor);
-    }
-    return scaled;
-  }
-
-  function customizeBasemapLayers(layers) {
-    return layers.map(function(l) {
-      l = Object.assign({}, l, { paint: Object.assign({}, l.paint), layout: Object.assign({}, l.layout) });
-      // Roads: narrow to 40% of default width
-      if (l['source-layer'] === 'roads' && l.paint && l.paint['line-width']) {
-        l.paint['line-width'] = scaleWidthExpr(l.paint['line-width'], 0.4);
-      }
-      // Country borders: solid non-disputed only, thicker
-      if (l.id === 'boundaries_country') {
-        l.filter = ['all', ['<=', 'kind_detail', 2], ['!=', 'disputed', true]];
-        l.paint['line-width'] = 2;
-      }
-      // Sub-regional boundaries: only at zoom 9+
-      if (l.id === 'boundaries') {
-        l.filter = ['>', 'kind_detail', 2];
-        l.paint['line-width'] = 0.8;
-        l.paint['line-opacity'] = ['step', ['zoom'], 0, 9, 1];
-      }
-      return l;
-    });
-  }
-
-  function buildMapStyle(isDark, lang) {
-    var flavor = isDark ? WARM_DARK_FLAVOR : WARM_FLAVOR;
-    return {
-      version: 8,
-      glyphs: 'https://protomaps.github.io/basemaps-assets/fonts/{fontstack}/{range}.pbf',
-      sprite: 'https://protomaps.github.io/basemaps-assets/sprites/v4/' + (isDark ? 'dark' : 'light'),
-      sources: {
-        protomaps: {
-          type: 'vector',
-          url: PMTILES_URL,
-          attribution: '<a href="https://protomaps.com">Protomaps</a> \u00a9 <a href="https://openstreetmap.org">OpenStreetMap</a>'
-        }
-      },
-      layers: customizeBasemapLayers(basemaps.layers('protomaps', flavor, { lang: lang }))
-    };
-  }
+  var PMTILES_URL = 'pmtiles://https://alprazolam.io/middle-east.pmtiles';
 
   var MAP_STYLE = buildMapStyle(isDarkActive, currentLang);
 
   var map = new maplibregl.Map({
     container: 'map',
     style: MAP_STYLE,
-    center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], // MapLibre uses [lng, lat]
+    center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], 
     zoom: DEFAULT_ZOOM,
     maxBounds: [[25.0, 6.0], [70.0, 44.0]],
     touchPitch: false,
     maxTileCacheZoomLevels: 8,
-    fadeDuration: 0
+    fadeDuration: 0,
+    attributionControl: false,
+    transformRequest: function(url, resourceType) {
+        if (url === 'pmtiles://https://tiles.oref-map.org/middle-east.pmtiles') {
+            return { url: 'pmtiles://https://alprazolam.io/middle-east.pmtiles' };
+        }
+        return { url: url };
+    }
   });
-
-  map.dragRotate.disable();
-  map.touchZoomRotate.disableRotation();
-
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
-
+  
   var mapLoaded = false;
   var polygonsGeoJSON = { type: 'FeatureCollection', features: [] };
-  var featureMap = {}; // name → GeoJSON feature object
-  var pendingPolygonData = null; // set if geo data loads before map
+  var featureMap = {}; 
+  var pendingPolygonData = null;
+
+  map.on('load', function() {
+    mapLoaded = true;
+    
+    // Lock rotation and add controls
+    map.dragRotate.disable();
+    map.touchZoomRotate.disableRotation();
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+
+    // Custom Reset Button
+    var navGroup = document.querySelector('.maplibregl-ctrl-group');
+    if (navGroup) {
+        var resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.title = 'איפוס תצוגה'; 
+        resetBtn.innerHTML = '<span class="maplibregl-ctrl-icon" aria-hidden="true" style="display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>';
+        resetBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            isZoomingProgrammatically = true;
+            map.flyTo({ center: [DEFAULT_CENTER[1], DEFAULT_CENTER[0]], zoom: DEFAULT_ZOOM, bearing: 0, pitch: 0 });
+            map.once('moveend', function() { isZoomingProgrammatically = false; });
+        });
+        navGroup.appendChild(resetBtn);
+    }
+
+    // Layers
+    map.addLayer({
+      id: 'boundaries_disputed',
+      type: 'line',
+      source: 'protomaps',
+      'source-layer': 'boundaries',
+      filter: ['all', ['<=', 'kind_detail', 2], ['==', 'disputed', true]],
+      paint: {
+        'line-color': '#777',
+        'line-width': 1.5,
+        'line-dasharray': [4, 3]
+      }
+    }, 'boundaries_country');
+
+    map.addSource('alerts-source', { type: 'geojson', data: polygonsGeoJSON });
+
+    map.addLayer({
+      id: 'alerts-fill',
+      type: 'fill',
+      source: 'alerts-source',
+      paint: {
+        'fill-color': ['coalesce', ['feature-state', 'fillColor'], '#888888'],
+        'fill-opacity': ['coalesce', ['feature-state', 'fillOpacity'], 0.01]
+      }
+    });
+
+    map.addLayer({
+      id: 'alerts-hit',
+      type: 'fill',
+      source: 'alerts-source',
+      paint: { 'fill-opacity': 0, 'fill-color': 'transparent' }
+    });
+
+    map.addLayer({
+      id: 'alerts-stroke',
+      type: 'line',
+      source: 'alerts-source',
+      paint: {
+        'line-color': ['coalesce', ['feature-state', 'lineColor'], '#aaaaaa'],
+        'line-opacity': ['coalesce', ['feature-state', 'lineOpacity'], 0], // Clean map fix
+        'line-width': ['coalesce', ['feature-state', 'lineWidth'], 1]
+      }
+    });
+
+    map.on('click', 'alerts-hit', function(e) {
+      if (menuOpen || drivingModeFeatureEnabled) return;
+      e.originalEvent.stopPropagation();
+      var validFeature = null;
+      for (var i = 0; i < e.features.length; i++) {
+          var fName = e.features[i].properties.name.toLowerCase();
+          if (fName.indexOf('border') !== 0 && fName !== 'israel') {
+              validFeature = e.features[i];
+              break;
+          }
+      }
+      if (!validFeature) return; 
+      var name = validFeature.properties.name;
+      if (selectedLocation === name) deselectLocation();
+      else openLocationPanel(name);
+    });
+
+    map.on('mouseenter', 'alerts-hit', function() {
+      if (!menuOpen && !drivingModeFeatureEnabled) map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'alerts-hit', function() { map.getCanvas().style.cursor = ''; });
+
+    if (pendingPolygonData) {
+      var cb = pendingPolygonCallback;
+      pendingPolygonCallback = null;
+      buildPolygons(pendingPolygonData, cb);
+      pendingPolygonData = null;
+    }
+  });
 
   function updateMapLibreSource() {
     if (!mapLoaded) return;
