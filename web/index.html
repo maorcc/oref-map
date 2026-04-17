@@ -411,6 +411,7 @@ body.idle #unified-panel.slim { opacity: 0; pointer-events: none; transition: op
 }
 /* Feature-flag-gated elements: hidden by default, shown when flag is active */
 .f-gated { display: none !important; }
+body.f-ellipse #ellipse-stub.f-gated { display: block !important; }
 .menu-item { border-bottom: 1px solid #f0f0f0; }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-row {
@@ -1030,7 +1031,7 @@ try {
           </div>
         </div>
       </div>
-      <div id="ellipse-stub" class="menu-item">
+      <div id="ellipse-stub" class="menu-item f-gated">
         <button class="menu-item-row" type="button" id="ellipse-enable-btn">
           <span class="menu-item-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="10" ry="6" transform="rotate(-15 12 12)"/></svg></span>
           <span class="menu-item-label">אליפסה</span>
@@ -1166,6 +1167,7 @@ try {
 
   // Ellipse: auto-load at startup if previously enabled; otherwise lazy-load on first enable
   (function() {
+    if (!FF.ellipse) return;
     var savedMode = 0;
     try { savedMode = Number(localStorage.getItem('oref-ellipse-mode')) || 0; } catch (e) {}
     if (savedMode > 0) {
