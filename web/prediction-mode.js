@@ -909,7 +909,7 @@
       // sees a mismatch and stops painting before clearAll() wipes the canvas.
       if(!enabled)activeRunId++;
       localStorage.setItem('oref-predict',enabled);
-      if(opts&&opts.showToast)showToast(enabled?'חיזוי כיוון שיגור מופעל':'חיזוי כיוון שיגור כובה');
+      if(opts&&opts.showToast)showToast(enabled?'שיערוך מקור שיגור מופעל':'שיערוך מקור שיגור כובה');
       if(enabled)sync();else clearAll();
     }
 
