@@ -84,6 +84,7 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 }
 .dot-red    { background: #ff0000; }
 .dot-purple { background: #9922cc; }
+.dot-brown  { background: #a0522d; }
 .dot-yellow { background: #ffcc00; }
 .dot-green  { background: #00cc00; }
 
@@ -131,6 +132,7 @@ body.has-overlay .maplibregl-canvas-container.maplibregl-interactive { pointer-e
 }
 .indicator-red    { background: #ff0000; animation: pulse 3s ease-in-out infinite; }
 .indicator-purple { background: #9922cc; animation: pulse 3s ease-in-out infinite; }
+.indicator-brown  { background: #a0522d; animation: pulse 3s ease-in-out infinite; }
 .indicator-yellow { background: #ffcc00; animation: pulse 3s ease-in-out infinite; }
 .indicator-green  { background: #00cc00; }
 .indicator-err    { background: #999; }
@@ -2410,7 +2412,7 @@ try {
   };
 
   // --- Colors ---
-  var COLORS = { red: '#ff0000', purple: '#9922cc', yellow: '#ffcc00', green: '#00cc00' };
+  var COLORS = { red: '#ff0000', purple: '#9922cc', brown: '#a0522d', yellow: '#ffcc00', green: '#00cc00' };
   // --- Sound ---
   function getAudioContext() {
     if (!audioCtx) {
@@ -2612,16 +2614,21 @@ try {
       return 'purple';
     }
 
-    // Inherit — generic shelter command, preserve existing color (red/purple)
+    // Brown — terrorist infiltration (distinct from rockets; not shown in legend)
+    if (title === 'חדירת מחבלים' ||
+        title === 'חדירת מחבלים - אין לצאת מהמרחב המוגן') {
+      return 'brown';
+    }
+
+    // Inherit — generic shelter command, preserve existing color (red/purple/brown)
     if (title === 'היכנסו מייד למרחב המוגן' ||
         title === 'היכנסו למרחב המוגן') {
       return 'inherit';
     }
 
-    // Red — active danger (missiles / non-conventional / terrorists)
+    // Red — active danger (missiles / non-conventional)
     if (title === 'ירי רקטות וטילים' ||
-        title === 'נשק לא קונבנציונלי' ||
-        title === 'חדירת מחבלים') {
+        title === 'נשק לא קונבנציונלי') {
       return 'red';
     }
 
@@ -2631,7 +2638,7 @@ try {
 
   // Resolve 'inherit' state for generic "enter shelter" alerts.
   // These don't specify a threat type — preserve the location's existing
-  // red/purple state if present, otherwise default to red.
+  // red/purple/brown state if present, otherwise default to red.
   // In history/timeline mode, `locationStates` holds the replay snapshot,
   // so read from `liveLocationStates` (the shadow of real current state)
   // to mirror where the caller will write via updateShadowState.
@@ -2639,7 +2646,7 @@ try {
     if (state !== 'inherit') return state;
     var source = (!isLiveMode && liveLocationStates) ? liveLocationStates : locationStates;
     var existing = source[location];
-    if (existing && (existing.state === 'red' || existing.state === 'purple')) {
+    if (existing && (existing.state === 'red' || existing.state === 'purple' || existing.state === 'brown')) {
       return existing.state;
     }
     return 'red';
@@ -2654,7 +2661,7 @@ try {
       fillOpacity: opacity,
       lineColor: COLORS[state],
       lineOpacity: opacity + 0.15,
-      lineWidth: state === 'red' ? 0.5 : 1
+      lineWidth: (state === 'red' || state === 'brown') ? 0.5 : 1
     });
   }
 
@@ -2667,8 +2674,8 @@ try {
   function setLocationState(name, state, since) {
     var existing = locationStates[name];
 
-    // Priority: red > purple > yellow. Green always overrides (all-clear).
-    var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    // Priority: red > purple > brown > yellow. Green always overrides (all-clear).
+    var PRIORITY = { red: 4, purple: 3, brown: 2, yellow: 1, green: 0 };
     if (existing) {
       if (state !== 'green') {
         if (existing.state === state) return;
@@ -2730,21 +2737,26 @@ try {
     }
   }
 
+  // End-event entries are listed before their matching start-event entries so that
+  // displayLabel's substring fallback picks up the "ended" label first if exact
+  // match ever misses (e.g. whitespace/punctuation drift in the API payload).
   var TITLE_LABELS = {
+    'ירי רקטות וטילים - האירוע הסתיים': 'רקטות וטילים - הסתיים',
+    'חדירת כלי טיס עוין - האירוע הסתיים': 'כטב״מ - האירוע הסתיים',
+    'הסתיים אירוע חדירת מחבלים - ניתן לצאת מהבתים': 'חדירת מחבלים - הסתיים',
+    'חדירת מחבלים - החשש הוסר': 'חדירת מחבלים - הסתיים',
     'ירי רקטות וטילים': 'אזעקת רקטות וטילים',
     'חדירת כלי טיס עוין': 'חדירת כטב״מ',
     'נשק לא קונבנציונלי': 'נשק לא קונבנציונלי',
     'חדירת מחבלים': 'חדירת מחבלים',
+    'חדירת מחבלים - אין לצאת מהמרחב המוגן': 'חדירת מחבלים - אין לצאת',
     'בדקות הקרובות צפויות להתקבל התרעות באזורך': 'התרעה מוקדמת',
     'היכנסו מייד למרחב המוגן': 'היכנסו מייד למרחב המוגן',
     'היכנסו למרחב המוגן': 'היכנסו למרחב המוגן',
     'על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך. במקרה של קבלת התרעה, יש להיכנס למרחב המוגן ולשהות בו עד להודעה חדשה.': 'שיפור מיקום למיגון מיטבי',
     'יש לשהות בסמיכות למרחב המוגן': 'שהייה בסמיכות למרחב המוגן',
-    'ירי רקטות וטילים - האירוע הסתיים': 'רקטות וטילים - הסתיים',
-    'חדירת כלי טיס עוין - האירוע הסתיים': 'כטב״מ - האירוע הסתיים',
     'ניתן לצאת מהמרחב המוגן': 'ניתן לצאת מהמרחב המוגן',
     'ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו': 'ניתן לצאת מהמרחב המוגן',
-    'חדירת מחבלים - החשש הוסר': 'חדירת מחבלים - החשש הוסר',
     'השוהים במרחב המוגן יכולים לצאת': 'ניתן לצאת מהמרחב המוגן',
     'האירוע הסתיים': 'האירוע הסתיים',
     'עדכון': 'ניתן לצאת מהמרחב המוגן',
@@ -3349,14 +3361,14 @@ try {
     if (!isLiveMode) return;
     if (!initialized) return;
     var dominant = null, bestP = -1, residentTotal = 0;
-    var P = { red: 3, purple: 2, yellow: 1 };
+    var P = { red: 4, purple: 3, brown: 2, yellow: 1 };
     for (var name in locationStates) {
       var s = locationStates[name].state;
       if (s !== 'green' && (P[s] || 0) > bestP) {
         bestP = P[s] || 0;
         dominant = s;
       }
-      if ((s === 'red' || s === 'purple') && locationPopulations) {
+      if ((s === 'red' || s === 'purple' || s === 'brown') && locationPopulations) {
         var pop = locationPopulations[name];
         if (pop) residentTotal += pop;
       }
@@ -3626,7 +3638,7 @@ try {
 
     // Replay history up to targetTime
     var accumulated = {}; // {location: {state, since}}
-    var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    var PRIORITY = { red: 4, purple: 3, brown: 2, yellow: 1, green: 0 };
     for (var i = 0; i < extendedHistory.length; i++) {
       var e = extendedHistory[i];
       if (e.alertDate > targetTime) break;
@@ -3699,7 +3711,7 @@ try {
 
   function updateShadowState(name, state, since) {
     if (!liveLocationStates) return;
-    var PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    var PRIORITY = { red: 4, purple: 3, brown: 2, yellow: 1, green: 0 };
     var existing = liveLocationStates[name];
     if (existing) {
       if (state === 'green') {
@@ -3735,7 +3747,7 @@ try {
 
     container.classList.add('has-data');
 
-    var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', yellow: '#f1c40f', green: '#2ecc71' };
+    var TICK_COLORS = { red: '#e74c3c', purple: '#9b59b6', brown: '#a0522d', yellow: '#f1c40f', green: '#2ecc71' };
     var PLAY_SPEED = 510;
 
     function updateDateNav() {
@@ -4251,7 +4263,7 @@ try {
     });
 
     // --- Timeline bands (show duration of active alerts) ---
-    var STATE_PRIORITY = { red: 3, purple: 2, yellow: 1, green: 0 };
+    var STATE_PRIORITY = { red: 4, purple: 3, brown: 2, yellow: 1, green: 0 };
     var computedBands = []; // [{start, end, state}] - visual tick bands
     var eventPeaks = []; // [timestamp] — last non-green before each all-clear wave
     var eventPeakSizes = []; // [number] — unique location count for each peak

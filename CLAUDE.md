@@ -113,9 +113,10 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 | `ירי רקטות וטילים` | Rocket/missile fire | 🔴 Red |
 | `חדירת כלי טיס עוין` | Hostile drone/aircraft | 🟣 Purple |
 | `נשק לא קונבנציונלי` | Non-conventional weapon | 🔴 Red |
-| `חדירת מחבלים` | Terrorist infiltration | 🔴 Red |
-| `היכנסו מייד למרחב המוגן` | Enter shelter immediately | Inherit (red/purple from prior alert; red if none) |
-| `היכנסו למרחב המוגן` | Enter the shelter | Inherit (red/purple from prior alert; red if none) |
+| `חדירת מחבלים` | Terrorist infiltration | 🟤 Brown (#a0522d; distinct from rockets, deliberately absent from legend) |
+| `חדירת מחבלים - אין לצאת מהמרחב המוגן` | Terrorist infiltration — stay in shelter | 🟤 Brown (stricter variant) |
+| `היכנסו מייד למרחב המוגן` | Enter shelter immediately | Inherit (red/purple/brown from prior alert; red if none) |
+| `היכנסו למרחב המוגן` | Enter the shelter | Inherit (red/purple/brown from prior alert; red if none) |
 | `בדקות הקרובות צפויות להתקבל התרעות באזורך` | Early warning — Iran launch, sirens expected in ~10 min | 🟡 Yellow |
 | `על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך...` | Preparedness notice — improve shelter position, enter shelter if alert received | 🟡 Yellow |
 | `יש לשהות בסמיכות למרחב המוגן` | Stay near the shelter | 🟡 Yellow |
@@ -123,7 +124,7 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 | `חדירת כלי טיס עוין - האירוע הסתיים` | Aircraft event over | 🟢 Green (fades) |
 | `ניתן לצאת מהמרחב המוגן` | Can leave shelter | 🟢 Green (fades) |
 | `ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו` | Can leave shelter but stay near it | 🟡 Yellow |
-| `חדירת מחבלים - החשש הוסר` | Terrorist threat removed | 🟢 Green (fades) |
+| `הסתיים אירוע חדירת מחבלים - ניתן לצאת מהבתים` | Terrorist event over, can leave home | 🟢 Green (fades) |
 | `השוהים במרחב המוגן יכולים לצאת...` | Shelter occupants can exit | 🟢 Green (fades) |
 | `תושבי האזורים הבאים אינם צריכים לשהות יותר בסמיכות למרחב המוגן.` | No longer need to stay near shelter | 🟢 Green (fades) |
 | `סיום שהייה בסמיכות למרחב המוגן` | End of stay near shelter | 🟢 Green (fades) |
@@ -132,7 +133,7 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 - Yellow titles are matched by exact string or substring: `לשפר את המיקום למיגון המיטבי`, `להישאר בקרבתו`.
 - API sometimes uses double spaces in titles — normalize with `.replace(/\s+/g, ' ')` before matching.
 - Unknown titles default to Red and log a console warning.
-- The two `היכנסו ... למרחב המוגן` titles are generic shelter commands and don't specify a threat type. They preserve the location's existing red or purple state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
+- The two `היכנסו ... למרחב המוגן` titles are generic shelter commands and don't specify a threat type. They preserve the location's existing red/purple/brown state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
 
 ### Extended History API
 - **URL**: `https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1`
