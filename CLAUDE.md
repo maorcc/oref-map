@@ -151,7 +151,6 @@ The live API is polled every 1s for immediate danger display. The history API is
 - `https://www.oref.org.il/alerts/alertCategories.json` — alert category definitions
 - `https://www.oref.org.il/alerts/alertsTranslation.json` — localized alert text
 - `https://www.oref.org.il/alerts/RemainderConfig_heb.json` — shelter duration per area
-- `https://www.oref.org.il/alerts/alertHistoryCount.json` — summary alert count
 - `https://www.oref.org.il/districts/districts_heb.json` — districts/areas list
 - `https://www.oref.org.il/districts/cities_heb.json` — cities list with metadata
 - `https://www.oref.org.il/districts/citiesNotes_heb.json` — per-city notes
