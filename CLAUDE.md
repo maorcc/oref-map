@@ -120,17 +120,20 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 | `בדקות הקרובות צפויות להתקבל התרעות באזורך` | Early warning — Iran launch, sirens expected in ~10 min | 🟡 Yellow |
 | `על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך...` | Preparedness notice — improve shelter position, enter shelter if alert received | 🟡 Yellow |
 | `יש לשהות בסמיכות למרחב המוגן` | Stay near the shelter | 🟡 Yellow |
+| `התקרבו למרחב מוגן` | Approach a protected space (preparedness, milder than `היכנסו מייד`) | 🟡 Yellow |
+| `איום מלבנון - התקרבו למרחב מוגן` | Threat from Lebanon — approach a protected space | 🟡 Yellow |
 | `ירי רקטות וטילים - האירוע הסתיים` | Rocket event over | 🟢 Green (fades) |
 | `חדירת כלי טיס עוין - האירוע הסתיים` | Aircraft event over | 🟢 Green (fades) |
 | `ניתן לצאת מהמרחב המוגן` | Can leave shelter | 🟢 Green (fades) |
 | `ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו` | Can leave shelter but stay near it | 🟡 Yellow |
 | `הסתיים אירוע חדירת מחבלים - ניתן לצאת מהבתים` | Terrorist event over, can leave home | 🟢 Green (fades) |
+| `אירוע חדירת מחבלים הסתיים` | Terrorist event over (variant phrasing) | 🟢 Green (fades) |
 | `השוהים במרחב המוגן יכולים לצאת...` | Shelter occupants can exit | 🟢 Green (fades) |
 | `תושבי האזורים הבאים אינם צריכים לשהות יותר בסמיכות למרחב המוגן.` | No longer need to stay near shelter | 🟢 Green (fades) |
 | `סיום שהייה בסמיכות למרחב המוגן` | End of stay near shelter | 🟢 Green (fades) |
 
-- Green titles are matched by substring (`האירוע הסתיים`, `ניתן לצאת` (excluding titles that also contain `להישאר בקרבתו`), `החשש הוסר`, `יכולים לצאת`, `אינם צריכים לשהות`, `סיום שהייה בסמיכות`) to catch variants.
-- Yellow titles are matched by exact string or substring: `לשפר את המיקום למיגון המיטבי`, `להישאר בקרבתו`.
+- Green titles are matched by substring (`הסתיים` — covers `האירוע הסתיים` and `אירוע חדירת מחבלים הסתיים`; `ניתן לצאת` (excluding titles that also contain `להישאר בקרבתו`), `החשש הוסר`, `יכולים לצאת`, `אינם צריכים לשהות`, `סיום שהייה בסמיכות`) to catch variants.
+- Yellow titles are matched by exact string or substring: `לשפר את המיקום למיגון המיטבי`, `להישאר בקרבתו`, `התקרבו למרחב מוגן` (substring — also catches the `איום מלבנון - …` prefixed form).
 - API sometimes uses double spaces in titles — normalize with `.replace(/\s+/g, ' ')` before matching.
 - Unknown titles default to Red and log a console warning.
 - The two `היכנסו ... למרחב המוגן` titles are generic shelter commands and don't specify a threat type. They preserve the location's existing red/purple/brown state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
