@@ -111,12 +111,14 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 | Title | Meaning | Map state |
 |---|---|---|
 | `ירי רקטות וטילים` | Rocket/missile fire | 🔴 Red |
+| `ירי רקטות וטילים - היכנסו למרחב המוגן` | Rocket/missile fire + enter shelter (combined form) | 🔴 Red |
 | `חדירת כלי טיס עוין` | Hostile drone/aircraft | 🟣 Purple |
 | `נשק לא קונבנציונלי` | Non-conventional weapon | 🔴 Red |
 | `חדירת מחבלים` | Terrorist infiltration | 🟤 Brown (#a0522d; distinct from rockets, deliberately absent from legend) |
 | `חדירת מחבלים - אין לצאת מהמרחב המוגן` | Terrorist infiltration — stay in shelter | 🟤 Brown (stricter variant) |
 | `היכנסו מייד למרחב המוגן` | Enter shelter immediately | Inherit (red/purple/brown from prior alert; red if none) |
 | `היכנסו למרחב המוגן` | Enter the shelter | Inherit (red/purple/brown from prior alert; red if none) |
+| `יש להיכנס למרחב מוגן בזמן ההתגוננות העומד לרשותכם.` | Enter shelter within your available defense time | Inherit (red/purple/brown from prior alert; red if none) |
 | `בדקות הקרובות צפויות להתקבל התרעות באזורך` | Early warning — Iran launch, sirens expected in ~10 min | 🟡 Yellow |
 | `על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך...` | Preparedness notice — improve shelter position, enter shelter if alert received | 🟡 Yellow |
 | `יש לשהות בסמיכות למרחב המוגן` | Stay near the shelter | 🟡 Yellow |
@@ -134,9 +136,10 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 
 - Green titles are matched by substring (`הסתיים` — covers `האירוע הסתיים` and `אירוע חדירת מחבלים הסתיים`; `ניתן לצאת` (excluding titles that also contain `להישאר בקרבתו`), `החשש הוסר`, `יכולים לצאת`, `אינם צריכים לשהות`, `סיום שהייה בסמיכות`) to catch variants.
 - Yellow titles are matched by exact string or substring: `לשפר את המיקום למיגון המיטבי`, `להישאר בקרבתו`, `התקרבו למרחב מוגן` (substring — also catches the `איום מלבנון - …` prefixed form).
+- Threat titles (red `ירי רקטות וטילים`, purple `חדירת כלי טיס עוין`, brown `חדירת מחבלים`) are matched by **substring**, so combined forms like `<threat> - היכנסו למרחב המוגן` classify by threat. The green "ended" check runs first, so `<threat> - האירוע הסתיים` stays green.
 - API sometimes uses double spaces in titles — normalize with `.replace(/\s+/g, ' ')` before matching.
 - Unknown titles default to Red and log a console warning.
-- The two `היכנסו ... למרחב המוגן` titles are generic shelter commands and don't specify a threat type. They preserve the location's existing red/purple/brown state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
+- The `היכנסו ... למרחב המוגן` titles and `יש להיכנס למרחב מוגן בזמן ההתגוננות העומד לרשותכם` (matched by substring `בזמן ההתגוננות העומד לרשותכם`) are generic shelter commands and don't specify a threat type. They preserve the location's existing red/purple/brown state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
 
 ### Extended History API
 - **URL**: `https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1`
