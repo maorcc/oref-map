@@ -161,6 +161,40 @@ def wrangler_put(key: str, data: bytes, content_type: str) -> bool:
         Path(tmp_path).unlink(missing_ok=True)
 
 
+def check_wrangler_auth() -> None:
+    """Fail fast if wrangler has no working credentials, before the long fetch.
+
+    Uploads shell out to `wrangler r2 object put` non-interactively, which can't
+    run the OAuth browser flow. If the cached token is missing/expired and
+    CLOUDFLARE_API_TOKEN is unset, the put fails only after the multi-minute oref
+    fetch already ran. Probe `wrangler whoami` up front instead.
+    """
+    try:
+        result = subprocess.run(
+            ["npx", "--yes", "wrangler", "whoami"],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"Error: could not run 'wrangler whoami': {e}", file=sys.stderr)
+        sys.exit(1)
+    out = (result.stdout + result.stderr).lower()
+    if (
+        result.returncode != 0
+        or "not authenticated" in out
+        or "failed to fetch auth token" in out
+    ):
+        print(
+            "Error: wrangler is not authenticated; uploads would fail.\n"
+            "Fix: run 'npx wrangler login', or export CLOUDFLARE_API_TOKEN "
+            "(needs R2 write) and CLOUDFLARE_ACCOUNT_ID.\n"
+            "(Use --dry-run to compare without uploading.)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def merge_entries(backfill: list[dict], remote: list[dict]) -> list[dict]:
     """Union of both entry sets by rid, sorted by alertDate."""
     by_rid = {e["rid"]: e for e in remote}
@@ -207,6 +241,13 @@ async def main() -> None:
     if reuse and update_today:
         print("Error: --reuse is not compatible with --today", file=sys.stderr)
         sys.exit(1)
+
+    # Pre-flight: uploads need working wrangler auth. Check before the long fetch
+    # so an expired token fails fast instead of after minutes of work. --dry-run
+    # never uploads, so it doesn't require auth.
+    if not dry_run:
+        check_wrangler_auth()
+
     yesterday = (date.today() - timedelta(days=1)).isoformat()
     today_str = date.today().isoformat()
 
