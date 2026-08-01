@@ -20,6 +20,21 @@ This file provides guidance to Claude Code when working with code in this reposi
 cd worker && npx wrangler deploy   # deploy API proxy Worker
 ```
 
+**If the dev server runs on a different machine than the browser**, the browser must still
+reach it as `http://localhost:8788`; browsing `http://<host>:8788` breaks in two places.
+`/api/alerts` 303-redirects to the production relay, whose CORS allowlist
+(`oref-relay/index.js`, `DEFAULT_ALLOWED_ORIGINS`) covers only `oref-map.org` and the
+localhost origins, so the fetch is blocked; and `functions/locations_polygons.json.js`
+serves the local static polygons file only when the hostname is
+`localhost`/`0.0.0.0`/`127.0.0.1`. Forward the port instead:
+
+```bash
+ssh -fNT -L 8788:localhost:8788 <host>
+```
+
+`?f-debugapi=oref-direct` sidesteps only the CORS half (forces a direct fetch in the Pages
+Function) and exercises a non-production code path.
+
 ## Structure
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
