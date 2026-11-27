@@ -2,7 +2,7 @@
 
 ## Overview
 
-A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets deployed on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions handle TLV-routed users directly, non-TLV users are redirected to a placement-pinned Worker.
+A static single-page web app showing live Pikud HaOref (Home Front Command) alerts as colored area polygons on a map of Israel. No build step — all JS/CSS is inline in `web/index.html`. Static assets are deployed on Cloudflare Pages. All Oref traffic goes through a **relay** (`oref-relay/`) that runs on a residential Israeli connection and is exposed through a Cloudflare Tunnel, because Oref blocks datacenter and cloud IPs (see [Access to Oref](#access-to-oref-geo-blocking-and-cloudfront)).
 
 Note: the displayed visitor count comes from the Pages Function at `/api/analytics`,
 which queries Cloudflare analytics and returns aggregated visit counts for the last
@@ -12,37 +12,37 @@ hour and last 24 hours. The client polls this endpoint once per minute.
 
 - **Map**: MapLibre GL JS + PMTiles (self-hosted Middle East extract on Cloudflare R2, Protomaps basemap with Hebrew labels)
 - **Polygons**: Pre-computed GeoJSON in `web/locations_polygons.json` loaded at startup into a MapLibre `alerts-source`
-- **API proxy (tier 1)**: Cloudflare Pages Functions (`functions/api/`) — serves TLV users directly, redirects others
-- **API proxy (tier 2)**: Cloudflare Worker (`worker/`) with placement `region = "azure:israelcentral"` — fallback for non-TLV users
+- **API entry point**: Cloudflare Pages Functions (`functions/api/`): 303-redirect every `/api/*` alert request to the relay
+- **Relay**: Node/Express (`oref-relay/index.js`) on a residential Israeli connection, behind a Cloudflare Tunnel; polls Oref and serves `/api2/*` from memory
 - **History storage**: Cloudflare R2 bucket (`oref-history`) with per-day JSONL files
-- **Ingestion**: Cloudflare Worker with cron trigger (`ingestion/`) — appends to R2 every 2 minutes with multi-attempt per 15-min window
+- **Ingestion**: Cloudflare Worker with cron trigger (`ingestion/`): fetches the relay's `/api2/alarms-history` and appends to R2 every 2 minutes, with multiple attempts per 15-min window
 - **No frameworks**: Vanilla JS, CSS
 
 ## Data Sources
 
 ### Live Alerts API
-- **Proxy**: `/api/alerts` → `https://www.oref.org.il/warningMessages/alert/Alerts.json`
-- **Poll interval**: 1 second
+- **Proxy**: `/api/alerts` → relay `/api2/alerts` → `https://www.oref.org.il/warningMessages/alert/Alerts.json`
+- **Poll interval**: 1 second (both the client and the relay)
 - **Shape**: `{"id", "cat", "title", "data": ["location", ...], "desc"}`
 - `data` is an **array** of location strings.
 - Returns a BOM-only (`\ufeff`) body when no alert is active.
 - Snapshot of what's active *right now* — short-lived alerts can be missed between polls.
 
 ### History API
-- **Proxy**: `/api/history` → `https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json`
-- **Poll interval**: 10 seconds
+- **Proxy**: `/api/history` → relay `/api2/history` → `https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json`
+- **Poll interval**: 10 seconds (both the client and the relay)
 - **Shape**: `[{"alertDate": "YYYY-MM-DD HH:MM:SS", "title", "data": "location", "category"}, ...]`
 - `data` is a **string** (single location), unlike the live API.
 - Returns ~1 hour of recent alerts (entries expire by age, not by count).
 - Reliable record of all alerts including all-clears. Used on page load to reconstruct initial state, and polled to catch all-clear events that would be missed in the live API. Also feeds into the timeline's `extendedHistory` to fill the R2 day-history lag.
 
 ### Extended History API
-- **URL**: `https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1`
-- Returns up to ~3,000 entries covering ~1–2 hours.
-- **Shape**: `{"data": "location", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category_desc": "title", "rid": number, ...}`
+- **Proxy**: relay `/api2/alarms-history` → `https://www.oref.org.il/api/v1/AlertHistory/heb?from=…&to=…&cities=`
+- The relay fetches the **last 2 hours**, following the API's paging (200 per page, at most 15 pages ≈ 3,000 entries), and converts each entry to the shape of the retired `GetAlarmsHistory.aspx`: `{"data", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category", "category_desc", "rid"}`. Results are sorted newest first.
+- `alertDate` has **exact seconds** (the new API's `time` field). Entries ingested before 2026-11 have seconds rounded to `:00`, because the old API rounded to the nearest minute.
 - `rid` is a unique ID per entry — used for deduplication.
-- **Modes**: `mode=0` (all), `mode=1` (24h), `mode=2` (7d), `mode=3` (month). City filter: `city_0=<name>`. Date filtering params are broken — always returns latest entries regardless.
-- Not used by the client UI. The regular history API covers ~50-60 min, which fills the R2 lag for the timeline. The proxy endpoint (`/api/alarms-history`) is only used by the ingestion worker to populate R2.
+- Until late 2026 the source was `alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx`, which no longer resolves. Details of both APIs are in [`oref-sources.md`](oref-sources.md).
+- Not used by the client UI. Only the ingestion worker calls it, to populate R2. The regular history API (~50-60 min coverage) fills the R2 lag for the timeline.
 
 ### Why Dual Polling?
 
@@ -50,48 +50,50 @@ The live API is a snapshot — all-clear alerts may only last a few seconds and 
 
 ### CORS
 
-The Oref APIs don't include `Access-Control-Allow-Origin`. Both the Pages Functions (`/api/*`) and the Worker (`/api2/*`) run on the same domain (`oref-map.org`), so no CORS headers are needed.
+`/api/*` on `oref-map.org` answers with a 303 to the relay's own hostname, so the browser's follow-up request is cross-origin. The relay sends `Access-Control-Allow-Origin` only for an allowlist: `https://oref-map.org` plus local dev origins (`DEFAULT_ALLOWED_ORIGINS` in `oref-relay/index.js`, overridable with the `CORS_ALLOWED_ORIGINS` env var). This is why the dev server must be browsed as `http://localhost:8788` (see `CLAUDE.md`).
 
-### Geo-blocking / Israeli IP requirement
+### Access to Oref: geo-blocking and CloudFront
 
-The Oref APIs geo-block non-Israeli IPs with **HTTP 403**. This was confirmed while building the `oref-logger` project: a Cloudflare Worker cron running from Zurich (`colo=ZRH`) got HTTP 403, while the same code triggered from Israel (`colo=TLV`) succeeded.
+**Current state (since late November 2026).** `www.oref.org.il` moved from Akamai to **AWS CloudFront**. CloudFront's WAF returns **403** to datacenter and cloud IPs **even inside Israel**: Cloudflare Pages Functions and placement-pinned Workers at colo TLV, and an Oracle Cloud VM in Jerusalem, were all verified blocked. Only residential connections get through. `/api/v1/*` and the static JSON files additionally require a full browser `User-Agent`, which the relay sends on every call. Details in [`oref-sources.md`](oref-sources.md#access-rules-as-of-2026-11-27).
 
-Previously, Pages Functions ran at the user's nearest Cloudflare edge. Users routed through non-Israeli edges (e.g., `FRA`, `ZRH`) got 403 errors because the proxy egressed from a non-Israeli IP.
+So no Cloudflare-hosted code can talk to Oref anymore, and every path goes through the relay:
 
-**Important**: Cloudflare Worker **cron triggers do not obey placement** — a cron-triggered worker always runs from a non-Israeli colo, regardless of `[placement]` configuration. Only fetch-triggered workers reliably run from the placed region.
+```text
+Browser ──/api/{alerts,history}──> Pages Function ──303──> relay (Cloudflare Tunnel) ──> www.oref.org.il
+Ingestion cron ──/api2/alarms-history──────────────────────> relay ──> www.oref.org.il/api/v1/AlertHistory
+```
 
-**Solution**: A two-tier proxy architecture:
+The relay is a **single point of failure**: if it or its connection goes down, the live map and ingestion stop, while `oref-map.org` itself keeps answering 200. The earliest warning is the ingestion worker's "missed window" Pushover alert.
 
-1. **Pages Functions (`/api/*`)**: Check `request.cf.colo`. If TLV, proxy directly to Oref (free, no Worker invocation). If not TLV, return 303 redirect to `/api2/*`.
-2. **Worker (`/api2/*`)**: Runs with placement `region = "azure:israelcentral"`, forcing execution at TLV regardless of the user's edge location.
+**Before late 2026 (Akamai era).** Oref blocked only non-Israeli IPs, so a Cloudflare Worker running in Israel was enough. The design then was a two-tier proxy: Pages Functions fetched Oref directly when `request.cf.colo` was TLV, and redirected everyone else to `/api2/*` Workers pinned to Israel with placement. That code still exists (`fetchOrefDirect` in `functions/api/_proxy.js`, reachable only with `?debugapi=oref-direct`, and `worker/`) but gets 403 now.
 
-The client detects the redirect via `resp.url` and permanently switches to `/api2/` for the rest of the session. This way the Worker only serves the small minority of non-TLV users.
+**Cloudflare Worker cron triggers do not obey placement**: a cron-triggered worker always runs from a non-Israeli colo, regardless of `[placement]`. This is why ingestion always had to go through a proxy.
 
-#### Placement investigation notes
+#### Placement investigation notes (Akamai era, historical)
 
-Several placement strategies were tested before finding a working solution:
+Several placement strategies were tested before finding one that worked:
 
 | Strategy | Result |
 |----------|--------|
 | Smart Placement (Pages) | Unreliable — sometimes ran locally at non-Israeli colos |
-| `hostname = "www.oref.org.il"` | Placed Worker in Seattle (SEA) — Oref uses Akamai CDN with anycast IPs, so the probe found a non-Israeli edge |
+| `hostname = "www.oref.org.il"` | Placed Worker in Seattle (SEA) — Oref used Akamai with anycast IPs, so the probe found a non-Israeli edge |
 | `region = "aws:il-central-1"` | Placed Worker at ZDM, not TLV — still got 403 |
 | `host = "<Israeli IP>:443"` | Worked from Israel but not consistently from other locations |
-| `region = "azure:israelcentral"` | Reliably places Worker at TLV — confirmed working from FRA, TLV, and other colos |
+| `region = "azure:israelcentral"` | Reliably placed Worker at TLV — confirmed working from FRA, TLV, and other colos |
 
-### Edge caching
+### Caching
 
-Both the Pages Functions and the Worker use the Cloudflare Cache API (`caches.default`) with `s-maxage=1` to cache Oref responses at each edge for 1 second. This reduces redundant fetches when many clients poll simultaneously. The browser cache uses `max-age=2` (matching the previous behavior).
+The relay polls `Alerts.json` every 1s and `AlertsHistory.json` every 10s and serves both from memory, so client load never reaches Oref. Extended history is fetched on demand and cached for 60s. Responses carry `Cache-Control: s-maxage=1, max-age=2`.
+
+**Failure behavior** (`/status` on the relay shows `updatedAt` for each cache):
+- `/api2/alarms-history` returns **502** when the upstream fetch fails. This lets the ingestion worker retry and, if every attempt in a window fails, send its Pushover alert. Before 2026-11 it returned the last cache (or `[]`) with 200, which hid a dead upstream for weeks.
+- `/api2/alerts` and `/api2/history` still return their **last cached response with 200** when Oref fails. So a blocked relay looks like a quiet day on the map. Known weakness, not yet fixed.
 
 ### Unknown title detection
 
-The Pages Functions proxy (`functions/api/_proxy.js`) monitors all alert responses passing through the TLV path for unrecognized alert titles. When an unknown title is detected:
+`checkAndNotifyUnknownTitles` in `functions/api/_proxy.js` sends a Pushover notification (deduplicated for 1 hour via the Cache API) when a response contains an alert title that `isKnownTitle` doesn't recognize.
 
-1. Check a 1-hour dedup cache (via Cloudflare Cache API) to avoid repeat notifications
-2. Send a Pushover notification with the unknown title and API kind
-3. Notification failures are silently swallowed — must not affect proxy behavior
-
-This runs only on the TLV path since all Israeli traffic flows through it — the same titles are seen regardless of the user's colo.
+**It is effectively inactive**: it runs only inside `fetchOrefDirect`, the Pages Function's direct-fetch path, which no longer serves traffic (everything is redirected to the relay) and gets 403 from Oref. Its title list is also behind the client's `classifyTitle`.
 
 ## Alert Classification
 
@@ -239,9 +241,9 @@ The Oref extended history API only exposes the latest ~3,000 entries (~1–2 hou
 
 ```text
   every 2 min (cron, multi-attempt per 15-min window)
-  [Ingestion Worker] ──fetch──> [proxy1 Worker] ──fetch──> [oref API]
-                                (placement: israelcentral,
-                                 different CF account)
+  [Ingestion Worker] ──fetch──> [relay /api2/alarms-history] ──fetch──> [oref /api/v1/AlertHistory]
+                                (residential Israeli IP,
+                                 Cloudflare Tunnel)
          │
          └──append──> [R2: oref-history]   (comma-per-line JSONL per day)
 
@@ -307,8 +309,8 @@ A Cloudflare Worker with a cron trigger every 2 minutes (`1/2 * * * *`, odd minu
 
 **Processing** (fetch attempts only):
 1. Check R2 marker — if exists, skip (already processed)
-2. Single `fetch()` to proxy1 Worker (`/api2/alarms-history`) — no in-process retries; cron cadence provides retries
-3. Strip BOM, parse JSON (~3,000 entries, ~50KB)
+2. Single `fetch()` to `${HISTORY_PROXY_URL}/api2/alarms-history` (the relay) — no in-process retries; cron cadence provides retries
+3. Strip BOM, parse JSON (the last 2 hours, up to ~3,000 entries)
 4. Filter to entries within the time window
 5. Map to 4 fields: `{ data, alertDate, category_desc, rid }`
 6. Sort by `alertDate`, group by R2 date key (events 23:xx → next day's file)
@@ -317,7 +319,9 @@ A Cloudflare Worker with a cron trigger every 2 minutes (`1/2 * * * *`, odd minu
 
 **Observability**: `[observability] enabled = true` in wrangler.toml persists logs to the Cloudflare dashboard. Console logs include timeslot, window boundaries, entry counts, R2 write details, marker status, and cleanup counts.
 
-**Error handling**: On fetch failure, the run exits silently — the next cron fires 2 minutes later. If all attempts fail, the alert-check sends a Pushover notification. R2 write failures and CPU limit crashes are **not** notified — check dashboard logs.
+**Error handling**: On fetch failure (any non-2xx, including the relay's 502 when Oref can't be reached), the run exits without writing a marker — the next cron fires 2 minutes later. If all attempts fail, the alert-check sends a Pushover notification, so an outage must last about 10 minutes to trigger it. R2 write failures and CPU limit crashes are **not** notified — check dashboard logs.
+
+**Silent-gap incident (2026-10/11)**: the old upstream hostname stopped resolving sometime between 2026-10-19 and 2026-11-08. The relay kept answering `200 []`, so every window was marked processed with 0 entries and no alert fired. R2 has no data for that period until it is backfilled. The relay now returns 502 on upstream failure; markers hold the entry count, so a run of `0` markers during known alerts is the tell-tale sign.
 
 ### Day-history API (`functions/api/day-history.js`)
 
@@ -346,22 +350,20 @@ uv run tools/backfill_history.py --today    # merge today first (no prompt), the
 
 Both modes use `r2_date_key()` to group events — entries with `alertDate` hour ≥ 23 go to the next day's file, matching the ingestion worker's partitioning.
 
-### Why proxy1, not history-proxy
+### Why ingestion goes through the relay
 
-The ingestion worker was originally designed to fetch from a dedicated `history-proxy` worker on the same Cloudflare account. This failed with **Cloudflare error 1042** — workers on the same account cannot call each other via HTTP fetch.
+**Cron triggers do not obey worker placement**: the ingestion cron always runs from a non-Israeli colo, so it could never call Oref directly. Since late 2026 CloudFront also blocks every Cloudflare egress IP, so no Worker can reach Oref at all. The ingestion worker therefore fetches from the relay (`HISTORY_PROXY_URL` in `ingestion/wrangler.toml`).
 
-Additionally, **cron triggers do not obey worker placement** — the ingestion cron always runs from a non-Israeli colo, so it cannot call the Oref API directly (would get 403).
-
-The solution: the ingestion worker calls `proxy1.oref-proxy1.workers.dev` — a proxy worker on a **different** Cloudflare account with placement `region = "azure:israelcentral"`. Cross-account HTTP calls work fine, and the proxy1 worker runs from TLV when fetch-triggered.
-
-The `history-proxy/` directory still exists in the repo but is not deployed via CI. It was useful for manual testing with its `X-Ingest-Key` auth.
+History of earlier attempts:
+- A dedicated `history-proxy` worker on the same account failed with **Cloudflare error 1042**: workers on the same account cannot call each other via HTTP fetch. The `history-proxy/` directory is still in the repo but is not deployed.
+- The ingestion worker then called `proxy1`, a placement-pinned Worker on a **different** Cloudflare account. It has called the relay instead since 2026-08 (the deployed version from 2026-08-01 already does). `proxy1` could not work today: CloudFront blocks it.
 
 ### Design alternatives considered
 
 | Approach | Why rejected |
 |----------|-------------|
 | **history-proxy on same account** | Cloudflare error 1042 — same-account workers can't call each other |
-| **Ingestion calls Oref API directly** | Cron triggers ignore placement — runs from non-Israeli colo, gets 403 |
+| **Ingestion calls Oref API directly** | Cron triggers ignore placement (non-Israeli colo), and CloudFront blocks Cloudflare IPs anyway — 403 |
 | **Move ingestion to proxy1 account** | R2 bucket is on the Pages account; R2 bindings are per-account, can't cross |
 | **Chunk-based writes** (write each 15-min window as separate R2 object, merge at midnight) | Would eliminate the read+append+write CPU cost, but complicates serving for the current day — rejected in favor of upgrading to a paid plan |
 
@@ -372,9 +374,8 @@ The ingestion worker's read+append+write pattern means CPU usage grows throughou
 ## Deployment
 
 ```sh
-./web-dev                          # npx wrangler pages dev web/ — local dev server
-./deploy                           # npx wrangler pages deploy web/ — deploy static assets
-cd worker && npx wrangler deploy   # deploy API proxy Worker
+./web-dev                            # npx wrangler pages dev web/ — local dev server
+./deploy                             # npx wrangler pages deploy web/ — deploy static assets
 cd ingestion && npx wrangler deploy  # deploy ingestion Worker
 ```
 
@@ -383,17 +384,19 @@ GitHub Actions (`.github/workflows/deploy.yml`) deploys on push to `main`:
 | Job | What it deploys | Account |
 |-----|----------------|---------|
 | `deploy-pages` | Static assets + Pages Functions | Pages account |
-| `deploy-workers` | proxy1, proxy2, proxy3 Workers | Per-proxy accounts |
+| `deploy-workers` | proxy1, proxy2, proxy3 Workers (legacy, see below) | Per-proxy accounts |
 | `deploy-ingestion` | Ingestion cron Worker | Pages account |
 
-The Pages project serves static assets and Pages Functions (`/api/*`). The proxy Workers handle `/api2/*` via Workers routes on `oref-map.org`, serving as fallback for non-TLV users.
+The Pages project serves static assets and Pages Functions (`/api/*`). The proxy Workers (`worker/`) are still deployed by CI but carry no traffic: the Pages Functions redirect to the relay, and CloudFront blocks the Workers' egress IPs anyway.
+
+**The relay is not deployed by CI.** It runs as a long-lived Node process plus `cloudflared` on its host and is updated by hand: copy `oref-relay/index.js`, restart the service, then check `/status` (all three `updatedAt` values should be recent once `/api2/alarms-history` has been requested). Setup notes are in `oref-relay/README.txt`. Its host must have a residential Israeli IP (see [Access to Oref](#access-to-oref-geo-blocking-and-cloudfront)).
 
 ### Cloudflare accounts
 
 Multiple Cloudflare accounts are used to work around platform limitations:
 
-- **Pages account** — hosts the Pages project, Pages Functions, R2 bucket, and ingestion worker
-- **proxy1/proxy2/proxy3 accounts** — host the placement-pinned proxy Workers. Separate accounts avoid error 1042 and distribute request volume across free-plan limits
+- **Pages account** — hosts the Pages project, Pages Functions, R2 bucket, ingestion worker, and the relay's Cloudflare Tunnel
+- **proxy1/proxy2/proxy3 accounts** — host the legacy placement-pinned proxy Workers. Separate accounts avoided error 1042 and spread request volume across free-plan limits
 
 ### Secrets
 

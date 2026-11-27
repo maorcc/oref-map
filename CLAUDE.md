@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project
 
-`oref-map` is a live alert map of Israel ("מפת העורף") showing colored area polygons for alert statuses per location. It uses MapLibre GL JS + self-hosted PMTiles (Protomaps, Cloudflare R2). Polygons are pre-computed GeoJSON (`locations_polygons.json`). Static assets on Cloudflare Pages; API proxy uses a two-tier architecture: Pages Functions serve TLV users directly, non-TLV users are redirected to a placement-pinned Worker.
+`oref-map` is a live alert map of Israel ("מפת העורף") showing colored area polygons for alert statuses per location. It uses MapLibre GL JS + self-hosted PMTiles (Protomaps, Cloudflare R2). Polygons are pre-computed GeoJSON (`locations_polygons.json`). Static assets on Cloudflare Pages. Oref blocks datacenter/cloud IPs, so all Oref traffic goes through a relay (`oref-relay/`) on a residential Israeli connection, behind a Cloudflare Tunnel; Pages Functions at `/api/*` 303-redirect to it.
 
 **Public URL**: https://oref-map.org
 
@@ -17,7 +17,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 ```bash
 ./web-dev                          # start dev server at http://localhost:8788 (wrangler pages dev)
 ./deploy                           # deploy static assets to Cloudflare Pages
-cd worker && npx wrangler deploy   # deploy API proxy Worker
+cd ingestion && npx wrangler deploy  # deploy ingestion cron Worker
 ```
 
 **If the dev server runs on a different machine than the browser**, the browser must still
@@ -32,19 +32,19 @@ serves the local static polygons file only when the hostname is
 ssh -fNT -L 8788:localhost:8788 <host>
 ```
 
-`?f-debugapi=oref-direct` sidesteps only the CORS half (forces a direct fetch in the Pages
-Function) and exercises a non-production code path.
+`?f-debugapi=oref-direct` (forces a direct fetch in the Pages Function) is no workaround
+anymore: CloudFront answers it with 403.
 
 ## Structure
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
 - `web/prediction-mode.js` — Launch-direction prediction overlay (lazy-loaded)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
-- `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
-- `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
-- `worker/wrangler.toml` — Worker configuration with placement and `/api2/*` route
-- `ingestion/src/index.js` — Cloudflare Worker cron: ingests extended history API into R2 day-history files
-- `tools/backfill_history.py` — One-off script to rebuild R2 day-history files from the oref API (mode=3, city by city)
+- `functions/api/` — Pages Functions: 303-redirect alert requests to the relay; `day-history` serves R2
+- `oref-relay/index.js` — Node/Express relay: polls Oref, serves `/api2/{alerts,history,alarms-history}` and `/status`. Not deployed by CI; updated by hand on its host
+- `worker/` — Legacy placement-pinned proxy Worker (proxy1-3). Still deployed by CI, unused: CloudFront blocks it
+- `ingestion/src/index.js` — Cloudflare Worker cron: fetches the relay's `/api2/alarms-history` and appends to R2 day-history files
+- `tools/backfill_history.py` — Manual script to rebuild R2 day-history files from the oref API. Run from a residential Israeli connection
 - `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
 - `docs/map-requirements.md` — Feature requirements doc
 
@@ -156,19 +156,19 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 - Unknown titles default to Red and log a console warning.
 - The `היכנסו ... למרחב המוגן` titles and `יש להיכנס למרחב מוגן בזמן ההתגוננות העומד לרשותכם` (matched by substring `בזמן ההתגוננות העומד לרשותכם`) are generic shelter commands and don't specify a threat type. They preserve the location's existing red/purple/brown state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
 
-### Extended History API
-- **URL**: `https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1`
-- Returns up to 3,000 recent alert entries (covering ~1-2 hours during active days).
-- Shape: `{"data": "location", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category_desc": "title", "rid": number, ...}`
-- `category_desc` is the alert title. Classify the same way.
-- `rid` is a unique ID per entry — used for deduplication.
-- Date filtering params are ignored — always returns latest entries.
+### Extended History API (alert archive)
+- **URL**: `https://www.oref.org.il/api/v1/AlertHistory/heb?from=YYYY-MM-DD&to=YYYY-MM-DD&cities=` (`to` is exclusive). Requires a full browser `User-Agent`.
+- 200 entries per page, newest first; next page via `lastCreatedOn`/`lastTitle`/`lastCityName` from `lastRetrievedAlarm`.
+- Shape: `{"lastRetrievedAlarm": {...}, "alarmsGroupedByDate": [{"key": "DD.MM.YYYY", "value": [{"data", "time": "HH:MM:SS", "dateTime": "YYYY-MM-DDTHH:MM:00", "category", "category_Desc", "rid"}]}]}`
+- The relay's `/api2/alarms-history` returns the last 2 hours of it in the old flat shape `{"data", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category", "category_desc", "rid"}`, with exact seconds. It answers **502** if Oref can't be reached.
+- `category_desc` is the alert title. Classify the same way. `rid` is a unique ID per entry — used for deduplication.
+- Replaces `alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx` (hostname gone since ~2026-11; it rounded `alertDate` to the minute). See `docs/oref-sources.md`.
 - **Not used by the client UI** — only consumed by the ingestion worker to populate R2 day-history. The regular history API (~50-60 min coverage) fills the R2 lag for the timeline.
 
 ### Dual polling rationale
 The live API is polled every 1s for immediate danger display. The history API is polled every 10s because all-clear events are short-lived in the live API and would be missed — the history API is the reliable source for state transitions to green.
 
-### Other available endpoints (not currently used)
+### Other available endpoints (not currently used; need a browser `User-Agent`)
 - `https://www.oref.org.il/alerts/alertCategories.json` — alert category definitions
 - `https://www.oref.org.il/alerts/alertsTranslation.json` — localized alert text
 - `https://www.oref.org.il/alerts/RemainderConfig_heb.json` — shelter duration per area
@@ -176,10 +176,9 @@ The live API is polled every 1s for immediate danger display. The history API is
 - `https://www.oref.org.il/districts/cities_heb.json` — cities list with metadata
 - `https://www.oref.org.il/districts/citiesNotes_heb.json` — per-city notes
 
-### Geo-blocking
-The Oref APIs geo-block non-Israeli IPs with **HTTP 403**. Pages Functions at `/api/*` check the colo — TLV users are proxied directly, non-TLV users get a 303 redirect to `/api2/*` which is handled by the placement-pinned Worker. See `docs/architecture.md` for details.
+### Geo-blocking and CloudFront
+Since late November 2026 `www.oref.org.il` is behind **AWS CloudFront**, which returns **HTTP 403** to datacenter/cloud IPs **even inside Israel** (Cloudflare Workers and Pages Functions at TLV, Oracle Cloud). Non-Israeli IPs are blocked as before. Only residential Israeli connections work, so all Oref calls go through the relay. `/api/v1/*` and static JSON files also need a full browser `User-Agent`. See `docs/architecture.md` § "Access to Oref" and `docs/oref-sources.md`.
 
-**Cloudflare Worker cron triggers do not obey placement** — a cron worker always runs from a non-Israeli colo. Only fetch-triggered workers (including the placement-pinned Worker at `/api2/*`) reliably run from TLV.
+**Cloudflare Worker cron triggers do not obey placement** — a cron worker always runs from a non-Israeli colo. Placement no longer helps anyway, since CloudFront blocks Cloudflare egress IPs.
 
-# currentDate
-Today's date is 2026-03-04.
+**Never put the relay's hostname or host details in this repo** beyond what the code already contains: the repo is public.

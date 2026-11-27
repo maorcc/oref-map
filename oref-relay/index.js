@@ -19,15 +19,25 @@ const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORI
 const OREF_HEADERS = {
   'Referer': 'https://www.oref.org.il/',
   'X-Requested-With': 'XMLHttpRequest',
+  // Oref's CloudFront WAF answers /api/v1/* with 403 unless the User-Agent looks like
+  // a full browser string (Node's default "node" and a bare "Mozilla/5.0" are both blocked).
+  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36',
 };
 
 const ALERTS_URL   = 'https://www.oref.org.il/warningMessages/alert/Alerts.json';
 const HISTORY_URL  = 'https://www.oref.org.il/warningMessages/alert/History/AlertsHistory.json';
-const EXTENDED_URL = 'https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1';
+// Replaces GetAlarmsHistory.aspx on alerts-history.oref.org.il, which no longer resolves.
+// Query: from=YYYY-MM-DD&to=YYYY-MM-DD (exclusive)&cities=; 200 entries per page, newest
+// first, paged with lastCreatedOn/lastTitle/lastCityName taken from lastRetrievedAlarm.
+const EXTENDED_URL = 'https://www.oref.org.il/api/v1/AlertHistory/heb';
 
 const LIVE_POLL_MS    = 1000;   // every 1s — mirrors production
 const HISTORY_POLL_MS = 10000;  // every 10s — mirrors production
 const EXTENDED_TTL_MS = 60000;  // cache extended history for 60s
+const EXTENDED_PAGE_SIZE   = 200;                // fixed by the API
+const EXTENDED_MAX_PAGES   = 15;                 // ~3,000 entries, the old endpoint's cap
+const EXTENDED_LOOKBACK_MS = 2 * 60 * 60 * 1000; // ingestion only needs the last ~30 min
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // --- Debug mode: load interesting-map.json ---
 
@@ -202,12 +212,69 @@ async function pollHistory() {
   return historyInFlight;
 }
 
+// --- Extended history (new /api/v1/AlertHistory, served in the old GetAlarmsHistory shape) ---
+
+function israelTimeStr(ms) {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Jerusalem',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(new Date(ms)).replace(' ', 'T');
+}
+
+// The ingestion worker reads data, alertDate, category_desc and rid. The new API truncates
+// `dateTime` to the minute and carries the exact seconds in `time`; alertDate keeps them.
+function toLegacyEntry(item) {
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(item.dateTime) || !/^\d{2}:\d{2}:\d{2}$/.test(item.time)) {
+    throw new Error(`unexpected dateTime/time "${item.dateTime}"/"${item.time}" for rid ${item.rid}`);
+  }
+  return {
+    data: item.data,
+    alertDate: `${item.dateTime.slice(0, 10)}T${item.time}`,
+    category: item.category,
+    category_desc: item.category_Desc,
+    rid: item.rid,
+  };
+}
+
+async function fetchExtendedEntries() {
+  const now = Date.now();
+  const cutoff = israelTimeStr(now - EXTENDED_LOOKBACK_MS);
+  const params = new URLSearchParams({
+    from: cutoff.slice(0, 10),
+    to: israelTimeStr(now + DAY_MS).slice(0, 10),
+    cities: '',
+  });
+  const byRid = new Map();
+
+  for (let page = 1; ; page++) {
+    const parsed = JSON.parse(await fetchOref(`${EXTENDED_URL}?${params}`));
+    if (!Array.isArray(parsed.alarmsGroupedByDate)) {
+      throw new Error('unexpected AlertHistory payload: no alarmsGroupedByDate array');
+    }
+    const items = parsed.alarmsGroupedByDate.flatMap(group => group.value);
+    for (const item of items) byRid.set(item.rid, toLegacyEntry(item));
+
+    const last = parsed.lastRetrievedAlarm;
+    if (items.length < EXTENDED_PAGE_SIZE || !last || toLegacyEntry(last).alertDate < cutoff) break;
+    if (page === EXTENDED_MAX_PAGES) {
+      console.warn(`[alarms-history] stopped at ${page} pages before reaching ${cutoff}`);
+      break;
+    }
+    params.set('lastCreatedOn', last.dateTime);
+    params.set('lastTitle', last.category_Desc);
+    params.set('lastCityName', last.data);
+  }
+
+  return [...byRid.values()].sort((a, b) => b.alertDate.localeCompare(a.alertDate));
+}
+
 let extendedInFlight = null;
 
 async function fetchExtended() {
   if (extendedInFlight) return extendedInFlight;
-  extendedInFlight = fetchOref(EXTENDED_URL).then(body => {
-    cache.extended.body = body;
+  extendedInFlight = fetchExtendedEntries().then(entries => {
+    cache.extended.body = JSON.stringify(entries);
     cache.extended.fetchedAt = Date.now();
     cache.extended.updatedAt = Date.now();
   }).finally(() => {
@@ -279,7 +346,9 @@ app.get(['/api/alarms-history', '/api2/alarms-history'], async (req, res) => {
       await fetchExtended();
     } catch (err) {
       logError('[alarms-history] fetch error:', err);
-      // Return stale data if available, empty array otherwise
+      // Fail loudly: a 200 with stale or empty data made the ingestion worker record
+      // empty windows, so a dead upstream went unnoticed for weeks.
+      return res.status(502).json({ error: 'extended history fetch failed' });
     }
   }
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
