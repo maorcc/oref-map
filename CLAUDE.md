@@ -41,7 +41,7 @@ anymore: CloudFront answers it with 403.
 - `web/prediction-mode.js` — Launch-direction prediction overlay (lazy-loaded)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
 - `functions/api/` — Pages Functions: 303-redirect alert requests to the relay; `day-history` serves R2
-- `oref-relay/index.js` — Node/Express relay: polls Oref, serves `/api2/{alerts,history,alarms-history}` and `/status`. Not deployed by CI; updated by hand on its host
+- `oref-relay/index.js` — Node/Express relay: polls Oref, serves `/api2/{alerts,history,alarms-history}` and `/status`. Not deployed by CI; updated by hand on its host (runbook: `oref-relay/SETUP.md`)
 - `worker/` — Legacy placement-pinned proxy Worker (proxy1-3). Still deployed by CI, unused: CloudFront blocks it
 - `ingestion/src/index.js` — Cloudflare Worker cron: fetches the relay's `/api2/alarms-history` and appends to R2 day-history files
 - `tools/backfill_history.py` — Manual script to rebuild R2 day-history files from the oref API. Run from a residential Israeli connection
@@ -54,6 +54,7 @@ Read the relevant doc before making changes in that area:
 
 | Task | Read |
 |------|------|
+| Operating the relay: deploy, health checks, systemd units, adding a second relay | `oref-relay/SETUP.md` (design and CloudFront block: `docs/architecture.md`) |
 | Map rendering, basemap tiles, polygon source, API proxy architecture, Cloudflare setup | `docs/architecture.md` |
 | Changing map bounds, replacing or extending PMTiles on R2, understanding tile coverage | `docs/architecture.md` § "Basemap Tiles (PMTiles on R2)" |
 | Ellipse mode behavior, geometry math, cluster algorithm | `docs/ellipse-feature.md` |
