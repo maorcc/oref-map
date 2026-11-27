@@ -27,6 +27,7 @@ cd worker && npx wrangler deploy   # deploy API proxy Worker
 - `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
 - `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
 - `worker/wrangler.toml` — Worker configuration with placement and `/api2/*` route
+- `oref-relay/` — Production API relay (Express, port 3001) behind the `orefproxyN.oref-map.org` Cloudflare Tunnels, running on a home-IP host; see `oref-relay/SETUP.md`
 - `ingestion/src/index.js` — Cloudflare Worker cron: ingests extended history API into R2 day-history files
 - `tools/backfill_history.py` — One-off script to rebuild R2 day-history files from the oref API (mode=3, city by city)
 - `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
@@ -38,6 +39,7 @@ Read the relevant doc before making changes in that area:
 
 | Task | Read |
 |------|------|
+| Production API relay, `orefproxy5` tunnel, relay host (`rpi4metal`), CloudFront IP block, adding a relay | `oref-relay/SETUP.md` (supersedes the API-proxy parts of `docs/architecture.md`) |
 | Map rendering, basemap tiles, polygon source, API proxy architecture, Cloudflare setup | `docs/architecture.md` |
 | Changing map bounds, replacing or extending PMTiles on R2, understanding tile coverage | `docs/architecture.md` § "Basemap Tiles (PMTiles on R2)" |
 | Ellipse mode behavior, geometry math, cluster algorithm | `docs/ellipse-feature.md` |
