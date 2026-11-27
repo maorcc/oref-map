@@ -20,9 +20,25 @@ This file provides guidance to Claude Code when working with code in this reposi
 cd worker && npx wrangler deploy   # deploy API proxy Worker
 ```
 
+**If the dev server runs on a different machine than the browser**, the browser must still
+reach it as `http://localhost:8788`; browsing `http://<host>:8788` breaks in two places.
+`/api/alerts` 303-redirects to the production relay, whose CORS allowlist
+(`oref-relay/index.js`, `DEFAULT_ALLOWED_ORIGINS`) covers only `oref-map.org` and the
+localhost origins, so the fetch is blocked; and `functions/locations_polygons.json.js`
+serves the local static polygons file only when the hostname is
+`localhost`/`0.0.0.0`/`127.0.0.1`. Forward the port instead:
+
+```bash
+ssh -fNT -L 8788:localhost:8788 <host>
+```
+
+`?f-debugapi=oref-direct` sidesteps only the CORS half (forces a direct fetch in the Pages
+Function) and exercises a non-production code path.
+
 ## Structure
 
 - `web/index.html` — Single-file map page (all JS/CSS inline)
+- `web/prediction-mode.js` — Launch-direction prediction overlay (lazy-loaded)
 - `web/cities_geo.json` — Location → [lat, lng] lookup
 - `functions/api/` — Pages Functions: proxy for TLV users, 303 redirect for non-TLV
 - `worker/src/index.js` — Cloudflare Worker: fallback proxy for non-TLV users (placement: `azure:israelcentral`)
@@ -112,28 +128,35 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 | Title | Meaning | Map state |
 |---|---|---|
 | `ירי רקטות וטילים` | Rocket/missile fire | 🔴 Red |
+| `ירי רקטות וטילים - היכנסו למרחב המוגן` | Rocket/missile fire + enter shelter (combined form) | 🔴 Red |
 | `חדירת כלי טיס עוין` | Hostile drone/aircraft | 🟣 Purple |
 | `נשק לא קונבנציונלי` | Non-conventional weapon | 🔴 Red |
-| `חדירת מחבלים` | Terrorist infiltration | 🔴 Red |
-| `היכנסו מייד למרחב המוגן` | Enter shelter immediately | Inherit (red/purple from prior alert; red if none) |
-| `היכנסו למרחב המוגן` | Enter the shelter | Inherit (red/purple from prior alert; red if none) |
+| `חדירת מחבלים` | Terrorist infiltration | 🟤 Brown (#a0522d; distinct from rockets, deliberately absent from legend) |
+| `חדירת מחבלים - אין לצאת מהמרחב המוגן` | Terrorist infiltration — stay in shelter | 🟤 Brown (stricter variant) |
+| `היכנסו מייד למרחב המוגן` | Enter shelter immediately | Inherit (red/purple/brown from prior alert; red if none) |
+| `היכנסו למרחב המוגן` | Enter the shelter | Inherit (red/purple/brown from prior alert; red if none) |
+| `יש להיכנס למרחב מוגן בזמן ההתגוננות העומד לרשותכם.` | Enter shelter within your available defense time | Inherit (red/purple/brown from prior alert; red if none) |
 | `בדקות הקרובות צפויות להתקבל התרעות באזורך` | Early warning — Iran launch, sirens expected in ~10 min | 🟡 Yellow |
 | `על תושבי האזורים הבאים לשפר את המיקום למיגון המיטבי בקרבתך...` | Preparedness notice — improve shelter position, enter shelter if alert received | 🟡 Yellow |
 | `יש לשהות בסמיכות למרחב המוגן` | Stay near the shelter | 🟡 Yellow |
+| `התקרבו למרחב מוגן` | Approach a protected space (preparedness, milder than `היכנסו מייד`) | 🟡 Yellow |
+| `איום מלבנון - התקרבו למרחב מוגן` | Threat from Lebanon — approach a protected space | 🟡 Yellow |
 | `ירי רקטות וטילים - האירוע הסתיים` | Rocket event over | 🟢 Green (fades) |
 | `חדירת כלי טיס עוין - האירוע הסתיים` | Aircraft event over | 🟢 Green (fades) |
 | `ניתן לצאת מהמרחב המוגן` | Can leave shelter | 🟢 Green (fades) |
 | `ניתן לצאת מהמרחב המוגן אך יש להישאר בקרבתו` | Can leave shelter but stay near it | 🟡 Yellow |
-| `חדירת מחבלים - החשש הוסר` | Terrorist threat removed | 🟢 Green (fades) |
+| `הסתיים אירוע חדירת מחבלים - ניתן לצאת מהבתים` | Terrorist event over, can leave home | 🟢 Green (fades) |
+| `אירוע חדירת מחבלים הסתיים` | Terrorist event over (variant phrasing) | 🟢 Green (fades) |
 | `השוהים במרחב המוגן יכולים לצאת...` | Shelter occupants can exit | 🟢 Green (fades) |
 | `תושבי האזורים הבאים אינם צריכים לשהות יותר בסמיכות למרחב המוגן.` | No longer need to stay near shelter | 🟢 Green (fades) |
 | `סיום שהייה בסמיכות למרחב המוגן` | End of stay near shelter | 🟢 Green (fades) |
 
-- Green titles are matched by substring (`האירוע הסתיים`, `ניתן לצאת` (excluding titles that also contain `להישאר בקרבתו`), `החשש הוסר`, `יכולים לצאת`, `אינם צריכים לשהות`, `סיום שהייה בסמיכות`) to catch variants.
-- Yellow titles are matched by exact string or substring: `לשפר את המיקום למיגון המיטבי`, `להישאר בקרבתו`.
+- Green titles are matched by substring (`הסתיים` — covers `האירוע הסתיים` and `אירוע חדירת מחבלים הסתיים`; `ניתן לצאת` (excluding titles that also contain `להישאר בקרבתו`), `החשש הוסר`, `יכולים לצאת`, `אינם צריכים לשהות`, `סיום שהייה בסמיכות`) to catch variants.
+- Yellow titles are matched by exact string or substring: `לשפר את המיקום למיגון המיטבי`, `להישאר בקרבתו`, `התקרבו למרחב מוגן` (substring — also catches the `איום מלבנון - …` prefixed form).
+- Threat titles (red `ירי רקטות וטילים`, purple `חדירת כלי טיס עוין`, brown `חדירת מחבלים`) are matched by **substring**, so combined forms like `<threat> - היכנסו למרחב המוגן` classify by threat. The green "ended" check runs first, so `<threat> - האירוע הסתיים` stays green.
 - API sometimes uses double spaces in titles — normalize with `.replace(/\s+/g, ' ')` before matching.
 - Unknown titles default to Red and log a console warning.
-- The two `היכנסו ... למרחב המוגן` titles are generic shelter commands and don't specify a threat type. They preserve the location's existing red or purple state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
+- The `היכנסו ... למרחב המוגן` titles and `יש להיכנס למרחב מוגן בזמן ההתגוננות העומד לרשותכם` (matched by substring `בזמן ההתגוננות העומד לרשותכם`) are generic shelter commands and don't specify a threat type. They preserve the location's existing red/purple/brown state; if none, they default to red. These titles never appear in the R2 day-history archive (Oref doesn't push them).
 
 ### Extended History API
 - **URL**: `https://alerts-history.oref.org.il//Shared/Ajax/GetAlarmsHistory.aspx?lang=he&mode=1`
@@ -151,7 +174,6 @@ The live API is polled every 1s for immediate danger display. The history API is
 - `https://www.oref.org.il/alerts/alertCategories.json` — alert category definitions
 - `https://www.oref.org.il/alerts/alertsTranslation.json` — localized alert text
 - `https://www.oref.org.il/alerts/RemainderConfig_heb.json` — shelter duration per area
-- `https://www.oref.org.il/alerts/alertHistoryCount.json` — summary alert count
 - `https://www.oref.org.il/districts/districts_heb.json` — districts/areas list
 - `https://www.oref.org.il/districts/cities_heb.json` — cities list with metadata
 - `https://www.oref.org.il/districts/citiesNotes_heb.json` — per-city notes

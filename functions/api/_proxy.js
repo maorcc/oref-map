@@ -98,10 +98,15 @@ function isKnownTitle(title) {
     return true;
   }
 
+  // Brown — terrorist infiltration
+  if (title === 'חדירת מחבלים' ||
+      title === 'חדירת מחבלים - אין לצאת מהמרחב המוגן') {
+    return true;
+  }
+
   // Red — active danger
   if (title === 'ירי רקטות וטילים' ||
       title === 'נשק לא קונבנציונלי' ||
-      title === 'חדירת מחבלים' ||
       title === 'היכנסו מייד למרחב המוגן' ||
       title === 'היכנסו למרחב המוגן') {
     return true;

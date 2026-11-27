@@ -1,5 +1,7 @@
 #!/bin/sh
-# Start local dev server at http://localhost:8788 (binds to 0.0.0.0 — also accessible via http://<your-ip>:8788).
+# Start local dev server at http://localhost:8788 (wrangler pages dev).
+# Binds to 0.0.0.0 so it is reachable across the network — but browse it as
+# http://localhost:8788 regardless; see the note below the polygons download.
 
 POLYGONS=web/locations_polygons.json
 if [ ! -f "$POLYGONS" ]; then
@@ -7,6 +9,16 @@ if [ ! -f "$POLYGONS" ]; then
   curl -sf -o "$POLYGONS" https://oref-map.org/locations_polygons.json \
     && echo "Done." \
     || echo "WARNING: Download failed. The map will not display polygons."
+fi
+
+# When the dev server runs on a different machine than the browser, the browser
+# must still reach it as http://localhost:8788, not http://<host>:8788 — the
+# relay's CORS allowlist (oref-relay/index.js) and the polygons local-dev
+# fallback (functions/locations_polygons.json.js) both key on a localhost origin.
+if [ "$(uname)" != "Darwin" ]; then
+  printf '\n  !  Browsing from another machine? Do NOT use http://%s:8788\n' "$(hostname)"
+  printf '     Tunnel instead:  ssh -fNT -L 8788:localhost:8788 %s\n' "$(hostname)"
+  printf '     Then open:       http://localhost:8788/\n\n'
 fi
 
 npx --yes wrangler pages dev web/ --ip 0.0.0.0 "$@"

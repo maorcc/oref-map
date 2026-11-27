@@ -1,0 +1,7 @@
+#!/bin/sh
+# Like ./web-dev but binds HISTORY_BUCKET to a local miniflare R2 bucket,
+# so /api/day-history serves local data instead of proxying to production.
+# Seed the bucket with:
+#   npx wrangler r2 object put oref-history/<date>.jsonl --file=<path> --local
+
+exec "$(dirname "$0")/web-dev" --r2 HISTORY_BUCKET=oref-history "$@"
