@@ -348,7 +348,8 @@ uv run tools/backfill_history.py --from 2026-10-19 --to 2026-11-01 --yes
 - Fetches the archive for the whole range with date-range paging (200 per page, 1 s between requests), and groups it with `r2_date_key()` (hour ≥ 23 goes to the next day's file, as in ingestion).
 - Reads each R2 file directly with `wrangler r2 object get` (not `/api/day-history`, which may be cached), and prints a per-day table: entries in R2, in the archive, to add, and in R2 only.
 - **Add-only**: entries are matched by `rid`. Missing entries are added with exact seconds; existing entries are never changed or removed. Each file is saved to `backups/r2/` (git-ignored) before it is overwritten, as a rollback copy.
-- **Cron safety**: ingestion appends without checking `rid`s. Entries in windows the cron may still process (window ending at Q is done by Q+14 min) are left to it, and files it may still write are written only in a quiet minute between cron runs, right after a fresh read.
+- **Cron safety**: ingestion appends without checking `rid`s and writes with a plain read-then-put. Entries in windows the cron may still process (window ending at Q is done by Q+14 min) are left to it. Files it may still write are written only in a minute when no cron runs, after the cron has written the marker of its last window (or given up on it), right after a fresh read, and only if at least 20 s remain before the next cron run. If an upload still ends inside a cron minute, the script says to rerun it, which restores anything the cron wrote meanwhile.
+- **Rounded neighbors**: the old API rounded to the nearest minute, so an alert at 22:59:45 may be in the next day's file as 23:00:00. `rid`s are compared across all files read plus the day after the range, so such entries are not added twice.
 - Reruns are safe: entries already in R2 are skipped.
 
 ### Why ingestion goes through the relay

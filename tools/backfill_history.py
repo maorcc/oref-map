@@ -80,12 +80,32 @@ def cron_cutoff(now: datetime) -> str:
     return q.strftime("%Y-%m-%dT%H:%M:%S")
 
 
+def seconds_until_cron(now: datetime) -> float:
+    """Seconds until the next minute in which the cron may write (0 inside such a minute)."""
+    t = now.replace(second=0, microsecond=0)
+    while t.minute in QUIET_MINUTES:
+        t += timedelta(minutes=1)
+    return max(0.0, (t - now).total_seconds())
+
+
+def last_window_settled(now: datetime) -> bool:
+    """True once the cron is done with the window it last worked on: its marker is written
+    (it wrote the day file before the marker), or its alert-check minute has passed.
+    Valid only inside a quiet minute, which is how wait_for_quiet_slot calls it."""
+    q = (now - timedelta(minutes=11)).replace(second=0, microsecond=0)
+    q = q.replace(minute=q.minute // 15 * 15)           # end of the last-attempted window
+    if now >= q + timedelta(minutes=WINDOW_DONE_MIN):
+        return True
+    timeslot = (q - timedelta(minutes=15)).strftime("%Y-%m-%dT%H:%M")
+    return wrangler("r2", "object", "get", f"{BUCKET}/meta/{timeslot}",
+                    "--remote", "--pipe").returncode == 0
+
+
 def wait_for_quiet_slot() -> None:
-    """Block until a minute in which the cron cannot write, with at least 40s left in it."""
+    """Block until the cron cannot write for at least 40 s and is done with its last window."""
     while True:
         now = israel_now()
-        next_quiet = (now.minute + 1) % 60 in QUIET_MINUTES
-        if now.minute in QUIET_MINUTES and (next_quiet or now.second < 20):
+        if seconds_until_cron(now) >= 40 and last_window_settled(now):
             return
         print(f"  waiting for a quiet slot between cron runs ({now:%H:%M:%S})...")
         time.sleep(20)
@@ -121,7 +141,8 @@ def to_entry(item: dict) -> dict:
 
 
 def fetch_archive(first_day: str, last_day: str) -> dict[str, list[dict]]:
-    """All archive entries for R2 days first_day..last_day, grouped by R2 date key."""
+    """Archive entries covering R2 days first_day..last_day, grouped by R2 date key. Also
+    holds the edge entries of the neighboring days, which callers use only for rid checks."""
     start = date.fromisoformat(first_day) - timedelta(days=1)   # 23:xx of the day before
     end = date.fromisoformat(last_day) + timedelta(days=1)      # `to` is exclusive
     params = {"from": start.isoformat(), "to": end.isoformat(), "cities": ""}
@@ -146,9 +167,7 @@ def fetch_archive(first_day: str, last_day: str) -> dict[str, list[dict]]:
 
     by_day: dict[str, list[dict]] = {}
     for e in by_rid.values():
-        key = r2_date_key(e["alertDate"])
-        if first_day <= key <= last_day:
-            by_day.setdefault(key, []).append(e)
+        by_day.setdefault(r2_date_key(e["alertDate"]), []).append(e)
     return by_day
 
 
@@ -213,8 +232,7 @@ def day_range(first: str, last: str) -> list[str]:
     return days
 
 
-def missing_entries(archive: list[dict], r2: list[dict], cutoff: str) -> list[dict]:
-    r2_rids = {e["rid"] for e in r2}
+def missing_entries(archive: list[dict], r2_rids: set, cutoff: str) -> list[dict]:
     return [e for e in archive if e["rid"] not in r2_rids and e["alertDate"] < cutoff]
 
 
@@ -245,14 +263,19 @@ def main() -> None:
 
     print("Reading R2 day files...")
     r2 = {day: r2_get(day)[0] for day in days}
+    # The old API rounded to the nearest minute, so an alert at 22:59:45 may sit in the next
+    # day's file as 23:00:00. Compare rids across all files read, including the day after.
+    next_day = (date.fromisoformat(days[-1]) + timedelta(days=1)).isoformat()
+    extra = r2_get(next_day)[0] if next_day <= today_key else []
+    r2_rids = {e["rid"] for entries in [*r2.values(), extra] for e in entries}
+    archive_rids = {e["rid"] for entries in archive.values() for e in entries}
 
     print(f"\n{'day':<12}{'R2':>8}{'archive':>9}{'to add':>8}{'R2 only':>9}")
     plan: dict[str, list[dict]] = {}
     for day in days:
         arc, cur = archive.get(day, []), r2[day]
-        add = missing_entries(arc, cur, cutoff)
-        arc_rids = {e["rid"] for e in arc}
-        r2_only = sum(1 for e in cur if e["rid"] not in arc_rids)
+        add = missing_entries(arc, r2_rids, cutoff)
+        r2_only = sum(1 for e in cur if e["rid"] not in archive_rids)
         if add:
             plan[day] = add
         if add or r2_only or len(arc) != len(cur):
@@ -269,19 +292,29 @@ def main() -> None:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     for day, add in plan.items():
-        if day >= live_from:
-            wait_for_quiet_slot()
-        # Re-read right before writing, so nothing the cron appended meanwhile is lost.
-        current, raw = r2_get(day)
-        add = missing_entries(add, current, cutoff)
-        if not add:
-            print(f"  {day}: nothing left to add")
-            continue
-        backup = BACKUP_DIR / f"{day}.{stamp}.jsonl"
-        backup.write_text(raw, encoding="utf-8")
-        merged = sorted(current + add, key=lambda e: e["alertDate"])   # stable: ties keep order
-        r2_put(day, to_jsonl(merged))
-        print(f"  {day}: added {len(add)} (now {len(merged)}), backup {backup}")
+        live = day >= live_from
+        while True:
+            if live:
+                wait_for_quiet_slot()
+            # Re-read right before writing, so nothing the cron appended meanwhile is lost.
+            current, raw = r2_get(day)
+            r2_rids.update(e["rid"] for e in current)
+            add = missing_entries(add, r2_rids, cutoff)
+            if not add:
+                print(f"  {day}: nothing left to add")
+                break
+            if live and seconds_until_cron(israel_now()) < 20:
+                print(f"  {day}: too close to the next cron run, retrying in the next quiet slot")
+                continue
+            backup = BACKUP_DIR / f"{day}.{stamp}.jsonl"
+            backup.write_text(raw, encoding="utf-8")
+            merged = sorted(current + add, key=lambda e: e["alertDate"])  # stable: ties keep order
+            r2_put(day, to_jsonl(merged))
+            print(f"  {day}: added {len(add)} (now {len(merged)}), backup {backup}")
+            if live and seconds_until_cron(israel_now()) == 0:
+                print(f"  WARNING: the upload of {day} ended inside a cron minute. Rerun the "
+                      "backfill in 15 minutes to restore anything the cron wrote meanwhile.")
+            break
 
 
 if __name__ == "__main__":
