@@ -35,6 +35,8 @@ it /api/v1/* is blocked.
 Endpoints and health
 ====================
 - /api2/alerts, /api2/history: served from memory, polled from Oref every 1s / 10s.
+  Return 503 once the last good poll is over 15s / 60s old (the map then shows a
+  connection error), and the ingestion cron sends a Pushover alert after 2 minutes.
 - /api2/alarms-history: at least the last 60 minutes of www.oref.org.il/api/v1/AlertHistory, in the old
   GetAlarmsHistory shape, cached 60s. Returns 502 if Oref can't be reached or the list
   would be incomplete.

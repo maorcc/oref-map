@@ -153,8 +153,8 @@ connected. Every Oref request sends a full browser `User-Agent`; CloudFront bloc
 
 | Endpoint | Source | Refresh | On upstream failure |
 |---|---|---|---|
-| `/api/alerts`, `/api2/alerts` | `www.oref.org.il/warningMessages/alert/Alerts.json` | polled every 1 s | last good body, HTTP 200 |
-| `/api/history`, `/api2/history` | `www.oref.org.il/warningMessages/alert/History/AlertsHistory.json` | polled every 10 s | last good body, HTTP 200 |
+| `/api/alerts`, `/api2/alerts` | `www.oref.org.il/warningMessages/alert/Alerts.json` | polled every 1 s | **HTTP 503** once the last good poll is over 15 s old |
+| `/api/history`, `/api2/history` | `www.oref.org.il/warningMessages/alert/History/AlertsHistory.json` | polled every 10 s | **HTTP 503** once the last good poll is over 60 s old |
 | `/api/alarms-history`, `/api2/alarms-history` | `www.oref.org.il/api/v1/AlertHistory/heb` (last 60 min, paged), converted to the old `GetAlarmsHistory` shape | fetched on request, cached 60 s | **HTTP 502** |
 | `/status` | — | — | `updatedAt` (ms epoch) of the last *successful* fetch per source |
 
@@ -235,14 +235,11 @@ cd <relay-dir> && npm update && npm audit && sudo systemctl restart oref-status
    that is a separate change.
 2. **Single point of failure.** Production depends on one relay and one home connection.
    Add a second relay on a different connection (see above).
-3. **Stale live data is silent.** If Oref starts rejecting the relay, `/api2/alerts` and
-   `/api2/history` keep serving the last good (possibly empty) body with HTTP 200, and
-   nothing alerts on a stale `/status`.
-4. **Unknown-title detection is off** (see legacy table); it needs to move into the relay
+3. **Unknown-title detection is off** (see legacy table); it needs to move into the relay
    or another path that sees real traffic.
-5. **Oref may block residential relays too.** If the cloud-IP block is deliberate, the
+4. **Oref may block residential relays too.** If the cloud-IP block is deliberate, the
    durable fix is an allowlist or official feed access from Oref.
-6. **Node 22 on 32-bit ARM ends April 2027** (only relevant on such a host).
+5. **Node 22 on 32-bit ARM ends April 2027** (only relevant on such a host).
 
 ## Incident timeline (Israel time)
 

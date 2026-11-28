@@ -87,7 +87,8 @@ The relay polls `Alerts.json` every 1s and `AlertsHistory.json` every 10s and se
 
 **Failure behavior** (`/status` on the relay shows `updatedAt` for each cache):
 - `/api2/alarms-history` returns **502** when the upstream fetch fails. This lets the ingestion worker retry and, if every attempt in a window fails, send its Pushover alert. Before 2026-11 it returned the last cache (or `[]`) with 200, which hid a dead upstream for weeks.
-- `/api2/alerts` and `/api2/history` still return their **last cached response with 200** when Oref fails. So a blocked relay looks like a quiet day on the map. Known weakness, not yet fixed.
+- `/api2/alerts` and `/api2/history` return **503** once their last successful poll is older than 15 s (alerts) or 60 s (history), and before the first one. The map then shows its connection-error status after a few failed polls, instead of a blocked relay looking like a quiet day. Until 2026-11 they kept serving the last cached body with 200. Each Oref request times out after 10 s, so a hung fetch can't stall a poll loop.
+- On every alert-check run (every 15 min), the ingestion worker reads the relay's `/status` and sends a Pushover alert ("oref-map relay: live data stale") if alerts or history weren't updated for over 2 minutes, or if `/status` can't be read.
 
 ### Unknown title detection
 
