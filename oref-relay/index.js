@@ -35,11 +35,17 @@ const LIVE_POLL_MS    = 1000;   // every 1s — mirrors production
 const HISTORY_POLL_MS = 10000;  // every 10s — mirrors production
 const EXTENDED_TTL_MS = 60000;  // cache extended history for 60s
 const EXTENDED_PAGE_SIZE   = 200;                // fixed by the API
-// Ingestion reads at most the last ~25 min (window start to its last attempt). The busiest
-// 30 min of the 2026 war had ~3,500 entries (18 pages); the page cap is only a safety stop.
-const EXTENDED_LOOKBACK_MS = 30 * 60 * 1000;
+// Ingestion reads back to its window start, ~26 min before its last attempt. The cutoff is
+// set from the relay's clock, so 60 min leaves ~30 min of slack for a late cron run. The
+// busiest hour of the 2026 war had ~5,400 entries (28 pages); the page cap is only a safety stop.
+const EXTENDED_LOOKBACK_MS = 60 * 60 * 1000;
 const EXTENDED_MAX_PAGES   = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const OREF_TIMEOUT_MS = 10000;  // per request, so a hung fetch can't stall a poll loop
+// Live data older than this is answered with 503 instead of the last good body, so the map
+// shows a connection problem rather than silently freezing. Polls run every 1 s / 10 s.
+const ALERTS_MAX_AGE_MS  = 15000;
+const HISTORY_MAX_AGE_MS = 60000;
 
 // --- Debug mode: load interesting-map.json ---
 
@@ -154,7 +160,7 @@ function appendErrorLog(entry) {
 }
 
 async function fetchOref(url) {
-  const resp = await fetch(url, { headers: OREF_HEADERS });
+  const resp = await fetch(url, { headers: OREF_HEADERS, signal: AbortSignal.timeout(OREF_TIMEOUT_MS) });
   if (!resp.ok) {
     const err = new Error(`HTTP ${resp.status} from ${url}`);
     err.code = String(resp.status);
@@ -329,17 +335,20 @@ setInterval(() => {
   appendFile(USAGE_LOG, line).catch(err => console.error('[usage] log error:', err.message));
 }, 2000);
 
-app.get(['/api/alerts', '/api2/alerts'], (req, res) => {
+function sendLive(res, entry, maxAgeMs) {
+  const age = entry.updatedAt ? Date.now() - entry.updatedAt : null;
+  if (!DEBUG && (age === null || age > maxAgeMs)) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(503).json({ error: 'stale', ageMs: age });
+  }
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=1, max-age=2');
-  res.send(cache.alerts.body);
-});
+  res.send(entry.body);
+}
 
-app.get(['/api/history', '/api2/history'], (req, res) => {
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 's-maxage=1, max-age=2');
-  res.send(cache.history.body);
-});
+app.get(['/api/alerts', '/api2/alerts'], (req, res) => sendLive(res, cache.alerts, ALERTS_MAX_AGE_MS));
+
+app.get(['/api/history', '/api2/history'], (req, res) => sendLive(res, cache.history, HISTORY_MAX_AGE_MS));
 
 app.get(['/api/alarms-history', '/api2/alarms-history'], async (req, res) => {
   const age = cache.extended.fetchedAt ? Date.now() - cache.extended.fetchedAt : Infinity;

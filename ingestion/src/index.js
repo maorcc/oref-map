@@ -10,6 +10,36 @@ function toIsraelTimeStr(timestampMs) {
   }).format(new Date(timestampMs)).replace(' ', 'T');
 }
 
+// The relay keeps polling Oref for the live map. If those polls fail (e.g. Oref starts
+// blocking the relay), the map shows a connection error but nothing else alerts. Checked on
+// alert-check runs, so at most one notification per 15-minute window.
+const LIVE_MAX_AGE_MS = 2 * 60 * 1000;
+
+async function checkLiveData(env) {
+  let problem;
+  // The deadline also covers reading the body, so a stalled response reaches the catch.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  try {
+    const resp = await fetch(`${env.HISTORY_PROXY_URL}/status`, { signal: controller.signal });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const status = await resp.json();
+    const stale = ['alerts', 'history'].filter(k => {
+      const updatedAt = status[k] && status[k].updatedAt;
+      return !updatedAt || Date.now() - updatedAt > LIVE_MAX_AGE_MS;
+    });
+    if (stale.length) problem = `${stale.join(' and ')} not updated for over 2 minutes`;
+  } catch (e) {
+    problem = `status check failed: ${e.message}`;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (problem) {
+    console.log(`Live data check: ${problem}`);
+    await sendPushover(env, 'oref-map relay: live data stale', `Relay ${problem}.`);
+  }
+}
+
 async function sendPushover(env, title, message) {
   if (!env.PUSHOVER_USER || !env.PUSHOVER_TOKEN) return;
   await fetch('https://api.pushover.net/1/messages.json', {
@@ -111,6 +141,9 @@ export default {
     const windowEndStr = toIsraelTimeStr(windowEndMs);
 
     console.log(`Timeslot: ${timeslot}, window: [${windowStartStr}, ${windowEndStr}), alertCheck: ${isAlertCheck}`);
+
+    // Relay live-data check needs no R2, so start it before anything that can fail.
+    if (isAlertCheck) ctx.waitUntil(checkLiveData(env));
 
     // Check if this timeslot was already processed
     const marker = await env.HISTORY_BUCKET.head(`meta/${timeslot}`);
