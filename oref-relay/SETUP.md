@@ -155,7 +155,7 @@ connected. Every Oref request sends a full browser `User-Agent`; CloudFront bloc
 |---|---|---|---|
 | `/api/alerts`, `/api2/alerts` | `www.oref.org.il/warningMessages/alert/Alerts.json` | polled every 1 s | last good body, HTTP 200 |
 | `/api/history`, `/api2/history` | `www.oref.org.il/warningMessages/alert/History/AlertsHistory.json` | polled every 10 s | last good body, HTTP 200 |
-| `/api/alarms-history`, `/api2/alarms-history` | `www.oref.org.il/api/v1/AlertHistory/heb` (last 2 h, paged), converted to the old `GetAlarmsHistory` shape | fetched on request, cached 60 s | **HTTP 502** |
+| `/api/alarms-history`, `/api2/alarms-history` | `www.oref.org.il/api/v1/AlertHistory/heb` (last 30 min, paged), converted to the old `GetAlarmsHistory` shape | fetched on request, cached 60 s | **HTTP 502** |
 | `/status` | — | — | `updatedAt` (ms epoch) of the last *successful* fetch per source |
 
 - Responses: `Content-Type: application/json; charset=utf-8`,
@@ -230,8 +230,9 @@ cd <relay-dir> && npm update && npm audit && sudo systemctl restart oref-status
    2026-10-19 and 2026-11-08. The relay kept answering `200 []`, so ingestion recorded
    every window as empty without alerting. The relay now uses
    `www.oref.org.il/api/v1/AlertHistory` and answers 502 on failure. Still to do: deploy
-   it on the relay machine, then backfill R2 from 2026-10-19 with
-   `tools/backfill_history.py` (run from a residential Israeli IP).
+   it on the relay machine, then backfill R2 from 2026-10-19. The backfill needs
+   `tools/backfill_history.py` moved to the new API first (it still calls the dead host);
+   that is a separate change.
 2. **Single point of failure.** Production depends on one relay and one home connection.
    Add a second relay on a different connection (see above).
 3. **Stale live data is silent.** If Oref starts rejecting the relay, `/api2/alerts` and

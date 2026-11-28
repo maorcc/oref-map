@@ -35,8 +35,10 @@ const LIVE_POLL_MS    = 1000;   // every 1s — mirrors production
 const HISTORY_POLL_MS = 10000;  // every 10s — mirrors production
 const EXTENDED_TTL_MS = 60000;  // cache extended history for 60s
 const EXTENDED_PAGE_SIZE   = 200;                // fixed by the API
-const EXTENDED_MAX_PAGES   = 15;                 // ~3,000 entries, the old endpoint's cap
-const EXTENDED_LOOKBACK_MS = 2 * 60 * 60 * 1000; // ingestion only needs the last ~30 min
+// Ingestion reads at most the last ~25 min (window start to its last attempt). The busiest
+// 30 min of the 2026 war had ~3,500 entries (18 pages); the page cap is only a safety stop.
+const EXTENDED_LOOKBACK_MS = 30 * 60 * 1000;
+const EXTENDED_MAX_PAGES   = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // --- Debug mode: load interesting-map.json ---
@@ -258,8 +260,8 @@ async function fetchExtendedEntries() {
     const last = parsed.lastRetrievedAlarm;
     if (items.length < EXTENDED_PAGE_SIZE || !last || toLegacyEntry(last).alertDate < cutoff) break;
     if (page === EXTENDED_MAX_PAGES) {
-      console.warn(`[alarms-history] stopped at ${page} pages before reaching ${cutoff}`);
-      break;
+      // A partial list would let ingestion mark a window done with entries missing.
+      throw new Error(`stopped at ${page} pages before reaching ${cutoff}`);
     }
     params.set('lastCreatedOn', last.dateTime);
     params.set('lastTitle', last.category_Desc);

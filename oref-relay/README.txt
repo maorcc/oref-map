@@ -35,8 +35,9 @@ it /api/v1/* is blocked.
 Endpoints and health
 ====================
 - /api2/alerts, /api2/history: served from memory, polled from Oref every 1s / 10s.
-- /api2/alarms-history: last 2 hours of www.oref.org.il/api/v1/AlertHistory, in the old
-  GetAlarmsHistory shape, cached 60s. Returns 502 if Oref can't be reached.
+- /api2/alarms-history: last 30 minutes of www.oref.org.il/api/v1/AlertHistory, in the old
+  GetAlarmsHistory shape, cached 60s. Returns 502 if Oref can't be reached or the list
+  would be incomplete.
 - /status: updatedAt per cache. alerts/history should be seconds old. extended stays null
   until /api2/alarms-history is requested (the ingestion cron does that every few minutes).
 

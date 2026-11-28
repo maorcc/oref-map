@@ -38,7 +38,7 @@ hour and last 24 hours. The client polls this endpoint once per minute.
 
 ### Extended History API
 - **Proxy**: relay `/api2/alarms-history` → `https://www.oref.org.il/api/v1/AlertHistory/heb?from=…&to=…&cities=`
-- The relay fetches the **last 2 hours**, following the API's paging (200 per page, at most 15 pages ≈ 3,000 entries), and converts each entry to the shape of the retired `GetAlarmsHistory.aspx`: `{"data", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category", "category_desc", "rid"}`. Results are sorted newest first.
+- The relay fetches the **last 30 minutes**, enough for the oldest window ingestion is still retrying (about 25 minutes back), following the API's paging (200 per page). The busiest 30 minutes of the 2026 war had about 3,500 entries (18 pages); a safety cap of 50 pages makes the relay answer 502 rather than return a partial list. It converts each entry to the shape of the retired `GetAlarmsHistory.aspx`: `{"data", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category", "category_desc", "rid"}`. Results are sorted newest first.
 - `alertDate` has **exact seconds** (the new API's `time` field). Entries ingested before 2026-11 have seconds rounded to `:00`, because the old API rounded to the nearest minute.
 - `rid` is a unique ID per entry — used for deduplication.
 - Until late 2026 the source was `alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx`, which no longer resolves. Details of both APIs are in [`oref-sources.md`](oref-sources.md).
@@ -235,7 +235,7 @@ The original timeline fetched the extended history API (`/api/alarms-history`) o
 
 ## History Storage
 
-The Oref extended history API only exposes the latest ~3,000 entries (~1–2 hours during active days). To preserve the full record, alerts are ingested into R2 every 2 minutes (with multi-attempt per 15-minute window) and served by date.
+The relay exposes only the last 30 minutes of the archive (the retired endpoint exposed the latest ~3,000 entries). To preserve the full record, alerts are ingested into R2 every 2 minutes (with multi-attempt per 15-minute window) and served by date.
 
 ### Architecture
 
@@ -310,7 +310,7 @@ A Cloudflare Worker with a cron trigger every 2 minutes (`1/2 * * * *`, odd minu
 **Processing** (fetch attempts only):
 1. Check R2 marker — if exists, skip (already processed)
 2. Single `fetch()` to `${HISTORY_PROXY_URL}/api2/alarms-history` (the relay) — no in-process retries; cron cadence provides retries
-3. Strip BOM, parse JSON (the last 2 hours, up to ~3,000 entries)
+3. Strip BOM, parse JSON (the last 30 minutes)
 4. Filter to entries within the time window
 5. Map to 4 fields: `{ data, alertDate, category_desc, rid }`
 6. Sort by `alertDate`, group by R2 date key (events 23:xx → next day's file)

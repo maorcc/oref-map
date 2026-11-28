@@ -161,7 +161,7 @@ Do **not** use `cat`/`category` for classification — the same number is reused
 - **URL**: `https://www.oref.org.il/api/v1/AlertHistory/heb?from=YYYY-MM-DD&to=YYYY-MM-DD&cities=` (`to` is exclusive). Requires a full browser `User-Agent`.
 - 200 entries per page, newest first; next page via `lastCreatedOn`/`lastTitle`/`lastCityName` from `lastRetrievedAlarm`.
 - Shape: `{"lastRetrievedAlarm": {...}, "alarmsGroupedByDate": [{"key": "DD.MM.YYYY", "value": [{"data", "time": "HH:MM:SS", "dateTime": "YYYY-MM-DDTHH:MM:00", "category", "category_Desc", "rid"}]}]}`
-- The relay's `/api2/alarms-history` returns the last 2 hours of it in the old flat shape `{"data", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category", "category_desc", "rid"}`, with exact seconds. It answers **502** if Oref can't be reached.
+- The relay's `/api2/alarms-history` returns the last 30 minutes of it in the old flat shape `{"data", "alertDate": "YYYY-MM-DDTHH:MM:SS", "category", "category_desc", "rid"}`, with exact seconds. It answers **502** if Oref can't be reached or the paging hits its safety cap, so ingestion never records a partial window.
 - `category_desc` is the alert title. Classify the same way. `rid` is a unique ID per entry — used for deduplication.
 - Replaces `alerts-history.oref.org.il/Shared/Ajax/GetAlarmsHistory.aspx` (hostname gone since ~2026-11; it rounded `alertDate` to the minute). See `docs/oref-sources.md`.
 - **Not used by the client UI** — only consumed by the ingestion worker to populate R2 day-history. The regular history API (~50-60 min coverage) fills the R2 lag for the timeline.
