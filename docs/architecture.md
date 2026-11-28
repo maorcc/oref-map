@@ -336,19 +336,20 @@ Pages Function serving R2 data as JSON.
 
 ### Backfill script (`tools/backfill_history.py`)
 
-Python script for manually filling historical data. Fetches all ~1,450 cities from the Oref API (`mode=3`, month of data per city), deduplicates by `rid`, groups by date.
+Manual script that adds missing entries to R2 day files from Oref's archive (`www.oref.org.il/api/v1/AlertHistory`). Runs from a residential Israeli connection, with wrangler logged in and `CLOUDFLARE_ACCOUNT_ID` set.
 
 **Usage**:
 ```bash
-uv run tools/backfill_history.py            # WAR_START..yesterday, interactive
-uv run tools/backfill_history.py --today    # merge today first (no prompt), then interactive
+uv run tools/backfill_history.py --from 2026-10-19 --dry-run   # report only
+uv run tools/backfill_history.py --from 2026-10-19             # report, confirm, write
+uv run tools/backfill_history.py --from 2026-10-19 --to 2026-11-01 --yes
 ```
 
-**Interactive mode** (past dates): Downloads the existing R2 file for each date, compares `rid` sets, shows a diff summary, saves both versions to `tmp/backfill-compare/`, and prompts per date.
-
-**`--today` mode**: Merges backfill data with the existing R2 file for today (union by `rid`). Uses a **cron-aware cutoff** — only includes backfill entries before the last completed quarter-hour boundary (`:00`, `:15`, `:30`, `:45`, available 3 min after each) to avoid creating duplicates when the next cron run appends. Prints a timing summary with margin to next cron.
-
-Both modes use `r2_date_key()` to group events — entries with `alertDate` hour ≥ 23 go to the next day's file, matching the ingestion worker's partitioning.
+- Fetches the archive for the whole range with date-range paging (200 per page, 1 s between requests), and groups it with `r2_date_key()` (hour ≥ 23 goes to the next day's file, as in ingestion).
+- Reads each R2 file directly with `wrangler r2 object get` (not `/api/day-history`, which may be cached), and prints a per-day table: entries in R2, in the archive, to add, and in R2 only.
+- **Add-only**: entries are matched by `rid`. Missing entries are added with exact seconds; existing entries are never changed or removed. Each file is saved to `backups/r2/` (git-ignored) before it is overwritten, as a rollback copy.
+- **Cron safety**: ingestion appends without checking `rid`s. Entries in windows the cron may still process (window ending at Q is done by Q+14 min) are left to it, and files it may still write are written only in a quiet minute between cron runs, right after a fresh read.
+- Reruns are safe: entries already in R2 are skipped.
 
 ### Why ingestion goes through the relay
 
