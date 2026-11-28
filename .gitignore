@@ -6,6 +6,9 @@ node_modules/
 .dev.vars
 .wrangler/
 /tmp/
+/backups/
+/cache/
+/reports/
 
 
 # Python-generated files

@@ -44,7 +44,8 @@ anymore: CloudFront answers it with 403.
 - `oref-relay/index.js` — Node/Express relay: polls Oref, serves `/api2/{alerts,history,alarms-history}` and `/status`. Not deployed by CI; updated by hand on its host (runbook: `oref-relay/SETUP.md`)
 - `worker/` — Legacy placement-pinned proxy Worker (proxy1-3). Still deployed by CI, unused: CloudFront blocks it
 - `ingestion/src/index.js` — Cloudflare Worker cron: fetches the relay's `/api2/alarms-history` and appends to R2 day-history files
-- `tools/backfill_history.py` — Manual script to rebuild R2 day-history files from the oref API. Run from a residential Israeli connection
+- `tools/backfill_history.py` — Manual script that adds entries missing from R2 day-history files, from the oref archive. Run from a residential Israeli connection
+- `tools/audit_history.py` — Compares R2 with the oref archive (read-only report); `--apply` rewrites files to match it (exact seconds)
 - `tools/poll-coderabbit.sh` — Polls CodeRabbit review status on a PR via GitHub commit status API
 - `docs/map-requirements.md` — Feature requirements doc
 

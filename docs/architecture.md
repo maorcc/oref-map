@@ -336,19 +336,34 @@ Pages Function serving R2 data as JSON.
 
 ### Backfill script (`tools/backfill_history.py`)
 
-Python script for manually filling historical data. Fetches all ~1,450 cities from the Oref API (`mode=3`, month of data per city), deduplicates by `rid`, groups by date.
+Manual script that adds missing entries to R2 day files from Oref's archive (`www.oref.org.il/api/v1/AlertHistory`). Runs from a residential Israeli connection, with wrangler logged in and `CLOUDFLARE_ACCOUNT_ID` set.
 
 **Usage**:
 ```bash
-uv run tools/backfill_history.py            # WAR_START..yesterday, interactive
-uv run tools/backfill_history.py --today    # merge today first (no prompt), then interactive
+uv run tools/backfill_history.py --from 2026-10-19 --dry-run   # report only
+uv run tools/backfill_history.py --from 2026-10-19             # report, confirm, write
+uv run tools/backfill_history.py --from 2026-10-19 --to 2026-11-01 --yes
 ```
 
-**Interactive mode** (past dates): Downloads the existing R2 file for each date, compares `rid` sets, shows a diff summary, saves both versions to `tmp/backfill-compare/`, and prompts per date.
+- Fetches the archive for the whole range with date-range paging (200 per page, 1 s between requests), and groups it with `r2_date_key()` (hour ≥ 23 goes to the next day's file, as in ingestion).
+- Reads each R2 file directly with `wrangler r2 object get` (not `/api/day-history`, which may be cached), and prints a per-day table: entries in R2, in the archive, to add, and in R2 only.
+- **Add-only**: entries are matched by `rid`. Missing entries are added with exact seconds; existing entries are never changed or removed. Each file is saved to `backups/r2/` (git-ignored) before it is overwritten, as a rollback copy.
+- **Cron safety**: ingestion appends without checking `rid`s and writes with a plain read-then-put. Entries in windows the cron may still process (window ending at Q is done by Q+14 min) are left to it. Files it may still write are written only in a minute when no cron runs, after the cron has written the marker of its last window (or given up on it), right after a fresh read, and only if at least 20 s remain before the next cron run. If an upload still ends inside a cron minute, the script says to rerun it, which restores anything the cron wrote meanwhile.
+- **Rounded neighbors**: the old API rounded to the nearest minute, so an alert at 22:59:45 may be in the next day's file as 23:00:00. `rid`s are compared across all files read plus the day after the range, so such entries are not added twice.
+- Reruns are safe: entries already in R2 are skipped.
 
-**`--today` mode**: Merges backfill data with the existing R2 file for today (union by `rid`). Uses a **cron-aware cutoff** — only includes backfill entries before the last completed quarter-hour boundary (`:00`, `:15`, `:30`, `:45`, available 3 min after each) to avoid creating duplicates when the next cron run appends. Prints a timing summary with margin to next cron.
+### History audit (`tools/audit_history.py`)
 
-Both modes use `r2_date_key()` to group events — entries with `alertDate` hour ≥ 23 go to the next day's file, matching the ingestion worker's partitioning.
+Read-only comparison of R2 with the archive for a range of R2 days, matched by `rid`. It reports, per day, entries missing from R2, entries only in R2, duplicates, entries in the wrong day file, times off by more than 30 s, and city/title mismatches, and writes the details to `reports/` (git-ignored). Archive days are cached in `cache/oref-archive/` (git-ignored), so reruns don't fetch them again; a full run from 2026-02-28 fetches ~440k entries and takes about an hour the first time.
+
+```bash
+uv run tools/audit_history.py --from 2026-02-28            # report only
+uv run tools/audit_history.py --from 2026-02-28 --apply    # report, plan, confirm, rewrite
+```
+
+`--apply` rewrites each file in the range to match the archive: exact times, each entry in the file its exact time belongs to, missing entries added, entries the archive lacks kept. Files outside the range and files the cron may still write are not touched. Each file is re-read before it is written, skipped if it changed since the plan, and backed up to `backups/r2/` first.
+
+The first audit (2026-11-28, 2026-02-28 to 2026-11-27) found no gaps besides the one backfilled that day: 21 missing entries (area-wide notices such as `ברחבי הארץ`, which the old city-by-city backfill never fetched), 1 entry only in R2, 56 entries in the next day's file because the old API rounded 22:59:3x to 23:00, and 98% of times rounded to the minute. The archive's `count` endpoint reports ~2% more than its listing returns on busy days; paging was verified to be complete (shifted page boundaries return the same set), and R2, built independently from the old API, agrees with the listing.
 
 ### Why ingestion goes through the relay
 
