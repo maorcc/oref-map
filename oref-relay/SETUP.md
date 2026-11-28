@@ -155,7 +155,7 @@ connected. Every Oref request sends a full browser `User-Agent`; CloudFront bloc
 |---|---|---|---|
 | `/api/alerts`, `/api2/alerts` | `www.oref.org.il/warningMessages/alert/Alerts.json` | polled every 1 s | last good body, HTTP 200 |
 | `/api/history`, `/api2/history` | `www.oref.org.il/warningMessages/alert/History/AlertsHistory.json` | polled every 10 s | last good body, HTTP 200 |
-| `/api/alarms-history`, `/api2/alarms-history` | `www.oref.org.il/api/v1/AlertHistory/heb` (last 30 min, paged), converted to the old `GetAlarmsHistory` shape | fetched on request, cached 60 s | **HTTP 502** |
+| `/api/alarms-history`, `/api2/alarms-history` | `www.oref.org.il/api/v1/AlertHistory/heb` (last 60 min, paged), converted to the old `GetAlarmsHistory` shape | fetched on request, cached 60 s | **HTTP 502** |
 | `/status` | — | — | `updatedAt` (ms epoch) of the last *successful* fetch per source |
 
 - Responses: `Content-Type: application/json; charset=utf-8`,

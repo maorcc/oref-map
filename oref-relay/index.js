@@ -35,9 +35,10 @@ const LIVE_POLL_MS    = 1000;   // every 1s — mirrors production
 const HISTORY_POLL_MS = 10000;  // every 10s — mirrors production
 const EXTENDED_TTL_MS = 60000;  // cache extended history for 60s
 const EXTENDED_PAGE_SIZE   = 200;                // fixed by the API
-// Ingestion reads at most the last ~25 min (window start to its last attempt). The busiest
-// 30 min of the 2026 war had ~3,500 entries (18 pages); the page cap is only a safety stop.
-const EXTENDED_LOOKBACK_MS = 30 * 60 * 1000;
+// Ingestion reads back to its window start, ~26 min before its last attempt. The cutoff is
+// set from the relay's clock, so 60 min leaves ~30 min of slack for a late cron run. The
+// busiest hour of the 2026 war had ~5,400 entries (28 pages); the page cap is only a safety stop.
+const EXTENDED_LOOKBACK_MS = 60 * 60 * 1000;
 const EXTENDED_MAX_PAGES   = 50;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
