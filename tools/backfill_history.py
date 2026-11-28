@@ -140,11 +140,8 @@ def to_entry(item: dict) -> dict:
     }
 
 
-def fetch_archive(first_day: str, last_day: str) -> dict[str, list[dict]]:
-    """Archive entries covering R2 days first_day..last_day, grouped by R2 date key. Also
-    holds the edge entries of the neighboring days, which callers use only for rid checks."""
-    start = date.fromisoformat(first_day) - timedelta(days=1)   # 23:xx of the day before
-    end = date.fromisoformat(last_day) + timedelta(days=1)      # `to` is exclusive
+def fetch_range(start: date, end: date, verbose: bool = True) -> list[dict]:
+    """Archive entries from calendar day `start` up to, not including, `end`."""
     params = {"from": start.isoformat(), "to": end.isoformat(), "cities": ""}
     by_rid: dict = {}
     page = 0
@@ -158,15 +155,24 @@ def fetch_archive(first_day: str, last_day: str) -> dict[str, list[dict]]:
         for item in items:
             by_rid[item["rid"]] = to_entry(item)
         last = payload.get("lastRetrievedAlarm")
-        print(f"  page {page}: {len(items)} entries, oldest {to_entry(last)['alertDate'] if last else '-'}")
+        if verbose:
+            oldest = to_entry(last)["alertDate"] if last else "-"
+            print(f"  page {page}: {len(items)} entries, oldest {oldest}")
         if len(items) < PAGE_SIZE or not last:
             break
         params.update(lastCreatedOn=last["dateTime"], lastTitle=last["category_Desc"],
                       lastCityName=last["data"])
         time.sleep(REQUEST_DELAY_S)
+    return list(by_rid.values())
 
+
+def fetch_archive(first_day: str, last_day: str) -> dict[str, list[dict]]:
+    """Archive entries covering R2 days first_day..last_day, grouped by R2 date key. Also
+    holds the edge entries of the neighboring days, which callers use only for rid checks."""
+    start = date.fromisoformat(first_day) - timedelta(days=1)   # 23:xx of the day before
+    end = date.fromisoformat(last_day) + timedelta(days=1)      # `to` is exclusive
     by_day: dict[str, list[dict]] = {}
-    for e in by_rid.values():
+    for e in fetch_range(start, end):
         by_day.setdefault(r2_date_key(e["alertDate"]), []).append(e)
     return by_day
 

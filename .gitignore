@@ -7,6 +7,8 @@ node_modules/
 .wrangler/
 /tmp/
 /backups/
+/cache/
+/reports/
 
 
 # Python-generated files

@@ -352,6 +352,19 @@ uv run tools/backfill_history.py --from 2026-10-19 --to 2026-11-01 --yes
 - **Rounded neighbors**: the old API rounded to the nearest minute, so an alert at 22:59:45 may be in the next day's file as 23:00:00. `rid`s are compared across all files read plus the day after the range, so such entries are not added twice.
 - Reruns are safe: entries already in R2 are skipped.
 
+### History audit (`tools/audit_history.py`)
+
+Read-only comparison of R2 with the archive for a range of R2 days, matched by `rid`. It reports, per day, entries missing from R2, entries only in R2, duplicates, entries in the wrong day file, times off by more than 30 s, and city/title mismatches, and writes the details to `reports/` (git-ignored). Archive days are cached in `cache/oref-archive/` (git-ignored), so reruns don't fetch them again; a full run from 2026-02-28 fetches ~440k entries and takes about an hour the first time.
+
+```bash
+uv run tools/audit_history.py --from 2026-02-28            # report only
+uv run tools/audit_history.py --from 2026-02-28 --apply    # report, plan, confirm, rewrite
+```
+
+`--apply` rewrites each file in the range to match the archive: exact times, each entry in the file its exact time belongs to, missing entries added, entries the archive lacks kept. Files outside the range and files the cron may still write are not touched. Each file is re-read before it is written, skipped if it changed since the plan, and backed up to `backups/r2/` first.
+
+The first audit (2026-11-28, 2026-02-28 to 2026-11-27) found no gaps besides the one backfilled that day: 21 missing entries (area-wide notices such as `ברחבי הארץ`, which the old city-by-city backfill never fetched), 1 entry only in R2, 56 entries in the next day's file because the old API rounded 22:59:3x to 23:00, and 98% of times rounded to the minute. The archive's `count` endpoint reports ~2% more than its listing returns on busy days; paging was verified to be complete (shifted page boundaries return the same set), and R2, built independently from the old API, agrees with the listing.
+
 ### Why ingestion goes through the relay
 
 **Cron triggers do not obey worker placement**: the ingestion cron always runs from a non-Israeli colo, so it could never call Oref directly. Since late 2026 CloudFront also blocks every Cloudflare egress IP, so no Worker can reach Oref at all. The ingestion worker therefore fetches from the relay (`HISTORY_PROXY_URL` in `ingestion/wrangler.toml`).
